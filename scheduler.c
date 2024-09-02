@@ -1,19 +1,21 @@
 #include <scheduler.h>
+#include <globals.h>
+
 #include "sys/time.h"
 #include "stdio.h"
 
 
-const unsigned char FLAG_RQ_BIT     = 0b00000001;
-const unsigned char FLAG_RQ_KILLED  = 0b00000010;
-const unsigned char FLAG_RQ_NEW     = 0b00000100;
-const unsigned char FLAG_RQ_RAN     = 0b00001000;
-const unsigned char FLAG_RQ_CHANGED = 0b00010000;
-const unsigned char FLAG_RQ_PARAMS  = 0b00010000;
-const unsigned char FLAG_RQ_CUSTOM1 = 0b01000000;
-const unsigned char FLAG_RQ_CUSTOM2 = 0b10000000;
+const unsigned char FLAG_RQ_BIT         = 0b00000001;
+const unsigned char FLAG_RQ_KILLED      = 0b00000010;
+const unsigned char FLAG_RQ_SLEEPING    = 0b00000100;
+const unsigned char FLAG_RQ_RAN         = 0b00001000;
+const unsigned char FLAG_RQ_CHANGED     = 0b00010000;
+const unsigned char FLAG_RQ_PARAMS      = 0b00100000;
+const unsigned char FLAG_RQ_NEW         = 0b01000000;
+const unsigned char FLAG_RQ_CUSTOM2     = 0b10000000;
 
 unsigned int GLOBAL_TASK_COUNT = 0;
-
+SleepingRunQueue* g_sleeping_rq;
 
 Task* create_task(Task* task, TimeStamp* starttime, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
     task->flags = '\0';
@@ -50,6 +52,7 @@ RunQueue* rq_init() {
     rq->mempool = (Task*) (rq + 1);
 
     rq->max = (RQ_MEMPOOL_SIZE - sizeof(RunQueue)) / sizeof(Task);
+    //rq->max = ((RQ_MEMPOOL_SIZE - sizeof(RunQueue)) / (sizeof(Task) * sizeof(Task*)));
 
     for (int i = 0; i < rq->max; i++) 
         (rq->mempool+i)->occupied = 0;
@@ -127,17 +130,81 @@ int rq_run(RunQueue* rq) {
     if (current->flags & FLAG_RQ_KILLED) 
         return rq_pop(rq);
 
-    if (timer_nready(&(current->kill_time)))
-        return tk_kill(current);
-
-    if (timer_ready(&(current->next_run))) return 1;
-
-    current->func(current, current->stack);
+    //printf("Running task %x; sleeping: %d\n", current, current->flags & FLAG_RQ_SLEEPING);
+    if (0 == (current->flags & FLAG_RQ_SLEEPING))
+        current->func(current, current->stack);
     rq->head = rq->head->next;
     rq->tail->next = current;
     rq->tail = current;
 
     return 0;
+}
+
+int rq_init_sleeping() {
+    g_sleeping_rq = (SleepingRunQueue*) malloc(PAGE_SIZE);
+
+    if (g_sleeping_rq == NULL) return -1;
+    int max = (PAGE_SIZE - sizeof(SleepingRunQueue)) / sizeof(SleepingTask);
+
+    g_sleeping_rq->mempool = (SleepingTask*) (g_sleeping_rq + 1);
+    g_sleeping_rq->head = NULL;
+    g_sleeping_rq->tail = NULL;
+
+
+    for (int i=0; i<max; i++) {
+        g_sleeping_rq->mempool[i].task = NULL;
+        g_sleeping_rq->mempool[i].next = NULL;
+    }
+
+    return max;
+}
+
+int rq_sleeping_add(Task* tk) {
+    if (tk == NULL || g_sleeping_rq == NULL) return -1;
+    
+    SleepingTask *stk = g_sleeping_rq->mempool;
+
+    while (stk->task != NULL) stk++;
+
+    stk->task = tk;
+
+    if (g_sleeping_rq->head == NULL || g_sleeping_rq->tail == NULL) {
+        g_sleeping_rq->head = stk;
+        g_sleeping_rq->tail = stk;
+
+    } else {
+        g_sleeping_rq->tail->next = stk;
+        g_sleeping_rq->tail = stk;
+    }
+
+    return 0;
+}
+
+int rq_sleeping_rm(SleepingTask* stk) {
+    if (g_sleeping_rq == NULL || stk == NULL) return -1;
+
+    SleepingTask* prev = NULL;
+
+    if (prev == NULL) g_sleeping_rq->head = stk->next;
+    else prev->next = stk->next;
+
+    stk->task = NULL;
+
+    return 0;
+}
+
+int rq_free_sleeping() {
+    free(g_sleeping_rq);
+}
+
+void tk_sleep(Task* task, unsigned int seconds) {
+    TimeStamp ts;
+    gettimeofday(&ts, NULL);
+    ts.tv_sec += seconds;
+
+    task->next_run = ts;
+    task->flags |= FLAG_RQ_SLEEPING;
+    rq_sleeping_add(task);
 }
 
 RunQueueList* rqll_init() {
@@ -198,6 +265,25 @@ int rqll_full(RunQueueList* rqll) {
 }
 
 
+int wake_tasks() {
+    SleepingTask* stk = g_sleeping_rq->head;
+    int i = 0;
+    while (stk != NULL) {
+        Task* tk = stk->task;
+        if (timer_nready(&(tk->next_run))) {
+            tk->flags &= !FLAG_RQ_SLEEPING;
+            SleepingTask* next = stk->next;
+            rq_sleeping_rm(stk);
+            stk = next;
+
+        } else {
+            stk = stk->next;
+        }
+
+        i++;
+    }
+    return i;
+}
 
 // Linear search, very slow
 int schedule(RunQueue* rq, TimeStamp* starttime, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
@@ -208,12 +294,12 @@ int schedule(RunQueue* rq, TimeStamp* starttime, int runtime, int (*func)(Task*,
 
 void schedule_run(RunQueueList* rqll) {
     int tasks_in_queue = 1;
+
     while (tasks_in_queue) {
         tasks_in_queue = 0;
 
         RunQueue* rq = rqll->head;
         while (rq != NULL) {
-
             int status = rq_run(rq);
             tasks_in_queue += status == 0;
             rq = rq->next;

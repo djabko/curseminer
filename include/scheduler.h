@@ -9,11 +9,11 @@
 
 const extern unsigned char FLAG_RQ_BIT;
 const extern unsigned char FLAG_RQ_KILLED;
+const extern unsigned char FLAG_RQ_SLEEPING;
 const extern unsigned char FLAG_RQ_NEW;
 const extern unsigned char FLAG_RQ_RAN;
 const extern unsigned char FLAG_RQ_CHANGED;
 const extern unsigned char FLAG_RQ_PARAMS;
-const extern unsigned char FLAG_RQ_CUSTOM1;
 const extern unsigned char FLAG_RQ_CUSTOM2;
 
 extern unsigned int GLOBAL_TASK_COUNT;
@@ -30,13 +30,23 @@ typedef struct Task {
 
 int tk_kill(Task*);
 
-
 /* RunQueue*/
 typedef struct RunQueue {
     Task *mempool, *head, *tail;
     unsigned int count, max;
     struct RunQueue *next;
 } RunQueue;
+
+/* Tracks Sleeping Tasks */
+typedef struct SleepingTask {
+    Task* task;
+    struct SleepingTask* next;
+} SleepingTask;
+
+typedef struct SleepingRunQueue {
+    SleepingTask *mempool, *head, *tail;
+} SleepingRunQueue;
+
 
 RunQueue* rq_init();
 Task* rq_add(RunQueue*, TimeStamp*, int, int (*func)(Task*, Stack64*), Stack64*);
@@ -55,6 +65,12 @@ RunQueue* rqll_add(RunQueueList*);
 int rqll_rm(RunQueueList*, RunQueue*);
 int rqll_empty(RunQueueList*);
 int rqll_full(RunQueueList*);
+
+
+int rq_init_sleeping();
+int rq_free_sleeping();
+void tk_sleep(Task*, unsigned int);
+int wake_tasks();
 
 int schedule (RunQueue*, TimeStamp*, int, int (*func)(Task*, Stack64*), Stack64*);
 void schedule_run (RunQueueList*);

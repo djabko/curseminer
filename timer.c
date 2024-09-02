@@ -2,7 +2,7 @@
 #include "stdio.h"
 #include "string.h"
 
-static TimeStamp INIT_TIME;
+TimeStamp INIT_TIME;
 TimeStamp last_sync, refresh_rate;
 
 void timer_init(int ips) {
@@ -11,6 +11,12 @@ void timer_init(int ips) {
 
     gettimeofday(&INIT_TIME, NULL);
     gettimeofday(&last_sync, NULL);
+}
+
+TimeStamp timer_now() {
+    TimeStamp now;
+    gettimeofday(&now, NULL);
+    return now;
 }
 
 void timer_never(TimeStamp* ts) {
