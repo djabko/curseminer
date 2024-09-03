@@ -20,7 +20,6 @@ void checkifNULL(void* ptr, const char* str) {
 void init() {
     timer_init(REFRESH_RATE);
 
-    rq_init_sleeping();
     RQLL = rqll_init();
     checkifNULL((void*)(RUN_QUEUE = rqll_add(RQLL)), "RQ_UI");
 
@@ -30,7 +29,6 @@ void init() {
 int exit_state() {
     printf("Exiting...");
 
-    rq_free_sleeping();
     free(RQLL);
     free(RUN_QUEUE);
 
@@ -38,22 +36,21 @@ int exit_state() {
 }
 
 int jobUI (Task* task, Stack64* stack) {
-    printf("=");
+    printf("\r<=====>");
     fflush(stdout);
     tk_sleep(task, 1);
-    //tk_kill(task);
 }
 
 int jobInput (Task* task, Stack64* stack) {
-    printf(">");
+    printf("\r<----->");
     fflush(stdout);
-    tk_sleep(task, 3);
+    tk_sleep(task, 2);
 }
 
 int jobIO (Task* task, Stack64* stack) {
-    printf("\r");
+    printf("\r<DONE!>\n");
     fflush(stdout);
-    tk_sleep(task, 4);
+    tk_sleep(task, 3);
 }
 
 int jobWake(Task* task, Stack64* stack) {
@@ -81,10 +78,10 @@ int main(int argc, const char** argv) {
     quit_time.tv_sec += 1;
 
     // change name to timeout
-    schedule(RUN_QUEUE, NULL, 0, jobUI, stackUI);
-    schedule(RUN_QUEUE, NULL, 0, jobInput, stackUI);
-    schedule(RUN_QUEUE, NULL, 1, jobIO, stackUI);
-    schedule(RUN_QUEUE, NULL, 0, jobWake, stackSL);
+    schedule(RUN_QUEUE, 10, 0, jobUI, stackUI);
+    schedule(RUN_QUEUE, 0, 0, jobInput, stackUI);
+    schedule(RUN_QUEUE, 4, 0, jobIO, stackUI);
+    schedule(RUN_QUEUE, 0, 0, jobWake, stackSL);
 
     TimeStamp *sleepts = malloc(sizeof(TimeStamp));
     gettimeofday(sleepts, NULL);

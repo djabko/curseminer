@@ -37,19 +37,9 @@ typedef struct RunQueue {
     struct RunQueue *next;
 } RunQueue;
 
-/* Tracks Sleeping Tasks */
-typedef struct SleepingTask {
-    Task* task;
-    struct SleepingTask* next;
-} SleepingTask;
-
-typedef struct SleepingRunQueue {
-    SleepingTask *mempool, *head, *tail;
-} SleepingRunQueue;
-
 
 RunQueue* rq_init();
-Task* rq_add(RunQueue*, TimeStamp*, int, int (*func)(Task*, Stack64*), Stack64*);
+Task* rq_add(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*);
 int rq_pop(RunQueue*);
 int rq_run(RunQueue*);
 
@@ -67,12 +57,30 @@ int rqll_empty(RunQueueList*);
 int rqll_full(RunQueueList*);
 
 
-int rq_init_sleeping();
-int rq_free_sleeping();
+int schedule (RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*);
+void schedule_run (RunQueueList*);
+
+
+
+typedef struct ll_node {
+    struct ll_node *next;
+    void* data; 
+} ll_node;
+
+typedef struct ll_head {
+    ll_node *mempool, *node;
+    unsigned int count, max;
+} ll_head;
+
+
+ll_head* ll_init(int);
+int ll_insert(ll_head*, void*);
+int ll_rm(ll_head*, void*);
+int ll_count(ll_head*);
+int ll_empty(ll_head*);
+int ll_full(ll_head*);
+void ll_free(ll_head*);
 void tk_sleep(Task*, unsigned int);
 int wake_tasks();
-
-int schedule (RunQueue*, TimeStamp*, int, int (*func)(Task*, Stack64*), Stack64*);
-void schedule_run (RunQueueList*);
 
 #endif
