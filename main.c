@@ -8,7 +8,7 @@
 #define REFRESH_RATE 5
 #define MIN_ARGS 0
 
-RunQueueList* RQLL = NULL;
+ll_head* RQLL = NULL;
 RunQueue* RUN_QUEUE = NULL;
 
 TimeStamp quit_time;
@@ -20,8 +20,8 @@ void checkifNULL(void* ptr, const char* str) {
 void init() {
     timer_init(REFRESH_RATE);
 
-    RQLL = rqll_init();
-    checkifNULL((void*)(RUN_QUEUE = rqll_add(RQLL)), "RQ_UI");
+    RQLL = scheduler_init();
+    checkifNULL((void*)(RUN_QUEUE = scheduler_new_rq(RQLL)), "RQ_UI");
 
     printf("Initialized...\n");
 }
@@ -29,35 +29,38 @@ void init() {
 int exit_state() {
     printf("Exiting...");
 
-    free(RQLL);
-    free(RUN_QUEUE);
+    scheduler_free_rqll(RQLL);
+    scheduler_free();
+
+    printf("Successfully deallocated scheduler!");
 
     return 0;
 }
 
 int jobUI (Task* task, Stack64* stack) {
-    printf("\r<=====>");
+    //printf("\r<=====>");
     fflush(stdout);
     tk_sleep(task, 1);
 }
 
 int jobInput (Task* task, Stack64* stack) {
-    printf("\r<----->");
+    //printf("\r<----->");
     fflush(stdout);
-    tk_sleep(task, 2);
+    tk_sleep(task, 1);
 }
 
 int jobIO (Task* task, Stack64* stack) {
-    printf("\r<DONE!>\n");
-    fflush(stdout);
-    tk_sleep(task, 3);
+    //printf("\r<DONE!>\n");
+    int i = 0;
+    while (i<100000000)
+        i++;
 }
 
 int jobWake(Task* task, Stack64* stack) {
     TimeStamp* ts = (TimeStamp*) st_pop(stack);
     if (timer_nready(ts)) {
         wake_tasks();
-        gettimeofday(ts, NULL);
+        timer_now(ts);
         ts->tv_sec += 1;
     }
 
@@ -74,17 +77,17 @@ int main(int argc, const char** argv) {
     Stack64* stackIO = st_init(16);
     Stack64* stackSL = st_init(2);
 
-    gettimeofday(&quit_time, NULL);
+    timer_now(&quit_time);
     quit_time.tv_sec += 1;
 
     // change name to timeout
-    schedule(RUN_QUEUE, 10, 0, jobUI, stackUI);
+    schedule(RUN_QUEUE, 1, 0, jobUI, stackUI);
     schedule(RUN_QUEUE, 0, 0, jobInput, stackUI);
-    schedule(RUN_QUEUE, 4, 0, jobIO, stackUI);
+    //schedule(RUN_QUEUE, 0, 0, jobIO, stackUI);
     schedule(RUN_QUEUE, 0, 0, jobWake, stackSL);
 
     TimeStamp *sleepts = malloc(sizeof(TimeStamp));
-    gettimeofday(sleepts, NULL);
+    timer_now(sleepts);
     st_push(stackSL, (uint64_t) sleepts);
     schedule_run(RQLL);
 

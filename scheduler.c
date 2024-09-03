@@ -16,6 +16,7 @@ const unsigned char FLAG_RQ_CUSTOM2     = 0b10000000;
 
 unsigned int GLOBAL_TASK_COUNT = 0;
 ll_head* g_sleeping_tasks;
+ll_head* g_dying_tasks;
 
 
 Task* create_task(Task* task, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
@@ -29,6 +30,7 @@ Task* create_task(Task* task, int delay, int runtime, int (*func)(Task*, Stack64
     else {
         gettimeofday(&(task->kill_time), NULL); 
         task->kill_time.tv_sec += runtime;
+        ll_insert(g_dying_tasks, task);
     }
     
     tk_sleep(task, delay);
@@ -152,68 +154,51 @@ void tk_sleep(Task* task, unsigned int seconds) {
     ll_insert(g_sleeping_tasks, task);
 }
 
-// TODO: convert to normal ll_head*
-RunQueueList* rqll_init() {
-    RunQueueList* rqll = malloc(LLRQ_MEMPOOL_SIZE);
-    rqll->mempool = (RunQueue**) (rqll + 1);
-
-    rqll->max = (LLRQ_MEMPOOL_SIZE - sizeof(RunQueueList)) / sizeof(RunQueue*);
-    rqll->head = NULL;
-    rqll->count = 0;
-
-    for (int i=0; i<rqll->max; i++) rqll->mempool[i] = NULL;
-
-    // Initialize ll of sleeping tasks
+ll_head* scheduler_init() {
+    ll_head* rqll = ll_init(1);
+    
+    // Initialize internal ll of sleeping tasks
     if (g_sleeping_tasks == NULL) {
         g_sleeping_tasks = ll_init(1);
+    }
+
+    // Initialize internal ll of dying tasks
+    if (g_dying_tasks == NULL) {
+        g_dying_tasks = ll_init(1);
     }
 
     return rqll;
 }
 
-RunQueue* rqll_add(RunQueueList* rqll) {
-    if (rqll_full(rqll)) return NULL;
+void scheduler_free() {
+    if (g_sleeping_tasks != NULL)
+        free(g_sleeping_tasks);
 
-    RunQueue* rq_ptr = rqll->mempool[0];
-    RunQueue* lastblock = rqll->mempool[ rqll->max - 1 ];
-    while (rq_ptr != NULL && rq_ptr < lastblock) rq_ptr++;
-    if (rq_ptr != NULL) return NULL;
+    if (g_dying_tasks != NULL)
+        free(g_dying_tasks);
+}
 
-    rq_ptr = rq_init();
+// TODO: Keep track of all rqll's via global variable
+void scheduler_free_rqll(ll_head* rqll) {
+    ll_node* node = rqll->node;
+    while (node->data != NULL) {
 
-    RunQueue* prev = rqll->head;
-    if (prev == NULL) {
-        rqll->head = rq_ptr;
-    } else {
-        while (prev->next != NULL) prev = prev->next;
-        prev->next = rq_ptr;
+        RunQueue* rq = (RunQueue*) node->data;
+        RunQueue* prev = rq;
+        rq = rq->next;
+
+        free(prev);
     }
-    rqll->count++;
 
-    return rq_ptr;
+    free(rqll);
 }
 
-int rqll_rm(RunQueueList* rqll, RunQueue* target) {
-    if (target == NULL) return -1;
 
-    RunQueue* rq_ptr = rqll->mempool[0];
-    RunQueue* lastblock = rqll->mempool[0] + rqll->max - 1;
-    while (rq_ptr != target && rq_ptr < lastblock) rq_ptr++;
-
-    if (rq_ptr != target) return -1;
-    free(rq_ptr);
-
-    rq_ptr = NULL;
-    return 0; }
-
-int rqll_empty(RunQueueList* rqll) {
-    return rqll->count <= 0;
+RunQueue* scheduler_new_rq(ll_head* rqll) {
+    RunQueue* rq = rq_init();
+    ll_insert(rqll, rq);
+    return rq;
 }
-
-int rqll_full(RunQueueList* rqll) {
-    return rqll->count >= rqll->max;
-}
-
 
 int wake_tasks() {
     ll_node* stk = g_sleeping_tasks->node;
@@ -235,6 +220,27 @@ int wake_tasks() {
     return i;
 }
 
+int kill_dying_tasks() {
+    ll_node* dtk = g_dying_tasks->node;
+    int i = 0;
+    while (dtk != NULL) {
+        Task* tk = dtk->data;
+        if (timer_nready(&(tk->kill_time))) {
+            tk_kill(tk);
+            ll_node* next = dtk->next;
+            ll_rm(g_dying_tasks, tk);
+            dtk = next;
+
+        } else {
+            dtk = dtk->next;
+        }
+
+        i++;
+    }
+    return i;
+}
+
+
 // Linear search, very slow
 int schedule(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
     Task* t = rq_add(rq, delay, runtime, func, stack);
@@ -242,20 +248,29 @@ int schedule(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*),
     return (t != NULL) - 1;
 }
 
-void schedule_run(RunQueueList* rqll) {
-    int tasks_in_queue = 1;
+void schedule_run(ll_head* rqll) {
+    int tasks_running = 1;
 
-    while (tasks_in_queue) {
-        tasks_in_queue = 0;
+    while (tasks_running) {
+        timer_print_now();
+        printf("\t");
+        tasks_running = 0;
 
-        RunQueue* rq = rqll->head;
-        while (rq != NULL) {
-            int status = rq_run(rq);
-            tasks_in_queue += status == 0;
-            rq = rq->next;
+        ll_node* node = rqll->node;
+        while (node != NULL) {
+
+            RunQueue* rq = (RunQueue*) node->data;
+            for (int i=0; i<rq->count; i++) {
+                tasks_running += rq_run(rq) == 0;
+            }
+
+            node = node->next;
         }
 
         timer_synchronize();
+        printf("\t");
+        timer_print_now();
+        printf("\n");
     }
 }
 
