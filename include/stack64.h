@@ -4,6 +4,15 @@
 #include "stdlib.h"
 #include "stdint.h"
 
+/* Double Linked List */
+typedef struct Node {
+    struct Node *prev, *next;
+} Node;
+
+typedef struct {
+    Node *head, *tail;
+} LLHead;
+
 
 /* 8 Byte Stack */
 typedef struct {
@@ -12,12 +21,28 @@ typedef struct {
 } Stack64;
 
 Stack64* st_init(int capacity);
-int st_push(Stack64* st, uint64_t data);
+int st_push(Stack64*, uint64_t);
 uint64_t st_pop(Stack64*);
-uint64_t st_peak(Stack64*);
+uint64_t st_peek(Stack64*);
 int st_empty(Stack64*);
 int st_full(Stack64*);
-void st_destroy(Stack64*);
+void st_free(Stack64*);
 void st_print(Stack64*);
+
+
+/* 8 Byte Queue */
+typedef struct {
+    uint64_t *mempool;
+    int head, tail, capacity, count;
+} Queue64;
+
+Queue64* qu_init(int n);
+int qu_enqueue(Queue64*, uint64_t);
+uint64_t qu_dequeue(Queue64*);
+uint64_t qu_peek(Queue64*);
+uint64_t qu_next(Queue64*);
+int qu_empty(Queue64*);
+int qu_full(Queue64*);
+void qu_print(Queue64*);
 
 #endif

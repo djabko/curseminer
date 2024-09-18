@@ -1,7 +1,10 @@
 #include "stack64.h"
+#include "globals.h"
 
 #include <stdio.h>
 
+
+/* STACK FUNCTIONS */
 
 Stack64* st_init(int capacity) {
     Stack64* st = malloc(sizeof(Stack64) + capacity * sizeof(uint64_t));
@@ -32,7 +35,7 @@ uint64_t st_pop(Stack64* st) {
     return data;
 }
 
-uint64_t st_peak(Stack64* st) {
+uint64_t st_peek(Stack64* st) {
     if (st == NULL || st->top == NULL) return -1;
     return *(st->top);
 }
@@ -67,4 +70,76 @@ void st_print(Stack64* st) {
 
     printf(" ]\n");
 }
+
+
+
+/* QUEUE FUNCTIONS */
+
+Queue64* qu_init(int n) {
+    Queue64* qu = malloc(PAGE_SIZE * n);
+    qu->mempool = (uint64_t*)(qu+1);
+    qu->count = 0;
+    qu->capacity = (PAGE_SIZE * n - sizeof(Queue64)) / sizeof(uint64_t);
+    qu->head = -1;
+    qu->tail = -1;
+
+    return qu;
+}
+
+int qu_enqueue(Queue64* qu, uint64_t data) {
+    if (qu_full(qu)) return -1;
+    else if (qu_empty(qu)) {
+        qu->head = 0;
+        qu->tail = 0;
+        qu->mempool[qu->head] = data;
+    } else {
+        qu->tail = (qu->tail + 1) % qu->capacity;
+        qu->mempool[qu->tail] = data;
+    }
+
+    return qu->count++;
+}
+
+uint64_t qu_dequeue(Queue64* qu) {
+    if (qu_empty(qu)) return -1;
+
+    uint64_t data = qu->mempool[qu->head];
+    qu->head = (qu->head + 1) % qu->capacity;
+    qu->count--;
+
+    if (qu->count <= 0) {
+        qu->head = -1;
+        qu->tail = -1;
+    }
+    return data;
+}
+
+uint64_t qu_next(Queue64* qu) {
+    uint64_t data = qu_dequeue(qu);
+    qu_enqueue(qu, data);
+    return data;
+}
+
+uint64_t qu_peek(Queue64* qu) {
+    return qu->mempool[qu->head];
+}
+
+int qu_empty(Queue64* qu) {
+    if (qu->count == 0 || qu->head == -1 || qu->tail == -1) {
+        qu->count = 0;
+        return 1;
+    }
+    return 0;
+}
+
+int qu_full(Queue64* qu) {
+    return qu->count >= qu->capacity;
+}
+
+void qu_print(Queue64* qu) {
+    for (int i = 0; i<=qu->count; i++) {
+        printf("%d: %lu\n", i, qu->mempool[i % qu->capacity]);
+    }
+}
+
 
