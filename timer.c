@@ -90,8 +90,6 @@ void timer_synchronize() {
 
     timer_sleep(&sleepts);
 
-    printf("Slept %d.%d", sleepts.tv_sec%60, sleepts.tv_nsec/10000);
-    
     timer_now(&last_sync);
 }
 

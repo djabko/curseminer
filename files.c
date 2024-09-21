@@ -33,13 +33,13 @@ int file_read(Task* task, Stack64* stack) {
     struct aiocb* cb = NULL;
 
     // If stack->top is 0, start read operation
-    if (st_peak(stack) == 0) {
+    if (st_peek(stack) == 0) {
         st_pop(stack);
-        cb = (struct aiocb*) st_peak(stack);
+        cb = (struct aiocb*) st_peek(stack);
         aio_read(cb);
 
     } else {
-        cb = (struct aiocb*) st_peak(stack);
+        cb = (struct aiocb*) st_peek(stack);
     }
 
     ssize_t err_val = aio_error(cb);

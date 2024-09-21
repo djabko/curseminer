@@ -23,5 +23,5 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
 clean:
-	rm -f $(TARGET) $(OBJS)
+	rm -f $(TARGET) $(OBJS) vgcore.*
 	rm -rf $(OBJDIR)

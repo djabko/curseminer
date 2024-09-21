@@ -26,7 +26,7 @@ typedef struct ll_node {
 } ll_node;
 
 typedef struct ll_head {
-    ll_node *mempool, *node;
+    ll_node *mempool, *node, *tail;
     unsigned int count, max;
 } ll_head;
 
@@ -47,7 +47,8 @@ void ll_free(ll_head*);
 typedef struct Task {
     unsigned char flags, occupied, byte2, byte3;
     int (*func) (struct Task*, Stack64*);
-    Stack64* stack;
+    void (*callback) (struct Task*);
+    Stack64 *stack;
     TimeStamp next_run, kill_time;
     struct Task* next;
 } Task;
@@ -63,9 +64,10 @@ typedef struct RunQueue {
 
 
 RunQueue* rq_init();
-Task* rq_add(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*);
+Task* rq_add(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*, void (*callback)(Task*));
 int rq_pop(RunQueue*);
 int rq_run(RunQueue*);
+int rq_kill_all_tasks(RunQueue*);
 
 
 /* Linked List of run queues*/
@@ -77,9 +79,13 @@ typedef struct RunQueueList {
 ll_head* scheduler_init();
 void scheduler_free();
 void scheduler_free_rqll();
-RunQueue* scheduler_new_rq(ll_head*);
+int rqll_kill_all_tasks(ll_head*);
+int kill_all_tasks();
+RunQueue* scheduler_new_rq_(ll_head*);
+RunQueue* scheduler_new_rq();
 
 int schedule (RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*);
+int schedule_cb(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*, void (*callback)(Task*));
 void schedule_run (ll_head*);
 
 

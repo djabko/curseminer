@@ -15,15 +15,17 @@ const unsigned char FLAG_RQ_NEW         = 0b01000000;
 const unsigned char FLAG_RQ_CUSTOM2     = 0b10000000;
 
 unsigned int GLOBAL_TASK_COUNT = 0;
-ll_head* g_sleeping_tasks;
-ll_head* g_dying_tasks;
+ll_head* DEFAULT_RQLL = NULL;
+ll_head* g_sleeping_tasks = NULL;
+ll_head* g_dying_tasks = NULL;
 
 
-Task* create_task(Task* task, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
+Task* create_task(Task* task, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
     task->flags = '\0';
     task->occupied = 1;
     task->func = func;
     task->stack = stack;
+    task->callback = callback;
     task->next = (Task*) task;
 
     if (runtime < 1) timer_never(&(task->kill_time));
@@ -75,7 +77,7 @@ int rq_full(RunQueue* rq) {
     return rq->max <= rq->count;
 }
 
-Task* rq_add(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
+Task* rq_add(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
 
     // TODO: Allocate more memory
     if (rq == NULL || rq_full(rq)) return NULL;
@@ -83,7 +85,7 @@ Task* rq_add(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*),
     Task* t = rq->mempool;
     while (t->occupied) t++;
 
-    create_task(t, delay, runtime, func, stack);
+    create_task(t, delay, runtime, func, stack, callback);
     if (rq->head == NULL || rq->tail == NULL) {
         rq->head = t;
         rq->tail = t;
@@ -129,8 +131,11 @@ int rq_run(RunQueue* rq) {
 
     if (!current->occupied) return -1;
 
-    if (current->flags & FLAG_RQ_KILLED) 
+    if (current->flags & FLAG_RQ_KILLED) {
+        if (current->callback)
+            current->callback(current);
         return rq_pop(rq);
+    }
 
     if (0 == (current->flags & FLAG_RQ_SLEEPING))
         current->func(current, current->stack);
@@ -167,6 +172,7 @@ ll_head* scheduler_init() {
         g_dying_tasks = ll_init(1);
     }
 
+    DEFAULT_RQLL = rqll;
     return rqll;
 }
 
@@ -180,24 +186,47 @@ void scheduler_free() {
 
 // TODO: Keep track of all rqll's via global variable
 void scheduler_free_rqll(ll_head* rqll) {
-    ll_node* node = rqll->node;
-    while (node->data != NULL) {
+    if (rqll == NULL) return;
 
-        RunQueue* rq = (RunQueue*) node->data;
+    ll_node* node = rqll->node;
+
+    if (node == NULL || node->data == NULL) return;
+    RunQueue* rq = (RunQueue*) node->data;
+
+    while (rq != NULL) {
         RunQueue* prev = rq;
         rq = rq->next;
-
         free(prev);
+        prev = rq;
     }
 
     free(rqll);
+    rqll = NULL;
 }
 
 
-RunQueue* scheduler_new_rq(ll_head* rqll) {
-    RunQueue* rq = rq_init();
-    ll_insert(rqll, rq);
-    return rq;
+
+// TODO: Rewrite tasks & runqueues to use ll_head
+//
+// This is a mess because rqll is ll_head and RunQueue is a separate linked list implementation; first the RunQueue is added to rqll list, then it must be added to the RunQueue list
+RunQueue* scheduler_new_rq_(ll_head* rqll) {
+
+    // 1. Insert into rqll (type ll_head)
+    fprintf(stderr, "ADDING RQ\n");
+    RunQueue* new_rq = rq_init();
+    ll_insert(rqll, new_rq);
+
+    // 2. Insert into the RunQueue structure
+    RunQueue* rq = (RunQueue*) rqll->tail->data;
+    rq->next = new_rq;
+
+    
+    rq->next = new_rq;
+    return new_rq;
+}
+
+RunQueue* scheduler_new_rq() {
+    return scheduler_new_rq_(DEFAULT_RQLL);
 }
 
 int wake_tasks() {
@@ -218,6 +247,44 @@ int wake_tasks() {
         i++;
     }
     return i;
+}
+
+int rq_kill_all_tasks(RunQueue* rq) {
+    if (!rq) return -1;
+    Task* task = rq->head;
+
+    int count = 0;
+
+    do {
+        tk_kill(task);
+        task = task->next;
+        count++;
+    } while (task != rq->head);
+
+
+    return count;
+}
+
+int rqll_kill_all_tasks(ll_head* rqll) {
+    if (ll_empty(rqll)) return -1;
+
+    int count = 0;
+
+    ll_node* node = rqll->node;
+    while (node && node->data) {
+        RunQueue* rq = (RunQueue*) node->data;
+        rq_kill_all_tasks(rq);
+        node = node->next;
+        count++;
+
+        printf("Killed RQ: %p\n", rq);
+    }
+
+    return count;
+}
+
+int kill_all_tasks() {
+    return rqll_kill_all_tasks(DEFAULT_RQLL);
 }
 
 int kill_dying_tasks() {
@@ -241,19 +308,21 @@ int kill_dying_tasks() {
 }
 
 
-// Linear search, very slow
 int schedule(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
-    Task* t = rq_add(rq, delay, runtime, func, stack);
+    return schedule_cb(rq, delay, runtime, func, stack, NULL);
+}
+
+int schedule_cb(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
+    Task* t = rq_add(rq, delay, runtime, func, stack, callback);
 
     return (t != NULL) - 1;
 }
+
 
 void schedule_run(ll_head* rqll) {
     int tasks_running = 1;
 
     while (tasks_running) {
-        timer_print_now();
-        printf("\t");
         tasks_running = 0;
 
         ll_node* node = rqll->node;
@@ -268,9 +337,6 @@ void schedule_run(ll_head* rqll) {
         }
 
         timer_synchronize();
-        printf("\t");
-        timer_print_now();
-        printf("\n");
     }
 }
 
@@ -282,7 +348,7 @@ ll_head* ll_init(int n) {
     head->node = NULL;
     head->count = 0;
     head->max = (n * PAGE_SIZE) / sizeof(ll_node) - sizeof(ll_head);
-    printf("%d / %d = %d\n", n*PAGE_SIZE, sizeof(ll_node), head->max);
+    printf("%d / %lu = %d\n", n*PAGE_SIZE, sizeof(ll_node), head->max);
 
     for (int i=0; i<(head->max); i++) {
         head->mempool[i].next = NULL;
@@ -302,24 +368,19 @@ int ll_insert(ll_head* head, void* ptr) {
         if (new_node->data == NULL) break;
         new_node++;
     }
-
-    ll_node* node = head->node;
     
-    // Case 1: list is empty
-    if (node == NULL) {
-        head->node = new_node;
-        new_node->data = ptr;
-        head->count++;
-        return 0;
-    }
-
-
-    // Case 2: find childless node at the end of list
-    while(node->next != NULL) node = node->next;
-
     new_node->data = ptr;
-    node->next = new_node;
     head->count++;
+   
+    // Case 1: list is empty
+    if (head->node == NULL) {
+        head->node = new_node;
+        head->tail = new_node;
+       
+    // Case 2: append to tail
+    } else {
+        head->tail->next = new_node;
+    }
 
     return 0;
 }
