@@ -51,7 +51,7 @@ int file_read(Task* task, Stack64* stack) {
         // Read operation finished
         case 0:
 
-            printf("'''%s'''\n", cb->aio_buf);
+            printf("'''%p'''\n", cb->aio_buf);
 
             size_t status = aio_return(cb);
 
@@ -83,9 +83,9 @@ int await_file_read(Task* task, Stack64* stack) {
 
     switch (aio_error(cb)) {
         case 0:
-            printf("File contents: '%s'\n", cb->aio_buf);
+            printf("File contents: '%p'\n", cb->aio_buf);
             file_close(cb->aio_fildes);
-            free(cb->aio_buf);
+            free((void*) cb->aio_buf);
             free(cb);
             tk_kill(task);
             return 0;
@@ -102,8 +102,6 @@ int await_file_read(Task* task, Stack64* stack) {
             printf("ERROR occured while reading file.'\n");
             exit(1);
     }
-
-
 }
 
 int file_close(int fd) {

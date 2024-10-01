@@ -14,7 +14,7 @@ TARGET=$(notdir $(shell pwd))
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -lncurses -lm -o $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -I$(INCDIR) -c $< -o $@
@@ -23,5 +23,5 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
 clean:
-	rm -f $(TARGET) $(OBJS) vgcore.*
+	rm -f $(TARGET) $(OBJS) vgcore.* errfile
 	rm -rf $(OBJDIR)

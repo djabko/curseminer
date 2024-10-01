@@ -62,7 +62,7 @@ void st_print(Stack64* st) {
 
     int i = 0;
     while (i < st->count) {
-        printf("%x", *(st->top - i * sizeof(uint64_t)));
+        printf("%lu", *(st->top - i * sizeof(uint64_t)));
         if (i < st->count-1) printf(", ");
         
         i++;

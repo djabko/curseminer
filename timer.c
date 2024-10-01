@@ -67,7 +67,7 @@ int timer_sleep(TimeStamp* t) {
 }
 
 void timer_print(TimeStamp* t) {
-    static long unsigned int years, months, days, hours, minutes, seconds, useconds;
+    static long unsigned int hours, minutes, seconds, useconds;
     hours = t->tv_sec / (60*60) % (24);
     minutes = t->tv_sec / (60) % (60);
     seconds = t->tv_sec % 60;
