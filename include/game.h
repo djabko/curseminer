@@ -2,6 +2,7 @@
 #define GAME_HEADER
 
 #include <stack64.h>
+#include <world.h>
 
 typedef unsigned char color_t;
 
@@ -23,11 +24,10 @@ typedef enum {
     ge_iron,
     ge_redore,
     ge_player,
-} GEntityTypeID;
+} EntityTypeID;
 
 
 typedef struct Skin {
-    Node node; // &node should be the same as Skin* 
     int id;
     char character;
     unsigned char bg_r, 
@@ -38,13 +38,21 @@ typedef struct Skin {
                   fg_b;
 } Skin;
 
-typedef struct GEntityType {
+typedef struct EntityType {
     int id;
     Skin* skin;
-} GEntityType;
+} EntityType;
+
+typedef struct World World;
+typedef struct GameContext {
+    World* world;
+    int world_view_x, world_view_y, skins_c, skins_maxc, entity_types_c, entity_types_maxc;
+    EntityType* entity_types;
+    Skin* skins;
+} GameContext;
 
 int game_init();
-GEntityType* game_world_getxy(int, int);
-Skin* game_getskins();
+EntityType* game_world_getxy(int, int);
+GameContext* game_get_context();
 
 #endif

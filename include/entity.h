@@ -2,17 +2,11 @@
 #define ENTITY_HEADER
 
 #include <game.h>
+#include <world.h>
 
-typedef struct GEntity {
-    GEntityType* type;
-    int id;
-    double x, y, vx, vy; // velocity in cols per second
-    void (*update) (struct GEntity*);
-} GEntity;
-
-GEntity* entity_spawn(GEntityType*, int, int, int, int);
+Entity* entity_spawn(World*, EntityType*, int, int, int, int);
 void entity_kill_by_id(int);
 void entity_kill_by_pos(int, int);
-void entity_rm(GEntity*);
+void entity_rm(World*, Entity*);
 
 #endif

@@ -154,7 +154,7 @@ void draw_gamewin() {
     int mx, my;
     getmaxyx(gamewin, my, mx);
 
-    GEntityType* entity;
+    EntityType* entity;
 
     for (int x=0; x<=mx; x++) {
         for (int y=0; y<=my; y++) {
@@ -181,18 +181,18 @@ void draw_main_menu() {
 }
 
 int init_colors() {
-    Skin* skin = game_getskins();
+    GameContext* game = game_get_context();
 
     int color_id = 0;
-    while (skin != NULL) {
+    for (int i=0; i<game->skins_c; i++) {
         int bg = color_id++;
         int fg = color_id++;
 
+        Skin* skin = game->skins + i;
         init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
         init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
 
         init_pair(skin->id, fg, bg);
-        skin = (Skin*) skin->node.next;
     }
 
     return 1;

@@ -8,32 +8,20 @@
 #include <scheduler.h>
 
 
+GameContext* GAME;
 RunQueue* GAME_RUNQUEUE;
-
-int SKIN_COUNT = 0;
-Skin *PREV_SKIN, *SKIN_MEMPOOL;
-
-int GENTITYT_COUNT = 0;
-GEntityType* GENTITYT_MEMPOOL;
 Queue64* GENTITY_QUEUE;
 
-int WORLD_VIEWX = 0;
-int WORLD_VIEWY = 0;
 
-
-void create_skin(Skin* skin, char c, color_t bg_r, color_t bg_g, color_t bg_b, color_t fg_r, color_t fg_g, color_t fg_b) {
-    skin->node.prev = NULL;
-    skin->node.next = NULL;
-
-    if (PREV_SKIN != NULL) {
-        skin->node.prev = &(PREV_SKIN->node);
-        skin->node.prev->next = &(skin->node);
+void create_skin(int id, char c, color_t bg_r, color_t bg_g, color_t bg_b, color_t fg_r, color_t fg_g, color_t fg_b) {
+    if (GAME->skins_c == GAME->skins_maxc) {
+        GAME->skins_maxc *= 2;
+        GAME->skins = realloc(GAME->skins, GAME->skins_maxc * sizeof(Skin));
     }
+    
+    Skin* skin = GAME->skins + GAME->skins_c++;
 
-    PREV_SKIN = skin;
-
-
-    skin->id = SKIN_COUNT++;
+    skin->id = id;
     skin->character = c;
 
     skin->bg_r = bg_r;
@@ -44,43 +32,38 @@ void create_skin(Skin* skin, char c, color_t bg_r, color_t bg_g, color_t bg_b, c
     skin->fg_b = fg_b;
 }
 
-void create_entity_type(GEntityType* gentity, Skin* skin) {
-    gentity->skin = skin;
-    gentity->id = GENTITYT_COUNT++;
+void create_entity_type(Skin* skin) {
+    if (GAME->entity_types_c == GAME->entity_types_maxc) {
+        GAME->entity_types_maxc *= 2;
+        GAME->entity_types = realloc(GAME->entity_types, GAME->entity_types_maxc * sizeof(EntityType));
+    }
+
+    EntityType* entitiyt = GAME->entity_types + GAME->entity_types_c;
+    entitiyt->skin = skin;
+    entitiyt->id = GAME->entity_types_c++;
 }
 
 int init_skins() {
-    PREV_SKIN = NULL;
-    SKIN_MEMPOOL = malloc(PAGE_SIZE);
-
-    create_skin(SKIN_MEMPOOL + sk_null,     ' ', 0, 0, 0, 255, 255, 255);
-    create_skin(SKIN_MEMPOOL + sk_default,  '*', 0, 0, 0, 120, 120, 120);
-    create_skin(SKIN_MEMPOOL + sk_gold,     'o', 0, 0, 0, 255, 215,   0);
-    create_skin(SKIN_MEMPOOL + sk_diamond,  '&', 0, 0, 0,  80, 240, 220);
-    create_skin(SKIN_MEMPOOL + sk_iron,     'f', 0, 0, 0, 120, 120, 120);
-    create_skin(SKIN_MEMPOOL + sk_redore,   '.', 0, 0, 0, 120,   6,   2);
-    create_skin(SKIN_MEMPOOL + sk_player,   'D', 0, 0, 0, 255, 215,   0);
-
-    return SKIN_MEMPOOL != NULL;
+    create_skin(sk_null,        ' ', 0, 0, 0, 255, 255, 255);
+    create_skin(sk_default,     '*', 0, 0, 0, 120, 120, 120);
+    create_skin(sk_gold,        'o', 0, 0, 0, 255, 215,   0);
+    create_skin(sk_diamond,     '&', 0, 0, 0,  80, 240, 220);
+    create_skin(sk_iron,        'f', 0, 0, 0, 120, 120, 120);
+    create_skin(sk_redore,      '.', 0, 0, 0, 120,   6,   2);
+    create_skin(sk_player,      'D', 0, 0, 0, 255, 215,   0);
+    return 1;
 }
 
-int init_entity_types() {
-    GENTITYT_MEMPOOL = malloc(PAGE_SIZE);
-
-    create_entity_type(GENTITYT_MEMPOOL + ge_null, SKIN_MEMPOOL + sk_null);
-    create_entity_type(GENTITYT_MEMPOOL + ge_stone, SKIN_MEMPOOL + sk_default);
-    create_entity_type(GENTITYT_MEMPOOL + ge_gold, SKIN_MEMPOOL + sk_gold);
-    create_entity_type(GENTITYT_MEMPOOL + ge_diamond, SKIN_MEMPOOL + sk_diamond);
-    create_entity_type(GENTITYT_MEMPOOL + ge_iron, SKIN_MEMPOOL + sk_iron);
-    create_entity_type(GENTITYT_MEMPOOL + ge_redore, SKIN_MEMPOOL + sk_redore);
-    create_entity_type(GENTITYT_MEMPOOL + ge_player, SKIN_MEMPOOL + sk_player);
-
-    return GENTITYT_MEMPOOL != NULL;
+void init_entity_types() {
+    int c = GAME->skins_c;
+    for (int i=0; i<c; i++)
+        create_entity_type( GAME->skins + i );
+    GAME->entity_types_c = c;
 }
 
 int update_game_world(Task* task, Stack64* stack) {
-    WORLD_VIEWX++;
-    WORLD_VIEWY++;
+    GAME->world_view_x++;
+    GAME->world_view_y++;
     tk_sleep(task, 1);
 
     return 0;
@@ -89,19 +72,25 @@ int update_game_world(Task* task, Stack64* stack) {
 int game_init() {
     int status = 0;
 
-    if (init_skins() != 0)
-        status--;
+    GAME = calloc(sizeof(GameContext), 1);
+    GAME->skins_c = 0;
+    GAME->entity_types_c = 0;
+    GAME->skins_maxc = 32;
+    GAME->entity_types_maxc = 32;
+    GAME->skins = calloc(GAME->skins_maxc, sizeof(Skin));
+    GAME->entity_types = calloc(GAME->entity_types_maxc, sizeof(EntityType));
+    GAME->world_view_x = 0;
+    GAME->world_view_y = 0;
 
-    if (init_entity_types() != 0)
-        status--;
+    init_skins();
+    init_entity_types();
+    GAME->world = world_init(256, 256, GAME->skins_c);
+    
 
+    Entity* new_entity = entity_spawn(GAME->world, GAME->entity_types + ge_player, 5, 5, 1, 0);
     GENTITY_QUEUE = qu_init(1);
-
-    GEntity* new_entity = entity_spawn(GENTITYT_MEMPOOL + ge_player, 5, 5, 1, 0);
     if (new_entity != NULL)
         qu_enqueue(GENTITY_QUEUE, (uint64_t) new_entity);
-
-    world_init(256, 256, GENTITYT_COUNT-1);
 
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
@@ -109,14 +98,12 @@ int game_init() {
     return status;
 }
 
-
-GEntityType* game_world_getxy(int x, int y) {
-    int id = world_getxy(x + WORLD_VIEWX, y + WORLD_VIEWY);
-
-    return GENTITYT_MEMPOOL + id;
+GameContext* game_get_context() {
+    return GAME;
 }
 
-Skin* game_getskins() {
-    return SKIN_MEMPOOL;
+EntityType* game_world_getxy(int x, int y) {
+    int id = world_getxy(x + GAME->world_view_x, y + GAME->world_view_y);
+    return GAME->entity_types + id;
 }
 

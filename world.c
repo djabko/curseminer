@@ -1,39 +1,43 @@
 #include <world.h>
-
 #include <stdlib.h>
+#include <stdio.h>
 
-unsigned int* WORLD_ARRAY = NULL;
-int MAXX = 0;
-int MAXY = 0;
-int MAXID = 1;
+World* WORLD = NULL;
+int MAXID = 0;
 
 void world_gen() {
-    if (WORLD_ARRAY == NULL) return;
+    if (WORLD->world_array == NULL) return;
 
-    for (int i=0; i<MAXX*MAXY; i++)
-        WORLD_ARRAY[i] = rand() % MAXID;
+    for (int i=0; i < (WORLD->maxx) * (WORLD->maxy); i++)
+        WORLD->world_array[i] = rand() % MAXID;
 }
 
-int world_init(int maxx, int maxy, int maxid) {
-    if (WORLD_ARRAY != NULL) return 0;
+World* world_init(int maxx, int maxy, int maxid) {
+    if (WORLD != NULL) return 0;
+    
+    WORLD = calloc(1, sizeof(World));
+
+    WORLD->maxx = maxx;
+    WORLD->maxy = maxy;
+    WORLD->entity_c = 0;
+    WORLD->entity_maxc = 32;
+    WORLD->world_array = calloc(maxx * maxy, sizeof(int));
+    WORLD->entities = calloc(WORLD->entity_maxc, sizeof(Entity));
+    fprintf(stderr, "Allocated: %p => %d\n", WORLD->entities, WORLD->maxx);
 
     MAXID = maxid;
-    MAXX = maxx;
-    MAXY = maxy;
-    WORLD_ARRAY = calloc(maxx * maxy, sizeof(int));
-
     world_gen();
 
-    return WORLD_ARRAY != NULL;
+    return WORLD;
 }
 
 int world_getxy(int x, int y) {
-    return WORLD_ARRAY[x * MAXX + y];
+    return WORLD->world_array[x * WORLD->maxy + y];
 }
 
 void world_free(int, int) {
-    if (WORLD_ARRAY == NULL) return;
-    free(WORLD_ARRAY);
+    if (WORLD->world_array == NULL) return;
+    free(WORLD->world_array);
 }
 
 
