@@ -10,8 +10,6 @@
 
 GameContext* GAME;
 RunQueue* GAME_RUNQUEUE;
-Queue64* GENTITY_QUEUE;
-
 
 void create_skin(int id, char c, color_t bg_r, color_t bg_g, color_t bg_b, color_t fg_r, color_t fg_g, color_t fg_b) {
     if (GAME->skins_c == GAME->skins_maxc) {
@@ -84,18 +82,22 @@ int game_init() {
 
     init_skins();
     init_entity_types();
-    GAME->world = world_init(256, 256, GAME->skins_c);
+    GAME->world = world_init(256, 256, GAME->skins_c - 1);
     
-
-    Entity* new_entity = entity_spawn(GAME->world, GAME->entity_types + ge_player, 5, 5, 1, 0);
-    GENTITY_QUEUE = qu_init(1);
-    if (new_entity != NULL)
-        qu_enqueue(GENTITY_QUEUE, (uint64_t) new_entity);
+    entity_spawn(GAME->world, GAME->entity_types + ge_player, 5, 5, 1, 0);
 
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
 
     return status;
+}
+
+void game_free() {
+    world_free();
+    free(GAME->world);
+    free(GAME->entity_types);
+    free(GAME->skins);
+    free(GAME);
 }
 
 GameContext* game_get_context() {

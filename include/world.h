@@ -12,7 +12,7 @@ typedef struct Entity {
 
 typedef struct World {
     int* world_array;
-    Entity* entities;
+    Queue64* entities;
     int maxx, maxy, entity_c, entity_maxc;
 } World;
 

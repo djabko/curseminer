@@ -22,8 +22,7 @@ World* world_init(int maxx, int maxy, int maxid) {
     WORLD->entity_c = 0;
     WORLD->entity_maxc = 32;
     WORLD->world_array = calloc(maxx * maxy, sizeof(int));
-    WORLD->entities = calloc(WORLD->entity_maxc, sizeof(Entity));
-    fprintf(stderr, "Allocated: %p => %d\n", WORLD->entities, WORLD->maxx);
+    WORLD->entities = qu_init( WORLD->entity_maxc );
 
     MAXID = maxid;
     world_gen();
@@ -37,7 +36,8 @@ int world_getxy(int x, int y) {
 
 void world_free(int, int) {
     if (WORLD->world_array == NULL) return;
+    free(WORLD->entities);
     free(WORLD->world_array);
+    free(WORLD);
 }
-
 

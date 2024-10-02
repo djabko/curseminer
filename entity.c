@@ -2,14 +2,16 @@
 #include <globals.h>
 #include <stdio.h>
 
-Entity* entity_spawn(World* world, EntityType* type, int x, int y, int num, int t) {
-    if (world->entity_c == world->entity_maxc) {
-        world->entity_maxc *= 2;
-        world->entities = realloc(world->entities, world->entity_maxc * sizeof(Entity));
-    }
+Entity* ENTITY_ARRAY = NULL;
+int MAX = 32;
 
-    Entity* new_entity = world->entities + world->entity_c;
-    fprintf(stderr, "Accessing: %p + %d\n", world->entities, world->entities->x);
+Entity* entity_spawn(World* world, EntityType* type, int x, int y, int num, int t) {
+    if (ENTITY_ARRAY == NULL)
+        ENTITY_ARRAY = calloc(world->entity_maxc, sizeof(Entity));
+
+    int i=0;
+    while (ENTITY_ARRAY[i].type != NULL) i++;
+    Entity* new_entity = ENTITY_ARRAY + i;
 
     new_entity->x = x;
     new_entity->y = y;
@@ -20,12 +22,15 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, int num, int 
     new_entity->speed = 2;
     new_entity->health = 10;
 
+    qu_enqueue(world->entities, (uint64_t) new_entity);
+
     return new_entity;
 }
 
 void entity_rm(World* world, Entity* entity) {
     if (world->entity_c <= 0) return;
     entity->id = -1;
+    entity->type = NULL;
     world->entity_c--;
 }
 

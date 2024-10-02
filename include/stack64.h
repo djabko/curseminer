@@ -4,6 +4,7 @@
 #include "stdlib.h"
 #include "stdint.h"
 
+
 /* Double Linked List */
 typedef struct Node {
     struct Node *prev, *next;
@@ -44,5 +45,19 @@ uint64_t qu_next(Queue64*);
 int qu_empty(Queue64*);
 int qu_full(Queue64*);
 void qu_print(Queue64*);
+
+
+/* 8 Byte Hashtable */
+struct HashTableEntry {
+    unsigned long key;
+    int value;
+};
+typedef struct HashTable {
+    int count, max;
+    struct HashTableEntry* entries;
+} HashTable;
+
+int ht_init(int size);
+int cache_lookup(HashTable* ht, char* str);
 
 #endif

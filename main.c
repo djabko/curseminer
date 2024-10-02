@@ -75,7 +75,7 @@ int main(int argc, const char** argv) {
     if (argc < MIN_ARGS+1) return -1;
     init();
 
-    int ui_runtime = 1;// atoi(argv[1]);
+    int ui_runtime = atoi(argv[1]);
 
     Stack64* stackUI = st_init(16);
     Stack64* stackIn = st_init(16);

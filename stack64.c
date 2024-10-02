@@ -143,3 +143,53 @@ void qu_print(Queue64* qu) {
 }
 
 
+
+
+/*
+ * === HASH TABLE ===
+ */
+
+unsigned long ht_hash(char* str) {
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c;
+
+    return hash;
+
+} inline unsigned long ht_hash(char*);
+
+int ht_init(int size) {
+    HashTable* ht = malloc(size * sizeof(HashTable));
+    ht->max = size;
+    ht->count = 0;
+
+    for (int i=0; i<size; i++) {
+        ht->entries[i].key = 0;
+        ht->entries[i].value = -1;
+    }
+
+    return ht != NULL;
+}
+
+int cache_lookup(HashTable* ht, char* str) {
+    if (ht == NULL) return -1;
+
+    unsigned long key = ht_hash(str);
+    int i = key % ht->max;
+
+    struct HashTableEntry* e = ht->entries + i;
+
+    int j = 0;
+    while (e->key != key) {
+        e = ht->entries + (i++ % ht->max);
+        j++;
+
+        if (e->value < 0 || ht->max < j)
+            return -1;
+    }
+
+    return e->value;
+}
+
