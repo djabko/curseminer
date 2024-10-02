@@ -5,6 +5,7 @@
 #include <time.h>
 
 TimeStamp INIT_TIME;
+TimeStamp TIMER_NOW;
 TimeStamp last_sync, refresh_rate;
 
 void timer_init(int ips) {
@@ -12,6 +13,7 @@ void timer_init(int ips) {
     refresh_rate.tv_nsec = 1000000 / ips;
 
     timer_now(&INIT_TIME);
+    timer_now(&TIMER_NOW);
     timer_now(&last_sync);
 }
 
@@ -41,19 +43,16 @@ TimeStamp timer_diff(TimeStamp* a, TimeStamp* b) {
     return time_diff;
 }
 
-int timer_ready(TimeStamp* ts) {
-    return !timer_nready(ts);
+int timer_nready(TimeStamp* ts) {
+    return !timer_ready(ts);
 }
 
-int timer_nready(TimeStamp* ts) {
+int timer_ready(TimeStamp* ts) {
     if (ts->tv_sec < 0 || ts->tv_nsec < 0) return 0;
 
-    TimeStamp now;
-    timer_now(&now);
-
-    seconds_t asec = now.tv_sec;
+    seconds_t asec = TIMER_NOW.tv_sec;
     seconds_t bsec = ts->tv_sec;
-    microseconds_t ausec = now.tv_nsec;
+    microseconds_t ausec = TIMER_NOW.tv_nsec;
     microseconds_t busec = ts->tv_nsec;
 
     seconds_t delta_sec = (bsec < asec) * (asec - bsec);
@@ -76,16 +75,14 @@ void timer_print(TimeStamp* t) {
 }
 
 void timer_print_now() {
-    TimeStamp now;
-    timer_now(&now);
-    timer_print(&now);
+    timer_print(&TIMER_NOW);
 }
 
 void timer_synchronize() {
-    static TimeStamp now, delta, sleepts;
-    timer_now(&now);
+    static TimeStamp delta, sleepts;
+    timer_now(&TIMER_NOW);
 
-    delta = timer_diff(&now, &last_sync);
+    delta = timer_diff(&TIMER_NOW, &last_sync);
     sleepts = timer_diff(&refresh_rate, &delta);
 
     timer_sleep(&sleepts);

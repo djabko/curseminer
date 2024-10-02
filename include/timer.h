@@ -11,13 +11,14 @@ typedef suseconds_t microseconds_t;
 typedef time_t seconds_t;
 
 extern TimeStamp INIT_TIME;
+extern TimeStamp TIMER_NOW;
 
 void timer_init(int);
 void timer_synchronize();
 void timer_print(TimeStamp*);
 void timer_print_now();
 void timer_never(TimeStamp*);
-void timer_now(TimeStamp*);
+void timer_now(TimeStamp*); // Calls gettimeofday() to retrieve current time
 int timer_ready(TimeStamp*);
 int timer_nready(TimeStamp*);
 int timer_sleep(TimeStamp*);

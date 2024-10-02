@@ -204,7 +204,12 @@ int UI_init() {
     raw();
     curs_set(0);
     noecho();
+    cbreak();
+    //keypad(stdscr, 1);
+    nodelay(stdscr, 1);
     getmaxyx(stdscr, LINES, COLS);
+
+    ESCDELAY = 25;
 
     gamewin = newwin(LINES*.6, COLS*.6, LINES * .05, COLS*.05);
     uiwin = newwin(LINES*.2, COLS*.8, LINES * .8, COLS*.05);

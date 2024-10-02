@@ -2,12 +2,14 @@
 #define WORLD_HEADER
 
 #include <game.h>
+#include <timer.h>
 
 typedef struct EntityType EntityType;
 typedef struct EntityController EntityController;
 typedef struct Entity {
     EntityType* type;
     EntityController* controller;
+    TimeStamp next_move;
     int id, x, y, vx, vy, speed, health;
 } Entity;
 

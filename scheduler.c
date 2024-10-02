@@ -147,12 +147,13 @@ int rq_run(RunQueue* rq) {
     return 0;
 }
 
-void tk_sleep(Task* task, unsigned int seconds) {
-    if (seconds < 1) return;
+void tk_sleep(Task* task, unsigned int milliseconds) {
+    if (milliseconds < 1) return;
 
     TimeStamp* ts = &(task->next_run);
     gettimeofday(ts, NULL);
-    ts->tv_sec += seconds;
+    ts->tv_sec += milliseconds / 1000;
+    ts->tv_usec += 1000 * (milliseconds % 100); 
 
     task->flags |= FLAG_RQ_SLEEPING;
 
@@ -234,7 +235,7 @@ int wake_tasks() {
     int i = 0;
     while (stk != NULL) {
         Task* tk = stk->data;
-        if (timer_nready(&(tk->next_run))) {
+        if (timer_ready(&(tk->next_run))) {
             tk->flags &= !FLAG_RQ_SLEEPING;
             ll_node* next = stk->next;
             ll_rm(g_sleeping_tasks, tk);
@@ -292,7 +293,7 @@ int kill_dying_tasks() {
     int i = 0;
     while (dtk != NULL) {
         Task* tk = dtk->data;
-        if (timer_nready(&(tk->kill_time))) {
+        if (timer_ready(&(tk->kill_time))) {
             tk_kill(tk);
             ll_node* next = dtk->next;
             ll_rm(g_dying_tasks, tk);

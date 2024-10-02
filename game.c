@@ -60,8 +60,8 @@ void init_entity_types() {
 }
 
 int update_game_world(Task* task, Stack64* stack) {
-    GAME->world_view_x++;
-    GAME->world_view_y++;
+    //GAME->world_view_x = GAME->world_view_x % GAME->world->maxx;
+    //GAME->world_view_y = GAME->world_view_y % GAME->world->maxy;
 
     Queue64* entity_qu = GAME->world->entities;
     Entity* end = (Entity*) qu_peek(entity_qu);
@@ -71,7 +71,7 @@ int update_game_world(Task* task, Stack64* stack) {
         e = (Entity*) qu_next(entity_qu);
     } while (e != end);
 
-    tk_sleep(task, 1);
+    tk_sleep(task, 100);
     return 0;
 }
 
@@ -92,7 +92,13 @@ int game_init() {
     init_entity_types();
     GAME->world = world_init(256, 256, GAME->skins_c - 1);
     
-    entity_spawn(GAME->world, GAME->entity_types + ge_player, 5, 5, 1, 0);
+    int e_x = rand() % (GAME->world_view_x + 20);
+    int e_y = rand() % (GAME->world_view_y + 20);
+    Entity* entity = entity_spawn(GAME->world, GAME->entity_types + ge_player, e_x, e_y, 1, 0);
+    entity->speed = 50;
+
+    Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, e_x, e_y, 1, 0);
+    entity_set_keyboard_controller(player);
 
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
