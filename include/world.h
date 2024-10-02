@@ -4,15 +4,16 @@
 #include <game.h>
 
 typedef struct EntityType EntityType;
+typedef struct EntityController EntityController;
 typedef struct Entity {
     EntityType* type;
+    EntityController* controller;
     int id, x, y, vx, vy, speed, health;
-    // Controller
 } Entity;
 
 typedef struct World {
     int* world_array;
-    Queue64* entities;
+    Queue64* entities; // should be a linked list
     int maxx, maxy, entity_c, entity_maxc;
 } World;
 

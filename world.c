@@ -25,7 +25,7 @@ World* world_init(int maxx, int maxy, int maxid) {
     WORLD->entities = qu_init( WORLD->entity_maxc );
 
     MAXID = maxid;
-    world_gen();
+    //world_gen();
 
     return WORLD;
 }

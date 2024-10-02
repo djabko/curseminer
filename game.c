@@ -62,8 +62,16 @@ void init_entity_types() {
 int update_game_world(Task* task, Stack64* stack) {
     GAME->world_view_x++;
     GAME->world_view_y++;
-    tk_sleep(task, 1);
 
+    Queue64* entity_qu = GAME->world->entities;
+    Entity* end = (Entity*) qu_peek(entity_qu);
+    Entity* e = (Entity*) qu_next(entity_qu);
+    do {
+        e->controller->tick(e);
+        e = (Entity*) qu_next(entity_qu);
+    } while (e != end);
+
+    tk_sleep(task, 1);
     return 0;
 }
 
@@ -105,6 +113,16 @@ GameContext* game_get_context() {
 }
 
 EntityType* game_world_getxy(int x, int y) {
+    Queue64* entity_qu = GAME->world->entities;
+    Entity* end = (Entity*) qu_peek(entity_qu);
+    Entity* e = (Entity*) qu_next(entity_qu);
+    do {
+        if (e->x == x && e->y == y) return e->type;
+
+        e = (Entity*) qu_next(entity_qu);
+    } while (e != end);
+
+   
     int id = world_getxy(x + GAME->world_view_x, y + GAME->world_view_y);
     return GAME->entity_types + id;
 }
