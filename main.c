@@ -9,9 +9,20 @@
 
 #define MIN_ARGS 0
 #define REFRESH_RATE 120
-#define KEYBOARD_EMPTY_RATE 1000000/10
+#define KEYBOARD_EMPTY_RATE 1000000 / 2
 
-GlobalType GLOBALS;
+struct Globals GLOBALS = {
+    .keyboard = {{{-1, {0}, -1, -1}}},
+    .window = {
+        .width=2<<6, 
+        .height=2<<5, 
+        .title="My Geemu",
+        .w = NULL,
+        .monitor = NULL,
+        .share = NULL
+    },
+    .player = NULL
+};
 
 ll_head* RQLL = NULL;
 RunQueue* RUN_QUEUE = NULL;
@@ -28,7 +39,9 @@ void init() {
     RQLL = scheduler_init();
     checkifNULL((void*)(
                 RUN_QUEUE = scheduler_new_rq(RQLL)), "RQ_UI");
+    
 
+    //window_init();
     UI_init();
     keyboard_init();
 
@@ -38,7 +51,8 @@ void init() {
 int exit_state() {
     printf("Exiting...");
 
-    //scheduler_free_rqll(RQLL);
+    UI_exit();
+    //window_free();
     scheduler_free();
 
     return 0;
@@ -46,26 +60,14 @@ int exit_state() {
 
 int tsinit = 0;
 int jobUI (Task* task, Stack64* stack) {
-    UI_update_time(1.0f / REFRESH_RATE, TIMER_NOW.tv_sec);
+
+    // int quit = window_loop();
+    int quit = UI_loop();
+
+    if (quit || kb_down(KB_Q))
+        tk_kill(task);
 
     keyboard_poll();
-    UI_loop();
-
-    // Put in function
-    static TimeStamp ts;
-    if (!tsinit || timer_ready(&ts)) {
-        if (GLOBALS.keyboard.keys[KB_Q] || GLOBALS.keyboard.keys[KB_ESC])
-            tk_kill(task);
-
-        ts = TIMER_NOW;
-        tsinit = 1;
-        long int newsec = ts.tv_sec + KEYBOARD_EMPTY_RATE / 1000000;
-        long int newusec = ts.tv_usec + KEYBOARD_EMPTY_RATE;
-        long int carry = newusec > 1000000 ? 1 : 0;
-        ts.tv_sec = newsec + carry;
-        ts.tv_usec = newusec % 1000000;
-        keyboard_clear();
-    }
 
     return 0;
 }
@@ -87,7 +89,6 @@ int jobMain (Task* task, Stack64* stack) {
 
 
 void ui_callback(Task* task) {
-    UI_exit();
     kill_all_tasks();
 }
 

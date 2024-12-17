@@ -24,25 +24,30 @@ void tick_move_entity(Entity* e) {
 
 void player_tick(Entity* player) {
     Queue64* qu = player->controller->behaviour_queue;
-    int up = GLOBALS.keyboard.keys[KB_W] || GLOBALS.keyboard.keys[KB_UP];
-    int down = GLOBALS.keyboard.keys[KB_S] || GLOBALS.keyboard.keys[KB_DOWN];
-    int right = GLOBALS.keyboard.keys[KB_D] || GLOBALS.keyboard.keys[KB_RIGHT];
-    int left = GLOBALS.keyboard.keys[KB_A] || GLOBALS.keyboard.keys[KB_LEFT];
+    int up = kb_down(KB_W);
+    int down = kb_down(KB_S);
+    int right = kb_down(KB_D);
+    int left = kb_down(KB_A);
+    int place_tile = kb_down(KB_C);
 
-    if (!up && !down) {
+    if (!(up || left || down || right)) {
+        player->vx = 0;
         player->vy = 0;
-    } else if (up) {
-        player->vy = -1;
-    } else if (down) {
-        player->vy = 1;
+    } else {
+
+        if (up)
+            player->vy = -1;
+        else if (down)
+            player->vy = 1;
+
+        if (left)
+            player->vx = -1;
+        else if (right)
+            player->vx = 1;
     }
 
-    if (!left && !right) {
-        player->vx = 0;
-    } else if (left) {
-        player->vx = -1;
-    } else if (right) {
-        player->vx = 1;
+    if (place_tile) {
+        game_world_setxy(player->x, player->y, ge_stone);
     }
 
     if (qu_empty(qu) && (up || down || right || left))

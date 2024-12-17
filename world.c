@@ -34,6 +34,10 @@ int world_getxy(int x, int y) {
     return WORLD->world_array[x * WORLD->maxy + y];
 }
 
+void world_setxy(int x, int y, int tid) {
+    WORLD->world_array[x * WORLD->maxy + y] = tid;
+}
+
 void world_free(int, int) {
     if (WORLD->world_array == NULL) return;
     free(WORLD->entities);

@@ -1,10 +1,13 @@
-#include "ncurses.h"
-#include "stdlib.h"
-#include "math.h"
+#include <stdlib.h>
+#include <math.h>
 
-#include <stack64.h>
-#include <UI.h>
-#include <game.h>
+#include "ncurses.h"
+
+#include "globals.h"
+#include "stack64.h"
+#include "UI.h"
+#include "game.h"
+#include "keyboard.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
 
@@ -148,6 +151,15 @@ void UI_update_time(double n, int s) {
     TIME_SEC = s;
 }
 
+void draw_keyboard_state() {
+    int x = COLS *0.8;
+    int y = LINES *0.3;
+    for (KeyID i=KB_START+1; i<KB_END; i++) {
+        mvprintw(y, x, "%c%s", keyid_to_string(i)[0], GLOBALS.keyboard.keys[i].down ? "*" : ".");
+        x += 3;
+    }
+}
+
 void draw_gamewin() {
     werase(gamewin);
 
@@ -171,6 +183,7 @@ void draw_gamewin() {
 void draw_uiwin() {
     werase(uiwin);
     draw_rt_clock(uiwin, 10, 5, COLS*.05);
+    //draw_keyboard_state();
     box(uiwin, 0, 0);
     wrefresh(uiwin);
 }
@@ -205,7 +218,6 @@ int UI_init() {
     curs_set(0);
     noecho();
     cbreak();
-    //keypad(stdscr, 1);
     nodelay(stdscr, 1);
     getmaxyx(stdscr, LINES, COLS);
 

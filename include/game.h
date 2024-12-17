@@ -54,6 +54,7 @@ typedef struct GameContext {
 int game_init();
 void game_free();
 EntityType* game_world_getxy(int, int);
+int game_world_setxy(int, int, EntityTypeID);
 GameContext* game_get_context();
 
 #endif

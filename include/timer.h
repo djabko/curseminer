@@ -12,6 +12,7 @@ typedef time_t seconds_t;
 
 extern TimeStamp INIT_TIME;
 extern TimeStamp TIMER_NOW;
+extern TimeStamp TIMER_NEVER;
 
 void timer_init(int);
 void timer_synchronize();
@@ -23,5 +24,6 @@ int timer_ready(TimeStamp*);
 int timer_nready(TimeStamp*);
 int timer_sleep(TimeStamp*);
 TimeStamp timer_diff(TimeStamp*, TimeStamp*);
+unsigned long timer_diff_milisec(TimeStamp*, TimeStamp*);
 
 #endif

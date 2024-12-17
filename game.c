@@ -1,10 +1,10 @@
 #include "stdlib.h"
 
+#include <globals.h>
 #include <game.h>
 #include <world.h>
 #include <entity.h>
 #include <stack64.h>
-#include <globals.h>
 #include <scheduler.h>
 
 
@@ -99,6 +99,7 @@ int game_init() {
 
     Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, e_x, e_y, 1, 0);
     entity_set_keyboard_controller(player);
+    GLOBALS.player = player;
 
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
@@ -131,5 +132,9 @@ EntityType* game_world_getxy(int x, int y) {
    
     int id = world_getxy(x + GAME->world_view_x, y + GAME->world_view_y);
     return GAME->entity_types + id;
+}
+
+int game_world_setxy(int x, int y, EntityTypeID tid) {
+    world_setxy(x, y, tid);
 }
 

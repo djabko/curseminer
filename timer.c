@@ -7,6 +7,7 @@
 TimeStamp INIT_TIME;
 TimeStamp TIMER_NOW;
 TimeStamp last_sync, refresh_rate;
+TimeStamp TIMER_NEVER = {0, 0};
 
 void timer_init(int ips) {
     refresh_rate.tv_sec = ips / 1000000;
@@ -41,6 +42,20 @@ TimeStamp timer_diff(TimeStamp* a, TimeStamp* b) {
     time_diff.tv_nsec = (0 <= asec - bsec) * (busec < ausec) * (ausec - busec);
 
     return time_diff;
+}
+
+unsigned long timer_diff_milisec(TimeStamp* a, TimeStamp* b) {
+    unsigned long diff = 0;
+
+    seconds_t asec = a->tv_sec;
+    seconds_t bsec = b->tv_sec;
+    microseconds_t ausec = a->tv_nsec;
+    microseconds_t busec = b->tv_nsec;
+
+    diff += (bsec < asec) * (asec - bsec) * 1000;
+    diff += (0 <= asec - bsec) * (busec < ausec) * (ausec - busec) / 1000;
+
+    return diff;
 }
 
 int timer_nready(TimeStamp* ts) {

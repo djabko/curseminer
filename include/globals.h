@@ -3,14 +3,18 @@
 
 #include <unistd.h>
 
-#include <keyboard.h>
+#include "keyboard.h"
+#include "game.h"
+#include "window.h"
 
 #define PAGE_SIZE getpagesize()
 
-typedef struct {
+struct Globals{
     Keyboard keyboard;
-} GlobalType;
+    WindowContext window;
+    Entity* player;
+};
 
-extern GlobalType GLOBALS;
+extern struct Globals GLOBALS;
 
 #endif

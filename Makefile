@@ -14,7 +14,7 @@ TARGET=$(notdir $(shell pwd))
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -lncurses -lm -o $@ $^
+	$(CC) $(CFLAGS) -lncurses -lm -lglfw -lvulkan -ldl -lpthread -o $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -I$(INCDIR) -c $< -o $@

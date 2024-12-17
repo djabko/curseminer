@@ -21,6 +21,7 @@ typedef struct World {
 
 World* world_init(int, int, int);
 int world_getxy(int, int);
+void world_setxy(int, int, int);
 void world_free();
 
 #endif
