@@ -14,16 +14,18 @@ typedef enum {
     sk_iron,
     sk_redore,
     sk_player,
+    sk_chaser_mob,
 } SkinTypeID;
 
 typedef enum {
-    ge_null,
+    ge_air,
     ge_stone,
     ge_gold,
     ge_diamond,
     ge_iron,
     ge_redore,
     ge_player,
+    ge_chaser_mob
 } EntityTypeID;
 
 

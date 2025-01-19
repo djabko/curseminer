@@ -17,8 +17,9 @@ Stack64* MENU_STACK = NULL;
 int LINES = 0;
 int COLS = 0;
 
-double TIME_COUNT = 0.0f;
-int TIME_SEC = 0.0f;
+// TODO: Remove TIME_SEC due
+int TIME_MSEC = 0;
+int TIME_SEC = 0;
 
 WINDOW *gamewin, *uiwin;
 
@@ -126,9 +127,11 @@ void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, doub
 }
 
 void draw_rt_clock(WINDOW* win, int x, int y, int r) {
-    int sc = TIME_SEC % 60;
-    int mn = TIME_SEC % (60*60);
-    int hr = (TIME_SEC+60*60) % (60*60*24);
+    int time_sec = TIME_MSEC / 1000;
+
+    int sc = time_sec % 60;
+    int mn = time_sec % (60*60);
+    int hr = (time_sec+60*60) % (60*60*24);
     double angleS = sc * (2*M_PI/60) - (M_PI/2);
     double angleM = mn * (2*M_PI/(60*60)) - (M_PI/2);
     double angleH = hr * (2*M_PI/(24*60*60)) - (M_PI/2);
@@ -146,9 +149,9 @@ void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     attroff(A_BOLD);
 }
 
-void UI_update_time(double n, int s) {
-    TIME_COUNT += n;
-    TIME_SEC = s;
+void UI_update_time(int msec) {
+    TIME_MSEC = msec;
+    TIME_SEC = msec / 1000;
 }
 
 void draw_keyboard_state() {
@@ -161,7 +164,6 @@ void draw_keyboard_state() {
 }
 
 void draw_gamewin() {
-    werase(gamewin);
 
     int mx, my;
     getmaxyx(gamewin, my, mx);
@@ -177,15 +179,28 @@ void draw_gamewin() {
     }
 
     box(gamewin, 0, 0);
-    wrefresh(gamewin);
+    wnoutrefresh(gamewin);
 }
 
 void draw_uiwin() {
-    werase(uiwin);
+    wclear(uiwin);
+
     draw_rt_clock(uiwin, 10, 5, COLS*.05);
     //draw_keyboard_state();
+
+    mvwprintw(uiwin, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
+            GLOBALS.player->y, GLOBALS.player->x,
+            GLOBALS.player->vy<0 ? '-':'+', GLOBALS.player->vy,
+            GLOBALS.player->vx<0 ? '-':'+', GLOBALS.player->vx
+            );
+
+    EntityType* entity = game_world_getxy(1, 1);
+    mvwprintw(uiwin, 7, 20, "Entity Type at (1,1): %lu", entity->id);
+
+    mvwprintw(uiwin, (TIME_MSEC/100)%(int)(LINES*.2), COLS*.4, "!"); // draw splash icon
+
     box(uiwin, 0, 0);
-    wrefresh(uiwin);
+    wnoutrefresh(uiwin);
 }
 
 void draw_main_menu() {
@@ -223,12 +238,15 @@ int UI_init() {
 
     ESCDELAY = 25;
 
+    //TODO:  Store window sizes in a struct
     gamewin = newwin(LINES*.6, COLS*.6, LINES * .05, COLS*.05);
     uiwin = newwin(LINES*.2, COLS*.8, LINES * .8, COLS*.05);
 
     int status = game_init();
     if (status != 0) {
-        printf("Error initializing game: %d\n", status);
+        fprintf(stderr, "Error initializing game: %d\n", status);
+        UI_exit();
+        return 0;
     }
 
     init_colors();
@@ -243,6 +261,8 @@ int UI_loop() {
     if (st_peek(MENU_STACK) == -1) return -1;
     voidfunc draw_func = (voidfunc) st_peek(MENU_STACK);
     draw_func();
+
+    doupdate();
     return 0;
 }
 

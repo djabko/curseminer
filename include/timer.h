@@ -10,6 +10,7 @@ typedef struct timeval TimeStamp;
 typedef suseconds_t microseconds_t;
 typedef time_t seconds_t;
 
+// TODO: move to globals
 extern TimeStamp INIT_TIME;
 extern TimeStamp TIMER_NOW;
 extern TimeStamp TIMER_NEVER;

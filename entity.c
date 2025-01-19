@@ -12,16 +12,51 @@ int MAX = 32;
 
 void tick_move_entity(Entity* e) {
     Queue64* qu = e->controller->behaviour_queue;
-    if (qu_dequeue(qu) == be_move && timer_ready(&e->next_move)) {
-        e->x += e->vx;
-        e->y += e->vy;
+    switch (qu_dequeue(qu)) {
 
-        timer_now(&e->next_move);
-        e->next_move.tv_sec += e->speed / 100;
-        e->next_move.tv_usec += (e->speed % 100) * 10000;
+        case be_attack:
+
+        case be_interact:
+
+        case be_place:
+            game_world_setxy(e->x, e->y, ge_stone);
+
+        case be_move:
+            if (timer_ready(&e->next_move)) {
+            e->x += e->vx;
+            e->y += e->vy;
+
+            timer_now(&e->next_move);
+            e->next_move.tv_sec += e->speed / 100;
+            e->next_move.tv_usec += (e->speed % 100) * 10000;
+        }
+
     }
 }
 
+void player_highlight_tile(int x, int y) {
+    /* TODO: 1. Make skin a property of each Entity
+     *       2. Rename EntityType.skin with EntityType.default_skin
+     *       3. Use this function to set skin of entity at (x,y) to sk_highlighted */
+    return;
+};
+
+/* Defines default entity action for each tick
+ * 
+ * Current behaviour is to follow the player via find_path() 
+ */
+void default_tick(Entity* e) {
+    Queue64* qu = e->controller->behaviour_queue;
+    e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+    qu_enqueue(qu, be_move);
+
+    tick_move_entity(e);
+}
+
+/* Defines player action for each tick
+ *
+ * Check keyboard states and places the appropriate action on player's behaviour queue
+ */
 void player_tick(Entity* player) {
     Queue64* qu = player->controller->behaviour_queue;
     int up = kb_down(KB_W);
@@ -35,19 +70,29 @@ void player_tick(Entity* player) {
         player->vy = 0;
     } else {
 
-        if (up)
+        if (up) {
             player->vy = -1;
-        else if (down)
+            player->facing = ENTITY_FACING_UP;
+            player_highlight_tile(player->x, player->y-1);
+        } else if (down) {
             player->vy = 1;
+            player->facing = ENTITY_FACING_DOWN;
+            player_highlight_tile(player->x, player->y+1);
+        }
 
-        if (left)
+        if (left) {
             player->vx = -1;
-        else if (right)
+            player->facing = ENTITY_FACING_LEFT;
+            player_highlight_tile(player->x-1, player->y);
+        } else if (right) {
             player->vx = 1;
+            player->facing = ENTITY_FACING_RIGHT;
+            player_highlight_tile(player->x+1, player->y);
+        }
     }
 
     if (place_tile) {
-        game_world_setxy(player->x, player->y, ge_stone);
+        qu_enqueue(qu, be_place);
     }
 
     if (qu_empty(qu) && (up || down || right || left))
@@ -56,24 +101,17 @@ void player_tick(Entity* player) {
     tick_move_entity(player);
 }
 
-void default_tick(Entity* e) {
-    if (e->x != 20 || e->y != 10) {
-        Queue64* qu = e->controller->behaviour_queue;
-        e->controller->find_path(e, 20, 10);
-        qu_enqueue(qu, be_move);
-    }
 
-    tick_move_entity(e);
-}
 
+// Calling game_world_getxy() here causes update_game_world to set entity_qu[i+0] to entity_qu[i+1]
 void default_find_path(Entity* e, int x, int y) {
-    if      (e->x < x)  e->vx =   1;
-    else if (e->x > x)  e->vx =  -1;
-    else                e->vx =   0;
+    if (e->x < x && game_world_getxy(e->x+1, e->y)->id == ge_air)  e->vx =   1;
+    else if (e->x > x && game_world_getxy(e->x-1, e->y)->id == ge_air)  e->vx =  -1;
+    else e->vx =   0;
 
-    if      (e->y < y)  e->vy =   1;
-    else if (e->y > y)  e->vy =  -1;
-    else                e->vy =   0;
+    if (e->y < y && game_world_getxy(e->x, e->y+1)->id == ge_air)  e->vy =   1;
+    else if (e->y > y && game_world_getxy(e->x, e->y-1)->id == ge_air)  e->vy =  -1;
+    else e->vy =   0;
 }
 
 int create_default_entity_controller() {
@@ -95,7 +133,7 @@ void entity_set_keyboard_controller(Entity* e) {
 }
 
 
-Entity* entity_spawn(World* world, EntityType* type, int x, int y, int num, int t) {
+Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing face, int num, int t) {
     if (ENTITY_ARRAY == NULL)
         ENTITY_ARRAY = calloc(world->entity_maxc, sizeof(Entity));
 
@@ -111,6 +149,7 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, int num, int 
     new_entity->vy = 0;
     new_entity->speed = 20;
     new_entity->health = 10;
+    new_entity->facing = face;
     timer_now(&new_entity->next_move);
 
     create_default_entity_controller();

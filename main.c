@@ -8,7 +8,8 @@
 #include <UI.h>
 
 #define MIN_ARGS 0
-#define REFRESH_RATE 120
+#define UPDATE_RATE 120 // times per second
+#define SCREEN_REFRESH_RATE 10 // times per second
 #define KEYBOARD_EMPTY_RATE 1000000 / 2
 
 struct Globals GLOBALS = {
@@ -16,7 +17,7 @@ struct Globals GLOBALS = {
     .window = {
         .width=2<<6, 
         .height=2<<5, 
-        .title="My Geemu",
+        .title="My game",
         .w = NULL,
         .monitor = NULL,
         .share = NULL
@@ -34,7 +35,7 @@ void checkifNULL(void* ptr, const char* str) {
 }
 
 void init() {
-    timer_init(REFRESH_RATE);
+    timer_init(UPDATE_RATE);
 
     RQLL = scheduler_init();
     checkifNULL((void*)(
@@ -59,20 +60,33 @@ int exit_state() {
 }
 
 int tsinit = 0;
+TimeStamp refresh_screen;
 int jobUI (Task* task, Stack64* stack) {
+    
+    if (!tsinit || timer_ready(&refresh_screen)) {
+        refresh_screen = TIMER_NOW;
+        refresh_screen.tv_usec += (1000000/SCREEN_REFRESH_RATE);
+        tsinit = 1;
+        fprintf(stderr, "refreshed: %lu\n", TIMER_NOW.tv_sec);
 
-    // int quit = window_loop();
-    int quit = UI_loop();
+        int sec = TIMER_NOW.tv_sec;
+        int msec = TIMER_NOW.tv_usec / 1000;
+        UI_update_time(sec * 1000 + msec);
 
-    if (quit || kb_down(KB_Q))
-        tk_kill(task);
-
-    keyboard_poll();
+        int quit = UI_loop();
+        if (quit)
+            tk_kill(task);
+    }
 
     return 0;
 }
 
 int jobInput (Task* task, Stack64* stack) {
+
+    keyboard_poll();
+    if (kb_down(KB_Q))
+        tk_kill(task);
+
     return 0;
 }
 
@@ -88,8 +102,11 @@ int jobMain (Task* task, Stack64* stack) {
 }
 
 
-void ui_callback(Task* task) {
-    kill_all_tasks();
+int killing = 0;
+void cb_exit(Task* task) {
+    if (killing) return;
+    killing++;
+    kill_all_tasks(); // TODO: Calling multiple times causes segfault
 }
 
 
@@ -111,8 +128,8 @@ int main(int argc, const char** argv) {
     quit_time.tv_sec += 1;
 
     schedule(RUN_QUEUE, 0, 0, jobMain, NULL);
-    schedule_cb(RUN_QUEUE, 0, ui_runtime, jobUI, stackUI, ui_callback);
-    schedule(RUN_QUEUE, 0, 1, jobInput, stackIn);
+    schedule_cb(RUN_QUEUE, 0, ui_runtime, jobUI, stackUI, cb_exit);
+    schedule_cb(RUN_QUEUE, 0, 0, jobInput, stackIn, cb_exit);
     schedule(RUN_QUEUE, 0, 1, jobIO, stackIO);
 
     schedule_run(RQLL);

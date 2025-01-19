@@ -61,7 +61,6 @@ void keyboard_poll() {
         ks->held = ks->down; // If it was already pressed, a subsequent signal means it's being held continuously
         ks->down = 1;
 
-        fprintf(stderr, "[%s]%s %lu\n", keyid_to_string(ks->id), ks->down?" *" : " .", timer_diff_milisec(&TIMER_NOW, &(ks->last_pressed)));
         ks->last_pressed = TIMER_NOW;
     }
 

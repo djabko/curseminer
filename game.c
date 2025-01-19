@@ -1,4 +1,5 @@
 #include "stdlib.h"
+#include <stdio.h>
 
 #include <globals.h>
 #include <game.h>
@@ -49,6 +50,7 @@ int init_skins() {
     create_skin(sk_iron,        'f', 0, 0, 0, 120, 120, 120);
     create_skin(sk_redore,      '.', 0, 0, 0, 120,   6,   2);
     create_skin(sk_player,      'D', 0, 0, 0, 255, 215,   0);
+    create_skin(sk_chaser_mob,  'M', 0, 0, 0, 215, 215,   50);
     return 1;
 }
 
@@ -64,13 +66,18 @@ int update_game_world(Task* task, Stack64* stack) {
     //GAME->world_view_y = GAME->world_view_y % GAME->world->maxy;
 
     Queue64* entity_qu = GAME->world->entities;
-    Entity* end = (Entity*) qu_peek(entity_qu);
+
+    Entity* end = (Entity*) qu_peek(entity_qu);;
     Entity* e = (Entity*) qu_next(entity_qu);
+
+    // TODO: loop sometimes iterates too many times
+    int i = entity_qu->count;
     do {
         e->controller->tick(e);
         e = (Entity*) qu_next(entity_qu);
-    } while (e != end);
-
+        i--;
+    } while (e != end && 0 < i);
+   
     tk_sleep(task, 100);
     return 0;
 }
@@ -94,12 +101,14 @@ int game_init() {
     
     int e_x = rand() % (GAME->world_view_x + 20);
     int e_y = rand() % (GAME->world_view_y + 20);
-    Entity* entity = entity_spawn(GAME->world, GAME->entity_types + ge_player, e_x, e_y, 1, 0);
-    entity->speed = 50;
-
-    Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, e_x, e_y, 1, 0);
+    Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
     entity_set_keyboard_controller(player);
     GLOBALS.player = player;
+
+    e_x = rand() % (GAME->world_view_x + 20);
+    e_y = rand() % (GAME->world_view_y + 20);
+    Entity* entity = entity_spawn(GAME->world, GAME->entity_types + ge_chaser_mob, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    entity->speed = 100;
 
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
@@ -119,22 +128,29 @@ GameContext* game_get_context() {
     return GAME;
 }
 
+// TODO: Use a hashtable instead
 EntityType* game_world_getxy(int x, int y) {
+
     Queue64* entity_qu = GAME->world->entities;
-    Entity* end = (Entity*) qu_peek(entity_qu);
+
+    if (qu_peek(entity_qu) == (uint64_t)GLOBALS.player)
+        qu_next(entity_qu);
+
     Entity* e = (Entity*) qu_next(entity_qu);
-    do {
+
+    for (int i=0; i < entity_qu->count; i++) {
         if (e->x == x && e->y == y) return e->type;
-
         e = (Entity*) qu_next(entity_qu);
-    } while (e != end);
+    }
 
-   
+    qu_next(entity_qu);
+
     int id = world_getxy(x + GAME->world_view_x, y + GAME->world_view_y);
     return GAME->entity_types + id;
 }
 
 int game_world_setxy(int x, int y, EntityTypeID tid) {
     world_setxy(x, y, tid);
+    return 0;
 }
 

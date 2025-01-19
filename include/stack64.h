@@ -44,7 +44,7 @@ uint64_t qu_peek(Queue64*);
 uint64_t qu_next(Queue64*);
 int qu_empty(Queue64*);
 int qu_full(Queue64*);
-void qu_print(Queue64*);
+void qu_print(Queue64*, int);
 
 
 /* 8 Byte Hashtable */

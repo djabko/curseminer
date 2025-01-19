@@ -8,7 +8,7 @@ int MAXID = 0;
 void world_gen() {
     if (WORLD->world_array == NULL) return;
 
-    for (int i=0; i < (WORLD->maxx) * (WORLD->maxy); i++)
+    for (int i=ge_air; i < (WORLD->maxx) * (WORLD->maxy); i++)
         WORLD->world_array[i] = rand() % MAXID;
 }
 

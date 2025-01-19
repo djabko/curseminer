@@ -4,6 +4,6 @@
 int UI_init();
 int UI_loop();
 int UI_exit();
-void UI_update_time(double, int);
+void UI_update_time(int);
 
 #endif

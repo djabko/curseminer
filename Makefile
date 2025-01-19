@@ -23,5 +23,5 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
 clean:
-	rm -f $(TARGET) $(OBJS) vgcore.* errfile
+	rm -f $(TARGET) $(OBJS) vgcore.* error.dump
 	rm -rf $(OBJDIR)

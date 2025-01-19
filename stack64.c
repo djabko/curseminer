@@ -136,9 +136,10 @@ int qu_full(Queue64* qu) {
     return qu->count >= qu->capacity;
 }
 
-void qu_print(Queue64* qu) {
-    for (int i = 0; i<=qu->count; i++) {
-        printf("%d: %lu\n", i, qu->mempool[i % qu->capacity]);
+void qu_print(Queue64* qu, int is_error) {
+    FILE* f = is_error ? stderr : stdout;
+    for (int i = 0; i<qu->count; i++) {
+        fprintf(f, "%d: %lu\n", i, qu->mempool[i % qu->capacity]);
     }
 }
 

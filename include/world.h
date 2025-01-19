@@ -10,7 +10,7 @@ typedef struct Entity {
     EntityType* type;
     EntityController* controller;
     TimeStamp next_move;
-    int id, x, y, vx, vy, speed, health;
+    int id, x, y, vx, vy, speed, health, facing;
 } Entity;
 
 typedef struct World {
