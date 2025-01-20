@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #include "ncurses.h"
 
@@ -10,6 +11,7 @@
 #include "keyboard.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
+#define MAX_TITLE 32
 
 typedef void (*voidfunc) ();
 
@@ -17,12 +19,15 @@ Stack64* MENU_STACK = NULL;
 int LINES = 0;
 int COLS = 0;
 
-// TODO: Remove TIME_SEC due
 int TIME_MSEC = 0;
-int TIME_SEC = 0;
 
-WINDOW *gamewin, *uiwin;
+typedef struct {
+    WINDOW* win;
+    int x, y, w, h;
+    char title[MAX_TITLE];
+} window_t;
 
+window_t gamewin, uiwin = {};
 
 typedef struct {
    double x, y; 
@@ -33,6 +38,7 @@ typedef struct {
 } Line;
 
 
+/* Math Helper Functions */
 int max(double a, double b) {
     return a * (b <= a) + b * (a < b);
 }
@@ -66,6 +72,8 @@ int che_dist(Line* line) {
             );
 }
 
+
+/* Draw Functions */
 void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
     for (int x=x1; x<=x2; x++) {
         for (int y=y1; y<=y2; y++) {
@@ -105,18 +113,6 @@ void draw_header() {
         mvaddch(3, i, '=');
 }
 
-void draw_footer() {
-}
-
-void draw_sides() {
-}
-
-void draw_skeleton() {
-    draw_header();
-    draw_footer();
-    draw_sides();
-}
-
 void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
     double x2, y2;
 
@@ -136,10 +132,10 @@ void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     double angleM = mn * (2*M_PI/(60*60)) - (M_PI/2);
     double angleH = hr * (2*M_PI/(24*60*60)) - (M_PI/2);
 
-    draw_clock_needle(win, x, y, '|', r*0.75,-1*(M_PI/2));
-    draw_clock_needle(win, x, y, '-', r*1.00, 0*(M_PI/2));
-    draw_clock_needle(win, x, y, '|', r*0.75, 1*(M_PI/2));
-    draw_clock_needle(win, x, y, '-', r*1, 2*(M_PI/2));
+    draw_clock_needle(win, x, y  , '|', r*0.75,-1*(M_PI/2));
+    draw_clock_needle(win, x, y  , '-', r*1.00, 0*(M_PI/2));
+    draw_clock_needle(win, x, y+1, '|', r*0.75, 1*(M_PI/2));
+    draw_clock_needle(win, x, y  , '-', r*1.00, 2*(M_PI/2));
 
     draw_clock_needle(win, x, y, '.', r*0.75, angleS);
     draw_clock_needle(win, x, y, 'm', r*0.50, angleM);
@@ -149,58 +145,52 @@ void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     attroff(A_BOLD);
 }
 
-void UI_update_time(int msec) {
-    TIME_MSEC = msec;
-    TIME_SEC = msec / 1000;
-}
-
-void draw_keyboard_state() {
-    int x = COLS *0.8;
-    int y = LINES *0.3;
+void draw_keyboard_state(WINDOW* scr, int x, int y) {
     for (KeyID i=KB_START+1; i<KB_END; i++) {
-        mvprintw(y, x, "%c%s", keyid_to_string(i)[0], GLOBALS.keyboard.keys[i].down ? "*" : ".");
+        mvwprintw(scr, y, x, "%c%s", keyid_to_string(i)[0], GLOBALS.keyboard.keys[i].down ? "*" : ".");
         x += 3;
     }
 }
 
 void draw_gamewin() {
 
-    int mx, my;
-    getmaxyx(gamewin, my, mx);
+    int mx = gamewin.w;
+    int my = gamewin.h;
 
     EntityType* entity;
 
-    for (int x=0; x<=mx; x++) {
-        for (int y=0; y<=my; y++) {
+    for (int x=0; x <= gamewin.w; x++) {
+        for (int y=0; y <= gamewin.h; y++) {
+
             entity = game_world_getxy(x, y);
-            wattron(gamewin, COLOR_PAIR(entity->skin->id));
-            mvwaddch(gamewin, y, x, entity->skin->character);
+            wattron(gamewin.win, COLOR_PAIR(entity->skin->id));
+            mvwaddch(gamewin.win, y, x, entity->skin->character);
         }
     }
 
-    box(gamewin, 0, 0);
-    wnoutrefresh(gamewin);
+    box(gamewin.win, 0, 0);
+    wnoutrefresh(gamewin.win);
 }
 
 void draw_uiwin() {
-    wclear(uiwin);
+    werase(uiwin.win);
 
-    draw_rt_clock(uiwin, 10, 5, COLS*.05);
-    //draw_keyboard_state();
+    draw_rt_clock(uiwin.win, uiwin.h/2+2, uiwin.h/2, uiwin.h/2);
 
-    mvwprintw(uiwin, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
+    mvwprintw(uiwin.win, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
             GLOBALS.player->y, GLOBALS.player->x,
             GLOBALS.player->vy<0 ? '-':'+', GLOBALS.player->vy,
             GLOBALS.player->vx<0 ? '-':'+', GLOBALS.player->vx
             );
 
     EntityType* entity = game_world_getxy(1, 1);
-    mvwprintw(uiwin, 7, 20, "Entity Type at (1,1): %lu", entity->id);
+    mvwprintw(uiwin.win, 7, 20, "Entity Type at (1,1): %lu", entity->id);
 
-    mvwprintw(uiwin, (TIME_MSEC/100)%(int)(LINES*.2), COLS*.4, "!"); // draw splash icon
+    mvwprintw(uiwin.win, (TIME_MSEC/100)%(int)(LINES*.2), COLS*.4, "!"); // draw splash icon
 
-    box(uiwin, 0, 0);
-    wnoutrefresh(uiwin);
+    box(uiwin.win, 0, 0);
+    draw_keyboard_state(uiwin.win, (int)COLS*.5, 5);
+    wnoutrefresh(uiwin.win);
 }
 
 void draw_main_menu() {
@@ -208,6 +198,8 @@ void draw_main_menu() {
     draw_uiwin();
 }
 
+
+/* Init Functions */
 int init_colors() {
     GameContext* game = game_get_context();
 
@@ -226,21 +218,40 @@ int init_colors() {
     return 1;
 }
 
+int init_window(window_t* window, int x, int y, int w, int h, const char* title) {
+    window->win = newwin(h, w, y, x);
+    window->x = x;
+    window->y = y;
+    window->w = w;
+    window->h = h;
+    strncpy(window->title, title, MAX_TITLE);
+
+    return NULL < window->win;
+}
+
+
+/* Public functions used by other components */
+void UI_update_time(int msec) {
+    TIME_MSEC = msec;
+}
+
+
 int UI_init() {
     initscr();
     start_color();
     raw();
-    curs_set(0);
-    noecho();
     cbreak();
+    noecho();
+    curs_set(0);
     nodelay(stdscr, 1);
-    getmaxyx(stdscr, LINES, COLS);
 
     ESCDELAY = 25;
+    getmaxyx(stdscr, LINES, COLS);
 
-    //TODO:  Store window sizes in a struct
-    gamewin = newwin(LINES*.6, COLS*.6, LINES * .05, COLS*.05);
-    uiwin = newwin(LINES*.2, COLS*.8, LINES * .8, COLS*.05);
+    init_window(&gamewin, LINES*.6, COLS*.6, LINES * .05, COLS*.05, "Game");
+    init_window(&gamewin, COLS*.05, LINES*.05, COLS*.6, LINES*.6, "Game");
+
+    init_window(&uiwin, COLS*.05, LINES*.8, COLS*.8, LINES*.2, "UI");
 
     int status = game_init();
     if (status != 0) {
@@ -267,6 +278,8 @@ int UI_loop() {
 }
 
 int UI_exit() {
+    delwin(gamewin.win);
+    delwin(uiwin.win);
     endwin();
     free(MENU_STACK);
     return 1;

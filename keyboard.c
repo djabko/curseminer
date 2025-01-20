@@ -36,6 +36,7 @@ void keyboard_init() {
     }
 }
 
+// Each string must correspond by position to it's KeyID enum
 const char* KEYID_STR_MAP[] = {
     "^",
     "up_arrow",
@@ -46,6 +47,7 @@ const char* KEYID_STR_MAP[] = {
     "S_key",
     "A_key",
     "D_key",
+    "C_key",
     "Q_key",
     "esc_key",
     "$"

@@ -9,7 +9,7 @@
 
 #define MIN_ARGS 0
 #define UPDATE_RATE 120 // times per second
-#define SCREEN_REFRESH_RATE 10 // times per second
+#define SCREEN_REFRESH_RATE 120 // times per second
 #define KEYBOARD_EMPTY_RATE 1000000 / 2
 
 struct Globals GLOBALS = {
@@ -60,12 +60,12 @@ int exit_state() {
 }
 
 int tsinit = 0;
-TimeStamp refresh_screen;
+TimeStamp last_screen_refresh;
 int jobUI (Task* task, Stack64* stack) {
     
-    if (!tsinit || timer_ready(&refresh_screen)) {
-        refresh_screen = TIMER_NOW;
-        refresh_screen.tv_usec += (1000000/SCREEN_REFRESH_RATE);
+    static int interval = 1000 / SCREEN_REFRESH_RATE;
+    if (!tsinit || interval <= timer_diff_milisec(&TIMER_NOW, &last_screen_refresh)) {
+        last_screen_refresh = TIMER_NOW;
         tsinit = 1;
         fprintf(stderr, "refreshed: %lu\n", TIMER_NOW.tv_sec);
 
@@ -84,6 +84,7 @@ int jobUI (Task* task, Stack64* stack) {
 int jobInput (Task* task, Stack64* stack) {
 
     keyboard_poll();
+    fprintf(stderr, "keyboard_polled:\n");
     if (kb_down(KB_Q))
         tk_kill(task);
 
