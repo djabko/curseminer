@@ -61,6 +61,7 @@ void init_entity_types() {
     GAME->entity_types_c = c;
 }
 
+// TODO: qu_next() is called 12 times in this function???
 int update_game_world(Task* task, Stack64* stack) {
     //GAME->world_view_x = GAME->world_view_x % GAME->world->maxx;
     //GAME->world_view_y = GAME->world_view_y % GAME->world->maxy;
@@ -68,15 +69,19 @@ int update_game_world(Task* task, Stack64* stack) {
     Queue64* entity_qu = GAME->world->entities;
 
     Entity* end = (Entity*) qu_peek(entity_qu);;
+    //fprintf(stderr, "\n\n=== START ===\n");
     Entity* e = (Entity*) qu_next(entity_qu);
 
-    // TODO: loop sometimes iterates too many times
     int i = entity_qu->count;
+
     do {
         e->controller->tick(e);
         e = (Entity*) qu_next(entity_qu);
         i--;
+
     } while (e != end && 0 < i);
+
+    //fprintf(stderr, "\n\n=== END ===\n");
    
     tk_sleep(task, 100);
     return 0;

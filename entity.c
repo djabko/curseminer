@@ -10,7 +10,7 @@ EntityController* KEYBOARD_CONTROLLER = NULL;
 Entity* ENTITY_ARRAY = NULL;
 int MAX = 32;
 
-void tick_move_entity(Entity* e) {
+void tick_entity_behaviour(Entity* e) {
     Queue64* qu = e->controller->behaviour_queue;
     switch (qu_dequeue(qu)) {
 
@@ -22,15 +22,13 @@ void tick_move_entity(Entity* e) {
             game_world_setxy(e->x, e->y, ge_stone);
 
         case be_move:
-            if (timer_ready(&e->next_move)) {
-            e->x += e->vx;
-            e->y += e->vy;
+            int interval = e->speed * 10;
 
-            timer_now(&e->next_move);
-            e->next_move.tv_sec += e->speed / 100;
-            e->next_move.tv_usec += (e->speed % 100) * 10000;
+            if (interval < timer_diff_milisec(&TIMER_NOW, &e->last_moved)) {
+                e->x += e->vx;
+                e->y += e->vy;
+                e->last_moved = TIMER_NOW;
         }
-
     }
 }
 
@@ -50,7 +48,7 @@ void default_tick(Entity* e) {
     e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
     qu_enqueue(qu, be_move);
 
-    tick_move_entity(e);
+    tick_entity_behaviour(e);
 }
 
 /* Defines player action for each tick
@@ -61,13 +59,14 @@ void player_tick(Entity* player) {
     Queue64* qu = player->controller->behaviour_queue;
     int up = kb_down(KB_W);
     int down = kb_down(KB_S);
-    int right = kb_down(KB_D);
     int left = kb_down(KB_A);
+    int right = kb_down(KB_D);
     int place_tile = kb_down(KB_C);
 
-    if (!(up || left || down || right)) {
+    if (!(up || down || left || right)) {
         player->vx = 0;
         player->vy = 0;
+
     } else {
 
         if (up) {
@@ -89,6 +88,7 @@ void player_tick(Entity* player) {
             player->facing = ENTITY_FACING_RIGHT;
             player_highlight_tile(player->x+1, player->y);
         }
+
     }
 
     if (place_tile) {
@@ -98,12 +98,12 @@ void player_tick(Entity* player) {
     if (qu_empty(qu) && (up || down || right || left))
         qu_enqueue(qu, be_move);
 
-    tick_move_entity(player);
+    tick_entity_behaviour(player);
+    fprintf(stderr, "Player ticked\n");
 }
 
 
 
-// Calling game_world_getxy() here causes update_game_world to set entity_qu[i+0] to entity_qu[i+1]
 void default_find_path(Entity* e, int x, int y) {
     if (e->x < x && game_world_getxy(e->x+1, e->y)->id == ge_air)  e->vx =   1;
     else if (e->x > x && game_world_getxy(e->x-1, e->y)->id == ge_air)  e->vx =  -1;
@@ -150,7 +150,7 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
     new_entity->speed = 20;
     new_entity->health = 10;
     new_entity->facing = face;
-    timer_now(&new_entity->next_move);
+    new_entity->last_moved = TIMER_NEVER;
 
     create_default_entity_controller();
     new_entity->controller = DEFAULT_CONTROLLER;

@@ -6,10 +6,12 @@
 
 typedef struct EntityType EntityType;
 typedef struct EntityController EntityController;
+
+// TODO: move to entity.h
 typedef struct Entity {
     EntityType* type;
     EntityController* controller;
-    TimeStamp next_move;
+    TimeStamp last_moved;
     int id, x, y, vx, vy, speed, health, facing;
 } Entity;
 

@@ -7,6 +7,10 @@
 
 typedef enum {
     be_move,
+    be_face_up,
+    be_face_down,
+    be_face_left,
+    be_face_right,
     be_place,
     be_attack,
     be_interact

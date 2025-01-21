@@ -40,6 +40,7 @@ typedef struct Skin {
                   fg_b;
 } Skin;
 
+// TODO: add name
 typedef struct EntityType {
     int id;
     Skin* skin;

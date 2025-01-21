@@ -97,6 +97,8 @@ int qu_enqueue(Queue64* qu, uint64_t data) {
         qu->mempool[qu->tail] = data;
     }
 
+    //fprintf(stderr, "Enqueued %x\n", data);
+
     return qu->count++;
 }
 
@@ -111,6 +113,8 @@ uint64_t qu_dequeue(Queue64* qu) {
         qu->head = -1;
         qu->tail = -1;
     }
+
+    //fprintf(stderr, "Dequeued %x\n", data);
     return data;
 }
 
@@ -138,9 +142,12 @@ int qu_full(Queue64* qu) {
 
 void qu_print(Queue64* qu, int is_error) {
     FILE* f = is_error ? stderr : stdout;
+    
+    if (qu->count < 1) fprintf(f, "<qu_empty>\n");
     for (int i = 0; i<qu->count; i++) {
-        fprintf(f, "%d: %lu\n", i, qu->mempool[i % qu->capacity]);
+        fprintf(f, "%d: %x\n", i, qu->mempool[(qu->head + i) % qu->capacity]);
     }
+    fprintf(f, "\n");
 }
 
 

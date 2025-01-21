@@ -67,7 +67,6 @@ int jobUI (Task* task, Stack64* stack) {
     if (!tsinit || interval <= timer_diff_milisec(&TIMER_NOW, &last_screen_refresh)) {
         last_screen_refresh = TIMER_NOW;
         tsinit = 1;
-        fprintf(stderr, "refreshed: %lu\n", TIMER_NOW.tv_sec);
 
         int sec = TIMER_NOW.tv_sec;
         int msec = TIMER_NOW.tv_usec / 1000;
@@ -84,7 +83,6 @@ int jobUI (Task* task, Stack64* stack) {
 int jobInput (Task* task, Stack64* stack) {
 
     keyboard_poll();
-    fprintf(stderr, "keyboard_polled:\n");
     if (kb_down(KB_Q))
         tk_kill(task);
 
