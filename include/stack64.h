@@ -41,6 +41,8 @@ Queue64* qu_init(int n);
 int qu_enqueue(Queue64*, uint64_t);
 uint64_t qu_dequeue(Queue64*);
 uint64_t qu_peek(Queue64*);
+uint64_t qu_peek_tail(Queue64*);
+uint64_t qu_get(Queue64*, int, int*);
 uint64_t qu_next(Queue64*);
 int qu_empty(Queue64*);
 int qu_full(Queue64*);

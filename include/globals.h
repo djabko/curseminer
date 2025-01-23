@@ -13,6 +13,7 @@ struct Globals{
     Keyboard keyboard;
     WindowContext window;
     Entity* player;
+    GameContext* game;
 };
 
 extern struct Globals GLOBALS;

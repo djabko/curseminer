@@ -104,6 +104,7 @@ void player_tick(Entity* player) {
 
 
 
+// Calling game_world_getxy() here causes update_game_world to set entity_qu[i+0] to entity_qu[i+1]
 void default_find_path(Entity* e, int x, int y) {
     if (e->x < x && game_world_getxy(e->x+1, e->y)->id == ge_air)  e->vx =   1;
     else if (e->x > x && game_world_getxy(e->x-1, e->y)->id == ge_air)  e->vx =  -1;

@@ -97,8 +97,6 @@ int qu_enqueue(Queue64* qu, uint64_t data) {
         qu->mempool[qu->tail] = data;
     }
 
-    //fprintf(stderr, "Enqueued %x\n", data);
-
     return qu->count++;
 }
 
@@ -114,18 +112,29 @@ uint64_t qu_dequeue(Queue64* qu) {
         qu->tail = -1;
     }
 
-    //fprintf(stderr, "Dequeued %x\n", data);
     return data;
+}
+
+uint64_t qu_peek(Queue64* qu) {
+    return qu->mempool[qu->head];
+}
+
+uint64_t qu_peek_tail(Queue64* qu) {
+    return qu->mempool[qu->tail];
+}
+
+
+// Returns the i'th element as offset from head, or 0
+// TODO: add error handling
+uint64_t qu_get(Queue64 *qu, int i, int *err) {
+    if (i < 0 || qu->count <= i) return 0;
+    return qu->mempool[ qu->head + i ];
 }
 
 uint64_t qu_next(Queue64* qu) {
     uint64_t data = qu_dequeue(qu);
     qu_enqueue(qu, data);
     return data;
-}
-
-uint64_t qu_peek(Queue64* qu) {
-    return qu->mempool[qu->head];
 }
 
 int qu_empty(Queue64* qu) {

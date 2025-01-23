@@ -69,7 +69,6 @@ int update_game_world(Task* task, Stack64* stack) {
     Queue64* entity_qu = GAME->world->entities;
 
     Entity* end = (Entity*) qu_peek(entity_qu);;
-    //fprintf(stderr, "\n\n=== START ===\n");
     Entity* e = (Entity*) qu_next(entity_qu);
 
     int i = entity_qu->count;
@@ -81,8 +80,6 @@ int update_game_world(Task* task, Stack64* stack) {
 
     } while (e != end && 0 < i);
 
-    //fprintf(stderr, "\n\n=== END ===\n");
-   
     tk_sleep(task, 100);
     return 0;
 }
@@ -118,6 +115,8 @@ int game_init() {
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
 
+    GLOBALS.game = GAME;
+
     return status;
 }
 
@@ -138,14 +137,14 @@ EntityType* game_world_getxy(int x, int y) {
 
     Queue64* entity_qu = GAME->world->entities;
 
-    if (qu_peek(entity_qu) == (uint64_t)GLOBALS.player)
-        qu_next(entity_qu);
+    // TODO: foreach macro
+    int err = -1;
+    int i = 0;
+    Entity* e = (Entity*) qu_get(entity_qu, i++, &err);
 
-    Entity* e = (Entity*) qu_next(entity_qu);
-
-    for (int i=0; i < entity_qu->count; i++) {
+    while (e) {
         if (e->x == x && e->y == y) return e->type;
-        e = (Entity*) qu_next(entity_qu);
+        e = (Entity*) qu_get(entity_qu, i++, &err);
     }
 
     qu_next(entity_qu);
