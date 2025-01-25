@@ -10,6 +10,7 @@
 #define PAGE_SIZE getpagesize()
 
 struct Globals{
+    int view_port_maxx, view_port_maxy;
     Keyboard keyboard;
     WindowContext window;
     Entity* player;

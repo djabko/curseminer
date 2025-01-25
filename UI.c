@@ -248,8 +248,10 @@ int UI_init() {
     ESCDELAY = 25;
     getmaxyx(stdscr, LINES, COLS);
 
-    init_window(&gamewin, LINES*.6, COLS*.6, LINES * .05, COLS*.05, "Game");
+    //init_window(&gamewin, LINES*.6, COLS*.6, LINES * .05, COLS*.05, "Game");
     init_window(&gamewin, COLS*.05, LINES*.05, COLS*.6, LINES*.6, "Game");
+    GLOBALS.view_port_maxx = COLS * .6 - 2;
+    GLOBALS.view_port_maxy = LINES *.6 - 2;
 
     init_window(&uiwin, COLS*.05, LINES*.8, COLS*.8, LINES*.2, "UI");
 

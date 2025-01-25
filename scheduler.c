@@ -134,11 +134,11 @@ int rq_run(RunQueue* rq) {
     if (!current->occupied) return -1;
 
     if (current->flags & FLAG_RQ_KILLED) {
-        rq_pop(rq);
 
         if (current->callback)
             current->callback(current);
 
+        rq_pop(rq);
         return 1;
     }
 
@@ -286,10 +286,9 @@ int rqll_kill_all_tasks(ll_head* rqll) {
     for (int i=0; i<rqll->count; i++) {
 
         if (rq->lock) continue;
+
         rq->lock = 1;
-
         count += rq_kill_all_tasks(rq);
-
         rq->lock = 0;
 
         rq = rq->next;

@@ -31,10 +31,15 @@ World* world_init(int maxx, int maxy, int maxid) {
 }
 
 int world_getxy(int x, int y) {
+    if (x < 0 || WORLD->maxx < x
+     || y < 0 || WORLD->maxy < y) return 0;
+
     return WORLD->world_array[x * WORLD->maxy + y];
 }
 
 void world_setxy(int x, int y, int tid) {
+    if (WORLD->maxx < x || WORLD->maxy < y) return;
+
     WORLD->world_array[x * WORLD->maxy + y] = tid;
 }
 

@@ -62,9 +62,6 @@ void init_entity_types() {
 }
 
 int update_game_world(Task* task, Stack64* stack) {
-    //GAME->world_view_x = GAME->world_view_x % GAME->world->maxx;
-    //GAME->world_view_y = GAME->world_view_y % GAME->world->maxy;
-
     Queue64* entity_qu = GAME->world->entities;
 
     Entity* end = (Entity*) qu_peek(entity_qu);;
@@ -102,7 +99,7 @@ int game_init() {
     
     int e_x = rand() % (GAME->world_view_x + 20);
     int e_y = rand() % (GAME->world_view_y + 20);
-    Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
     entity_set_keyboard_controller(player);
     GLOBALS.player = player;
 
@@ -133,6 +130,14 @@ GameContext* game_get_context() {
 
 // TODO: Use a hashtable instead
 EntityType* game_world_getxy(int x, int y) {
+    x += GAME->world_view_x;
+    y += GAME->world_view_y;
+
+    /* world_view updating should take place in a separate task */
+    if (GLOBALS.player->x < GAME->world_view_x+1) GAME->world_view_x--;
+    if (GLOBALS.player->x > GAME->world_view_x + GLOBALS.view_port_maxx) GAME->world_view_x++;
+    if (GLOBALS.player->y < GAME->world_view_y+1) GAME->world_view_y--;
+    if (GLOBALS.player->y > GAME->world_view_y + GLOBALS.view_port_maxy) GAME->world_view_y++;
 
     Queue64* entity_qu = GAME->world->entities;
 
@@ -153,6 +158,8 @@ EntityType* game_world_getxy(int x, int y) {
 }
 
 int game_world_setxy(int x, int y, EntityTypeID tid) {
+    x += GAME->world_view_x;
+    y += GAME->world_view_y;
     world_setxy(x, y, tid);
     return 0;
 }
