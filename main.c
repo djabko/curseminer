@@ -42,7 +42,6 @@ void init() {
                 RUN_QUEUE = scheduler_new_rq(RQLL)), "RQ_UI");
     
 
-    //window_init();
     UI_init();
     keyboard_init();
 
@@ -53,7 +52,6 @@ int exit_state() {
     printf("Exiting...");
 
     UI_exit();
-    //window_free();
     scheduler_free();
 
     return 0;
@@ -96,16 +94,12 @@ int jobIO (Task* task, Stack64* stack) {
 int jobMain (Task* task, Stack64* stack) {
     if (GLOBAL_TASK_COUNT < 2) tk_kill(task);
     wake_tasks();
-    kill_dying_tasks();
     return 0;
 }
 
 
-int killing = 0;
 void cb_exit(Task* task) {
-    if (killing) return;
-    killing++;
-    kill_all_tasks(); // TODO: Calling multiple times causes segfault
+    kill_all_tasks();
 }
 
 
@@ -125,6 +119,7 @@ int main(int argc, const char** argv) {
 
     gettimeofday(&quit_time, NULL);
     quit_time.tv_sec += 1;
+
 
     schedule(RUN_QUEUE, 0, 0, jobMain, NULL);
     schedule_cb(RUN_QUEUE, 0, ui_runtime, jobUI, stackUI, cb_exit);

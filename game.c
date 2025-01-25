@@ -61,7 +61,6 @@ void init_entity_types() {
     GAME->entity_types_c = c;
 }
 
-// TODO: qu_next() is called 12 times in this function???
 int update_game_world(Task* task, Stack64* stack) {
     //GAME->world_view_x = GAME->world_view_x % GAME->world->maxx;
     //GAME->world_view_y = GAME->world_view_y % GAME->world->maxy;

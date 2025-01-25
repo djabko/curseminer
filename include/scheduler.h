@@ -58,8 +58,10 @@ int tk_kill(Task*);
 /* RunQueue*/
 typedef struct RunQueue {
     Task *mempool, *head, *tail;
-    unsigned int count, max;
     struct RunQueue *next;
+
+    unsigned int count, max;
+    int lock;
 } RunQueue;
 
 

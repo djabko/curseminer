@@ -56,12 +56,12 @@ RunQueue* rq_init() {
     rq->mempool = (Task*) (rq + 1);
 
     rq->max = (RQ_MEMPOOL_SIZE - sizeof(RunQueue)) / sizeof(Task);
-    //rq->max = ((RQ_MEMPOOL_SIZE - sizeof(RunQueue)) / (sizeof(Task) * sizeof(Task*)));
 
     for (int i = 0; i < rq->max; i++) 
         (rq->mempool+i)->occupied = 0;
 
     rq->count = 0;
+    rq->lock = 0;
     rq->head = NULL;
     rq->tail = NULL;
     rq->next = NULL;
@@ -121,6 +121,8 @@ int rq_pop(RunQueue* rq) {
     rq->count--;
     rm_task(old);
 
+    GLOBAL_TASK_COUNT--;
+
     return 0;
 }
 
@@ -132,9 +134,12 @@ int rq_run(RunQueue* rq) {
     if (!current->occupied) return -1;
 
     if (current->flags & FLAG_RQ_KILLED) {
+        rq_pop(rq);
+
         if (current->callback)
             current->callback(current);
-        return rq_pop(rq);
+
+        return 1;
     }
 
     if (0 == (current->flags & FLAG_RQ_SLEEPING))
@@ -213,7 +218,6 @@ void scheduler_free_rqll(ll_head* rqll) {
 RunQueue* scheduler_new_rq_(ll_head* rqll) {
 
     // 1. Insert into rqll (type ll_head)
-    fprintf(stderr, "ADDING RQ\n");
     RunQueue* new_rq = rq_init();
     ll_insert(rqll, new_rq);
 
@@ -256,36 +260,47 @@ int rq_kill_all_tasks(RunQueue* rq) {
 
     int count = 0;
 
-    do {
-        tk_kill(task);
+    for (int i=0; i<rq->count; i++) {
+        
+        if ( !(task->flags & FLAG_RQ_KILLED)) {
+            tk_kill(task);
+            count++;
+        }
+
         task = task->next;
-        count++;
-    } while (task != rq->head);
+    }
 
 
     return count;
 }
 
+// TODO: Currently doesn't iterate RunQueueLists (rqll) because they are not tracked in any way other than DEFAULT_RQLL and g_sleeping_tasks
 int rqll_kill_all_tasks(ll_head* rqll) {
     if (ll_empty(rqll)) return -1;
 
     int count = 0;
-
     ll_node* node = rqll->node;
-    while (node && node->data) {
-        RunQueue* rq = (RunQueue*) node->data;
-        rq_kill_all_tasks(rq);
-        node = node->next;
-        count++;
+    RunQueue* rq = (RunQueue*) node->data;
 
-        printf("Killed RQ: %p\n", rq);
+    // Iterate all RunQueues on list
+    for (int i=0; i<rqll->count; i++) {
+
+        if (rq->lock) continue;
+        rq->lock = 1;
+
+        count += rq_kill_all_tasks(rq);
+
+        rq->lock = 0;
+
+        rq = rq->next;
     }
 
     return count;
 }
 
 int kill_all_tasks() {
-    return rqll_kill_all_tasks(DEFAULT_RQLL);
+    int count = rqll_kill_all_tasks(DEFAULT_RQLL);
+    return count;
 }
 
 int kill_dying_tasks() {
@@ -342,19 +357,15 @@ void schedule_run(ll_head* rqll) {
 }
 
 
+// TODO: initialize tail
 ll_head* ll_init(int n) {
     n = n * (n>0) + (n<=0);
-    ll_head* head = malloc(n * PAGE_SIZE);
+    ll_head* head = calloc(n, PAGE_SIZE);
     head->mempool = (ll_node*) (head+1);
     head->node = NULL;
     head->count = 0;
     head->max = (n * PAGE_SIZE) / sizeof(ll_node) - sizeof(ll_head);
     printf("%d / %lu = %d\n", n*PAGE_SIZE, sizeof(ll_node), head->max);
-
-    for (int i=0; i<(head->max); i++) {
-        head->mempool[i].next = NULL;
-        head->mempool[i].data = NULL;
-    }
 
     return head;
 }

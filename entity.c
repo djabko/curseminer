@@ -40,7 +40,6 @@ void player_highlight_tile(int x, int y) {
 };
 
 /* Defines default entity action for each tick
- * 
  * Current behaviour is to follow the player via find_path() 
  */
 void default_tick(Entity* e) {
@@ -52,7 +51,6 @@ void default_tick(Entity* e) {
 }
 
 /* Defines player action for each tick
- *
  * Check keyboard states and places the appropriate action on player's behaviour queue
  */
 void player_tick(Entity* player) {
@@ -99,12 +97,9 @@ void player_tick(Entity* player) {
         qu_enqueue(qu, be_move);
 
     tick_entity_behaviour(player);
-    fprintf(stderr, "Player ticked\n");
 }
 
 
-
-// Calling game_world_getxy() here causes update_game_world to set entity_qu[i+0] to entity_qu[i+1]
 void default_find_path(Entity* e, int x, int y) {
     if (e->x < x && game_world_getxy(e->x+1, e->y)->id == ge_air)  e->vx =   1;
     else if (e->x > x && game_world_getxy(e->x-1, e->y)->id == ge_air)  e->vx =  -1;
