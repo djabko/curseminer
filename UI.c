@@ -39,15 +39,6 @@ typedef struct {
 
 
 /* Math Helper Functions */
-int max(double a, double b) {
-    return a * (b <= a) + b * (a < b);
-}
-
-int min(double a, double b) {
-    return a * (a <= b) + b * (b < a);
-}
-
-
 double euc_dist(Line* line) {
     return floor( 
             sqrt(
