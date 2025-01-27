@@ -141,17 +141,9 @@ EntityType* game_world_getxy(int x, int y) {
 
     Queue64* entity_qu = GAME->world->entities;
 
-    // TODO: foreach macro
-    int err = -1;
-    int i = 0;
-    Entity* e = (Entity*) qu_get(entity_qu, i++, &err);
-
-    while (e) {
+    qu_foreach(entity_qu, Entity*, e) {
         if (e->x == x && e->y == y) return e->type;
-        e = (Entity*) qu_get(entity_qu, i++, &err);
     }
-
-    qu_next(entity_qu);
 
     int id = world_getxy(x + GAME->world_view_x, y + GAME->world_view_y);
     return GAME->entity_types + id;

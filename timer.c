@@ -1,3 +1,4 @@
+#include "globals.h"
 #include "timer.h"
 #include "stdio.h"
 #include "string.h"
@@ -86,7 +87,7 @@ void timer_print(TimeStamp* t) {
     minutes = t->tv_sec / (60) % (60);
     seconds = t->tv_sec % 60;
     useconds = t->tv_nsec;// / 10000;
-    printf("<%02lu:%02lu:%02lu.%lu>", hours, minutes, seconds, useconds);
+    _log_debug("<%02lu:%02lu:%02lu.%lu>", hours, minutes, seconds, useconds);
 }
 
 void timer_print_now() {

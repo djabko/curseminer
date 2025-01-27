@@ -1,3 +1,4 @@
+#include "globals.h"
 #include "files.h"
 
 #include <errno.h>
@@ -25,7 +26,7 @@ int file_open(Task* task, Stack64* stack) {
     Stack64* new_stack = st_init(1);
     st_push(new_stack, (uint64_t) cb);
 
-    printf("\n");
+    log_debug_nl();
     return 0;
 }
 
@@ -51,7 +52,7 @@ int file_read(Task* task, Stack64* stack) {
         // Read operation finished
         case 0:
 
-            printf("'''%p'''\n", cb->aio_buf);
+            log_debug("'''%p'''", cb->aio_buf);
 
             size_t status = aio_return(cb);
 
@@ -61,16 +62,16 @@ int file_read(Task* task, Stack64* stack) {
 
             // EOF encountered, file has been read in full
             else if (0 <= status && status < cb->aio_nbytes) {
-                printf("EOF encountered, file read in full\n");
+                log_debug("EOF encountered, file read in full");
                 tk_kill(task);
             }
 
             // Error case
             else
-                printf("Error reading file...\n");
+                log_debug("Error reading file...");
         // Error case
         default:
-            printf("File reading error...\n");
+            log_debug("File reading error...");
             tk_kill(task);
             free(cb);
     }
@@ -83,7 +84,7 @@ int await_file_read(Task* task, Stack64* stack) {
 
     switch (aio_error(cb)) {
         case 0:
-            printf("File contents: '%p'\n", cb->aio_buf);
+            log_debug("File contents: '%p'", cb->aio_buf);
             file_close(cb->aio_fildes);
             free((void*) cb->aio_buf);
             free(cb);
@@ -91,15 +92,15 @@ int await_file_read(Task* task, Stack64* stack) {
             return 0;
 
         case EINPROGRESS:
-            printf("In progress...\n");
+            log_debug("In progress...");
             return 1;
 
         case ECANCELED:
-            printf("Cancelled!!\n");
+            log_debug("Cancelled!!");
             return -1;
 
         default:
-            printf("ERROR occured while reading file.'\n");
+            log_debug("ERROR occured while reading file.'");
             exit(1);
     }
 }

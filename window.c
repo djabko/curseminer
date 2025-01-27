@@ -26,12 +26,12 @@ void error_callback(int error, const char* description) {
     static const char* ansi_color_red = "\x1b[31m";
     static const char* ansi_clear = "\x1b[0m";
 
-    fprintf(stderr, "%sError: %s%s\n", ansi_color_red, description, ansi_clear);
+    log_debug("%sError: %s%s", ansi_color_red, description, ansi_clear);
     glfwSetWindowShouldClose(GLOBALS.window.w, GLFW_TRUE);
 }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    fprintf(stderr, "Key pressed: %d\t%d\t%d\t%d\n", key, scancode, action, mods);
+    log_debug("Key pressed: %d\t%d\t%d\t%d", key, scancode, action, mods);
 
     if (action == GLFW_RELEASE && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q))
         glfwSetWindowShouldClose(GLOBALS.window.w, GLFW_TRUE);
@@ -84,17 +84,17 @@ int vulkan_init() {
     VkExtensionProperties extensionprops[available];
     vkEnumerateInstanceExtensionProperties(NULL, &available, extensionprops);
 
-    fprintf(stderr, "%d/%d extensions available: {\n", enabled, available);
-    for (int i=0; i<available; i++) fprintf(stderr, "'%s'%s", extensionprops[i].extensionName, i==enabled?"":", ");
-    fprintf(stderr, "}\n\n");
+    _log_debug("%d/%d extensions available: {\n", enabled, available);
+    for (int i=0; i<available; i++) _log_debug("'%s'%s", extensionprops[i].extensionName, i==enabled?"":", ");
+    _log_debug("}\n\n");
 
     const char* extensions[enabled + 1];
     for (int i=0; i<enabled; i++) extensions[i] = _extensions[i];
     extensions[enabled++] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 
-    fprintf(stderr, "%d/%d extensions enabled: {\n", enabled, available);
-    for (int i=0; i<enabled; i++) fprintf(stderr, "'%s'%s", extensions[i], i==enabled?"":", ");
-    fprintf(stderr, "}\n\n");
+    _log_debug("%d/%d extensions enabled: {\n", enabled, available);
+    for (int i=0; i<enabled; i++) _log_debug("'%s'%s", extensions[i], i==enabled?"":", ");
+    _log_debug("}\n\n");
 
     pri.appinfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     pri.appinfo.pApplicationName = GLOBALS.window.title;

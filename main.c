@@ -31,7 +31,7 @@ RunQueue* RUN_QUEUE = NULL;
 TimeStamp quit_time;
 
 void checkifNULL(void* ptr, const char* str) {
-    if (ptr == NULL) printf("%s is a null pointer.\n", str);
+    if (ptr == NULL) log_debug("%s is a null pointer.\n", str);
 }
 
 void init() {
@@ -45,11 +45,11 @@ void init() {
     UI_init();
     keyboard_init();
 
-    printf("Initialized...\n");
+    log_debug("Initialized...\n");
 }
 
 int exit_state() {
-    printf("Exiting...");
+    log_debug("Exiting...");
 
     UI_exit();
     scheduler_free();

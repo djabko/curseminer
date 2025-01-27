@@ -18,20 +18,27 @@
 #define foreachn(ptr, n, e) for (typeof(ptr) e=ptr; e < ptr + n; e++)
 
 #ifdef DEBUG
+
 #define DEBUG_FD stderr
-#define log_debug(...)                  \
-    ifdef (DEBUG) {                     \
-        fprintf(DEBUG_FD, __VA_ARGS__); \
-        print_newln(stderr);            \
-    }
+#define log_debug_nl() fprintf(DEBUG_FD, "\n")
+#define _log_debug(...)   fprintf(DEBUG_FD, __VA_ARGS__)
+#define log_debug(...)                      \
+    do {                                    \
+    fprintf(DEBUG_FD, __VA_ARGS__);         \
+    log_debug_nl();                         \
+    } while (0)                                       
+
 #else
-#define log_debug(...) {}
+
+#define log_debug_nl()
+#define _log_debug(...)
+#define log_debug(...)
 #endif
 
-#define assert(condition, ...)          \
-    if (!(condition)) {                 \
-        log_debug(__VA_ARGS__);              \
-        exit(-1);                       \
+#define assert(condition, ...)              \
+    if (!(condition)) {                     \
+        log_debug(__VA_ARGS__);             \
+        exit(-1);                           \
     }
 
 

@@ -10,6 +10,7 @@ typedef struct Node {
     struct Node *prev, *next;
 } Node;
 
+// TODO: implement utility functions for linked lists
 typedef struct {
     Node *head, *tail;
 } LLHead;
@@ -46,7 +47,12 @@ uint64_t qu_get(Queue64*, int, int*);
 uint64_t qu_next(Queue64*);
 int qu_empty(Queue64*);
 int qu_full(Queue64*);
-void qu_print(Queue64*, int);
+void qu_print(Queue64*);
+
+#define qu_foreach(qu, type, e)         \
+    int __ITERATOR_1804289383 = 0;      \
+    int __ERROR_CODE_846930886 = -1;    \
+    for(type e = (type) qu->mempool[qu->head]; e; e = (type) qu_get(qu, __ITERATOR_1804289383++, &__ERROR_CODE_846930886))
 
 
 /* 8 Byte Hashtable */

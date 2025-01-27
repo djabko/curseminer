@@ -144,10 +144,6 @@ void draw_keyboard_state(WINDOW* scr, int x, int y) {
 }
 
 void draw_gamewin() {
-
-    int mx = gamewin.w;
-    int my = gamewin.h;
-
     EntityType* entity;
 
     for (int x=0; x <= gamewin.w; x++) {
@@ -175,7 +171,7 @@ void draw_uiwin() {
             );
 
     EntityType* entity = game_world_getxy(1, 1);
-    mvwprintw(uiwin.win, 7, 20, "Entity Type at (1,1): %lu", entity->id);
+    mvwprintw(uiwin.win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
     mvwprintw(uiwin.win, (TIME_MSEC/100)%(int)(LINES*.2), COLS*.4, "!"); // draw splash icon
 
@@ -217,7 +213,7 @@ int init_window(window_t* window, int x, int y, int w, int h, const char* title)
     window->h = h;
     strncpy(window->title, title, MAX_TITLE);
 
-    return NULL < window->win;
+    return NULL < (void*) window->win;
 }
 
 
@@ -248,7 +244,7 @@ int UI_init() {
 
     int status = game_init();
     if (status != 0) {
-        fprintf(stderr, "Error initializing game: %d\n", status);
+        log_debug("Error initializing game: %d", status);
         UI_exit();
         return 0;
     }
