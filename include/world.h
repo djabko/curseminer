@@ -15,9 +15,30 @@ typedef struct Entity {
     int id, x, y, vx, vy, speed, health, facing;
 } Entity;
 
+typedef enum ChunkType {
+    NORMAL,
+    FOREST,
+    OCEAN
+} ChunkType;
+
+typedef struct Chunk {
+    int *data;
+    int top_x, top_y;
+    ChunkType type;
+
+    struct Chunk *top, *bottom, *left, *right;
+} Chunk;
+
+typedef struct ChunkArena {
+    int count, max;
+    Chunk *start, *free, *end;
+    struct ChunkArena* next;
+} ChunkArena;
+
 typedef struct World {
-    int* world_array;
-    Queue64* entities; // should be a linked list
+    int *world_array;
+    ChunkArena *chunk_arenas;
+    Queue64 *entities; // TODO: should be a linked list
     int maxx, maxy, entity_c, entity_maxc;
 } World;
 
