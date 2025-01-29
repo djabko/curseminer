@@ -16,14 +16,14 @@ typedef struct Entity {
 } Entity;
 
 typedef enum ChunkType {
-    NORMAL,
-    FOREST,
-    OCEAN
+    CHUNK_TYPE_NORMAL,
+    CHUNK_TYPE_FOREST,
+    CHUNK_TYPE_OCEAN
 } ChunkType;
 
 typedef struct Chunk {
     int *data;
-    int top_x, top_y;
+    int tl_x, tl_y;
     ChunkType type;
 
     struct Chunk *top, *bottom, *left, *right;
