@@ -22,7 +22,7 @@ typedef enum ChunkType {
 } ChunkType;
 
 typedef struct Chunk {
-    int *data;
+    char *data;
     int tl_x, tl_y;
     ChunkType type;
 
@@ -31,19 +31,20 @@ typedef struct Chunk {
 
 typedef struct ChunkArena {
     int count, max;
+    size_t chunk_s;
     Chunk *start, *free, *end;
     struct ChunkArena* next;
 } ChunkArena;
 
 typedef struct World {
-    int *world_array;
+    char *world_array;
     ChunkArena *chunk_arenas;
     Queue64 *entities; // TODO: should be a linked list
     int maxx, maxy, entity_c, entity_maxc;
 } World;
 
-World* world_init(int, int, int);
-int world_getxy(int, int);
+World* world_init(int, int);
+unsigned char world_getxy(int, int);
 void world_setxy(int, int, int);
 void world_free();
 

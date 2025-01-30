@@ -95,7 +95,7 @@ int game_init() {
 
     init_skins();
     init_entity_types();
-    GAME->world = world_init(256, 256, GAME->skins_c - 1);
+    GAME->world = world_init(20, GAME->skins_c - 1);
     
     int e_x = rand() % (GAME->world_view_x + 20);
     int e_y = rand() % (GAME->world_view_y + 20);
