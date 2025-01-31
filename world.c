@@ -5,6 +5,7 @@
 
 #define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 16
 
+int ITERATOR = 0;
 /* Global Variables
  * Initialized in world_init() 
  */
@@ -17,7 +18,6 @@ int is_arena_full(ChunkArena *arena) {
     return arena->free == arena->end;
 }
 
-// TODO: include chunk->data in memory arena
 ChunkArena *chunk_init_arena(size_t mem_size, int chunk_length) {
     
     int chunk_max = (mem_size - sizeof(ChunkArena)) / ( sizeof(Chunk) + chunk_length );
@@ -26,7 +26,7 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_length) {
     mem_size = mem_size < sizeof(ChunkArena) + sizeof(Chunk) + chunk_length
         ? DEFAULT_CHUNK_ARENA_SIZE : mem_size;
 
-    ChunkArena *arena = malloc(mem_size);
+    ChunkArena *arena = calloc(mem_size, 1);
     Chunk *start = (Chunk*) (arena + 1);
 
     arena->count = 0;
@@ -38,6 +38,17 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_length) {
     arena->next = NULL;
 
     return arena;
+}
+
+// Retrieves the next chunk in memory arena or NULL
+Chunk *chunk_arena_next(ChunkArena *arena, Chunk *chunk) {
+    if (arena == NULL || chunk == NULL || (chunk < arena->start && arena->end <= chunk)) return NULL;
+
+    size_t stride = sizeof(Chunk) + arena->chunk_s * arena->chunk_s;
+    uintptr_t ptr = (uintptr_t) (chunk);
+    ptr += stride;
+
+    return (Chunk*) ptr;
 }
 
 // Returns a free area of memory for chunk allocation
@@ -55,11 +66,8 @@ Chunk *chunk_get_free(World *world) {
     } 
     
     Chunk *re = arena->free;
-    size_t stride = sizeof(Chunk) + arena->chunk_s * arena->chunk_s;
-    uintptr_t ptr = (uintptr_t) (arena->free);
-    ptr += stride;
-    arena->free = (Chunk*) ptr;
 
+    arena->free = chunk_arena_next(arena, arena->free);
     arena->count++;
 
     return re;
@@ -84,6 +92,27 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
 Chunk *chunk_create(World *world, int x, int y) {
     fprintf(stderr, "Created chunk [%d/%d]\n", world->chunk_arenas->count, world->chunk_arenas->max);
     return _chunk_create(world, x, y, NULL, NULL, NULL, NULL);
+}
+
+Chunk *chunk_lookup(World *world, int x, int y) {
+
+    // Make sure (x,y) points to top-left corner of their chunk
+    int chunk_s = world->chunk_arenas->chunk_s;
+    x = (x / chunk_s) * chunk_s;
+    y = (y / chunk_s) * chunk_s;
+
+    fprintf(stderr, "Looking for chunk at (%d, %d)\n", x, y);
+
+    ChunkArena *arena = world->chunk_arenas;
+    for (; arena != NULL; arena = arena->next) {
+        Chunk *chunk = arena->start;
+
+        for (; chunk <= arena->free; chunk = chunk_arena_next(arena, chunk)) {
+            if (chunk->tl_x == x && chunk->tl_y == y) return chunk;
+        }
+    }
+
+    return NULL;
 }
 
 void chunk_free_all() {
@@ -117,7 +146,8 @@ World *world_init(int chunk_s, int maxid) {
     WORLD->entity_maxc = 32;
     WORLD->entities = qu_init( WORLD->entity_maxc );
 
-    WORLD->world_array = chunk_create(WORLD, 0, 0)->data;
+    Chunk *chunk1 = chunk_create(WORLD, 0, 0);
+    WORLD->world_array = chunk1->data;
 
     //world_gen();
 
@@ -125,14 +155,15 @@ World *world_init(int chunk_s, int maxid) {
 }
 
 unsigned char world_getxy(int x, int y) {
-    if (x < 0 || WORLD->maxx < x
-     || y < 0 || WORLD->maxy < y) return 0;
+    if (x < 0 || WORLD->maxx <= x
+     || y < 0 || WORLD->maxy <= y) return 0;
 
+    fprintf(stderr, "Getting (%d,%d) => %d\n", x, y, WORLD->world_array[x * WORLD->maxy + y]);
     return WORLD->world_array[x * WORLD->maxy + y];
 }
 
 void world_setxy(int x, int y, int tid) {
-    if (WORLD->maxx < x || WORLD->maxy < y) return;
+    if (x < 0 && WORLD->maxx < x || y < 0 && WORLD->maxy < y) return;
 
     WORLD->world_array[x * WORLD->maxy + y] = tid;
 }
