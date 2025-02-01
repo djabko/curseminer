@@ -58,17 +58,17 @@ void st_destroy(Stack64* st) {
 
 void st_print(Stack64* st) {
     if (st == NULL) return;
-    printf("[ ");
+    _log_debug("[ ");
 
     int i = 0;
     while (i < st->count) {
-        printf("%lu", *(st->top - i * sizeof(uint64_t)));
-        if (i < st->count-1) printf(", ");
+        _log_debug("%lu", *(st->top - i * sizeof(uint64_t)));
+        if (i < st->count-1) _log_debug(", ");
         
         i++;
     }
 
-    printf(" ]\n");
+    log_debug(" ]");
 }
 
 
@@ -149,14 +149,12 @@ int qu_full(Queue64* qu) {
     return qu->count >= qu->capacity;
 }
 
-void qu_print(Queue64* qu, int is_error) {
-    FILE* f = is_error ? stderr : stdout;
-    
-    if (qu->count < 1) fprintf(f, "<qu_empty>\n");
+void qu_print(Queue64* qu) {
+    if (qu->count < 1) log_debug("<qu_empty>");
     for (int i = 0; i<qu->count; i++) {
-        fprintf(f, "%d: %x\n", i, qu->mempool[(qu->head + i) % qu->capacity]);
+        log_debug("%d: %p", i, (void*) qu->mempool[(qu->head + i) % qu->capacity]);
     }
-    fprintf(f, "\n");
+    log_debug_nl();
 }
 
 
