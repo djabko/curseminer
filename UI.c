@@ -143,6 +143,14 @@ void draw_keyboard_state(WINDOW* scr, int x, int y) {
     }
 }
 
+void draw_gamewin_nogui() {
+    for (int x=0; x <= gamewin.w; x++) {
+        for (int y=0; y <= gamewin.h; y++) {
+            EntityType *e = game_world_getxy(x, y); 
+        }
+    }
+}
+
 void draw_gamewin() {
     EntityType* entity;
 
@@ -157,6 +165,10 @@ void draw_gamewin() {
 
     box(gamewin.win, 0, 0);
     wnoutrefresh(gamewin.win);
+}
+
+void draw_uiwin_nogui() {
+    EntityType *e = game_world_getxy(1, 1);
 }
 
 void draw_uiwin() {
@@ -178,6 +190,12 @@ void draw_uiwin() {
     box(uiwin.win, 0, 0);
     draw_keyboard_state(uiwin.win, (int)COLS*.5, 5);
     wnoutrefresh(uiwin.win);
+}
+
+// Simulates drawing the screen without actually printing anything
+void draw_main_menu_nogui() {
+    draw_gamewin_nogui();
+    draw_uiwin_nogui();
 }
 
 void draw_main_menu() {
@@ -223,16 +241,25 @@ void UI_update_time(int msec) {
 }
 
 
-int UI_init() {
-    initscr();
-    start_color();
-    raw();
-    cbreak();
-    noecho();
-    curs_set(0);
-    nodelay(stdscr, 1);
+int UI_init(int nogui_mode) {
+    MENU_STACK = st_init(16);
 
-    ESCDELAY = 25;
+    if (!nogui_mode) {
+        initscr();
+        start_color();
+        raw();
+        cbreak();
+        noecho();
+        curs_set(0);
+        nodelay(stdscr, 1);
+
+        ESCDELAY = 25;
+
+        st_push(MENU_STACK, (uint64_t) draw_main_menu);
+    } else {
+        st_push(MENU_STACK, (uint64_t) draw_main_menu_nogui);   
+    }
+
     getmaxyx(stdscr, LINES, COLS);
 
     //init_window(&gamewin, LINES*.6, COLS*.6, LINES * .05, COLS*.05, "Game");
@@ -250,9 +277,6 @@ int UI_init() {
     }
 
     init_colors();
-
-    MENU_STACK = st_init(16);
-    st_push(MENU_STACK, (uint64_t) draw_main_menu);
 
     return 1;
 }

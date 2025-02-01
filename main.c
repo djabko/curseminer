@@ -34,7 +34,7 @@ void checkifNULL(void* ptr, const char* str) {
     if (ptr == NULL) log_debug("%s is a null pointer.\n", str);
 }
 
-void init() {
+void init(int nogui_mode) {
     timer_init(UPDATE_RATE);
 
     RQLL = scheduler_init();
@@ -42,7 +42,7 @@ void init() {
                 RUN_QUEUE = scheduler_new_rq(RQLL)), "RQ_UI");
     
 
-    UI_init();
+    UI_init(nogui_mode);
     keyboard_init();
 
     log_debug("Initialized...\n");
@@ -105,13 +105,12 @@ void cb_exit(Task* task) {
 
 int main(int argc, const char** argv) {
     if (argc < MIN_ARGS+1) return -1;
-    init();
 
-    int ui_runtime;
-    if (argc == 2)
-        ui_runtime = atoi(argv[1]);
-    else 
-        ui_runtime = 0;
+    const char *nogui_string = "-nogui";
+    int nogui_mode = 0;
+    for (int i=1; i<argc; i++) if (1 < argc && 0 == strncmp(argv[i], nogui_string, 7)) nogui_mode = 1;
+
+    init(nogui_mode);
 
     Stack64* stackUI = st_init(16);
     Stack64* stackIn = st_init(16);
@@ -120,9 +119,8 @@ int main(int argc, const char** argv) {
     gettimeofday(&quit_time, NULL);
     quit_time.tv_sec += 1;
 
-
     schedule(RUN_QUEUE, 0, 0, jobMain, NULL);
-    schedule_cb(RUN_QUEUE, 0, ui_runtime, jobUI, stackUI, cb_exit);
+    schedule_cb(RUN_QUEUE, 0, 0, jobUI, stackUI, cb_exit);
     schedule_cb(RUN_QUEUE, 0, 0, jobInput, stackIn, cb_exit);
     schedule(RUN_QUEUE, 0, 1, jobIO, stackIO);
 
