@@ -12,6 +12,7 @@ int ITERATOR = 0;
  * Initialized in world_init() 
  */
 World *WORLD = NULL;
+ChunkDescriptor *CHUNK_DESCRIPTORS;
 int MAXID = 0;
 
 
@@ -102,14 +103,13 @@ Chunk *chunk_create(World *world, int x, int y) {
 }
 
 Chunk *chunk_lookup(World *world, int x, int y) {
+    int chunk_s = world->chunk_arenas->chunk_s;
 
-    if (x < 0 || 19 < x || y < 0 || 19 < y) {
-        fprintf(stderr,"Yes\n");
+    if (x < 0 || chunk_s-1 < x || y < 0 || chunk_s-1 < y) {
+
     }
 
     // Make sure (x,y) points to top-left corner of their chunk
-    int chunk_s = world->chunk_arenas->chunk_s;
-
     if (x < 0) x -= chunk_s;
     if (y < 0) y -= chunk_s;
 
@@ -118,10 +118,8 @@ Chunk *chunk_lookup(World *world, int x, int y) {
 
     ChunkArena *arena = world->chunk_arenas;
     for (; arena != NULL; arena = arena->next) {
-        Chunk *chunk = arena->start;
-
-        for (; chunk <= arena->free; chunk = chunk_arena_next(arena, chunk)) {
-            if (chunk->tl_x == x && chunk->tl_y == y) return chunk;
+        for (ChunkDescriptor *cd = CHUNK_DESCRIPTORS; cd->ptr; cd++) {
+            if (cd->tl_x == x && cd->tl_y == y) return cd->ptr;
         }
     }
 
@@ -209,7 +207,6 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
         case DIRECTION_LEFT:
             if (source->left) return NULL;
 
-            x, y;
             x = source->tl_x - chunk_s;
             y = source->tl_y;
 
@@ -226,7 +223,6 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
         case DIRECTION_RIGHT:
             if (source->right) return NULL;
 
-            x, y;
             x = source->tl_x + chunk_s;
             y = source->tl_y;
 
@@ -272,6 +268,7 @@ World *world_init(int chunk_s, int maxid) {
     if (WORLD != NULL) return 0;
     
     WORLD = calloc(1, sizeof(World));
+    CHUNK_DESCRIPTORS = calloc(PAGE_SIZE, sizeof(ChunkDescriptor));
 
     MAXID = maxid;
     WORLD->maxx = chunk_s;

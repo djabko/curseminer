@@ -29,6 +29,11 @@ typedef struct Chunk {
     struct Chunk *top, *bottom, *left, *right;
 } Chunk;
 
+typedef struct ChunkDescriptor {
+    int tl_x, tl_y;
+    Chunk *ptr;
+} ChunkDescriptor;
+
 typedef struct ChunkArena {
     int count, max;
     size_t chunk_s;
