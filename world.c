@@ -1,7 +1,9 @@
 #include <globals.h>
 #include <world.h>
+
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 16
 
@@ -16,6 +18,11 @@ int MAXID = 0;
 /* Internal Chunk Functions */
 int is_arena_full(ChunkArena *arena) {
     return arena->free == arena->end;
+}
+
+// TODO: Reuse math code from UI.c
+int _che_dist(int x1, int y1, int x2, int y2) {
+    return round( max(x1 - x2, y1 - y2) );
 }
 
 ChunkArena *chunk_init_arena(size_t mem_size, int chunk_length) {
@@ -96,12 +103,18 @@ Chunk *chunk_create(World *world, int x, int y) {
 
 Chunk *chunk_lookup(World *world, int x, int y) {
 
+    if (x < 0 || 19 < x || y < 0 || 19 < y) {
+        fprintf(stderr,"Yes\n");
+    }
+
     // Make sure (x,y) points to top-left corner of their chunk
     int chunk_s = world->chunk_arenas->chunk_s;
+
+    if (x < 0) x -= chunk_s;
+    if (y < 0) y -= chunk_s;
+
     x = (x / chunk_s) * chunk_s;
     y = (y / chunk_s) * chunk_s;
-
-    fprintf(stderr, "Looking for chunk at (%d, %d)\n", x, y);
 
     ChunkArena *arena = world->chunk_arenas;
     for (; arena != NULL; arena = arena->next) {
@@ -113,6 +126,128 @@ Chunk *chunk_lookup(World *world, int x, int y) {
     }
 
     return NULL;
+}
+
+// Find chunk closest to position (x,y)
+Chunk *chunk_nearest(World *world, int x, int y) {
+    ChunkArena *arena = world->chunk_arenas;
+
+    if (arena == NULL || arena->start == NULL) return NULL;
+
+    x = (x / arena->chunk_s) * arena->chunk_s;
+    y = (y / arena->chunk_s) * arena->chunk_s;
+
+    int min_dist = 0;
+    Chunk *nearest = arena->start;
+    while (arena != NULL) {
+        for (Chunk *chunk = arena->start;
+             chunk < arena->free;
+             chunk = chunk_arena_next(arena, chunk)) {
+
+            int dist = _che_dist(nearest->tl_x, nearest->tl_y, chunk->tl_x,   chunk->tl_y);
+
+            if (dist < min_dist && 0 < dist) {
+                min_dist = dist;
+                nearest = chunk;
+            }
+        }
+        arena = arena->next;
+    }
+
+    fprintf(stderr, "Found nearest neighbour to (%d,%d) at (%d,%d)\n", x, y, nearest->tl_x, nearest->tl_y);
+    return nearest;
+}
+
+Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
+    /* 1. Check based on direction
+     * 2. Check if position not occupied
+     * 3. Create new chunk
+     * 4. Check for neighbours
+     */
+
+    fprintf(stderr, "Inserting chunk to the %x of (%d,%d)\n", dir, source->tl_x, source->tl_y);
+
+    int chunk_s = world->chunk_arenas->chunk_s;
+
+    Chunk *new_chunk = NULL;
+
+    int x, y;
+    Chunk *top, *bottom, *left, *right;
+    switch (dir) {
+        case DIRECTION_UP:
+            if (source->top) return NULL;
+
+            x = source->tl_x;
+            y = source->tl_y - chunk_s;
+
+            top = chunk_lookup(world, x, y - chunk_s);
+            bottom = source;
+            left = chunk_lookup(world, x - chunk_s, y);
+            right = chunk_lookup(world, x + chunk_s, y);
+
+            new_chunk = _chunk_create(world, x, y, top, bottom, left, right);
+
+            source->top = new_chunk;
+            break;
+
+        case DIRECTION_DOWN:
+            if (source->bottom) return NULL;
+
+            x = source->tl_x;
+            y = source->tl_y + chunk_s;
+
+            top = source;
+            bottom = chunk_lookup(world, x, y + chunk_s);
+            left = chunk_lookup(world, x - chunk_s, y);
+            right = chunk_lookup(world, x + chunk_s, y);
+
+            new_chunk = _chunk_create(world, x, y, top, bottom, left, right);
+
+            source->bottom = new_chunk;
+            break;
+
+        case DIRECTION_LEFT:
+            if (source->left) return NULL;
+
+            x, y;
+            x = source->tl_x - chunk_s;
+            y = source->tl_y;
+
+            top = chunk_lookup(world, x, y - chunk_s);
+            bottom = chunk_lookup(world, x, y + chunk_s);
+            left = chunk_lookup(world, x - chunk_s, y);
+            right = source;
+
+            new_chunk = _chunk_create(world, x, y, top, bottom, left, right);
+
+            source->left = new_chunk;
+            break;
+
+        case DIRECTION_RIGHT:
+            if (source->right) return NULL;
+
+            x, y;
+            x = source->tl_x + chunk_s;
+            y = source->tl_y;
+
+            top = chunk_lookup(world, x, y - chunk_s);
+            bottom = chunk_lookup(world, x, y + chunk_s);
+            left = source;
+            right = chunk_lookup(world, x + chunk_s, y);
+
+            new_chunk = _chunk_create(world, x, y, top, bottom, left, right);
+
+            source->right = new_chunk;
+            break;
+
+        default:
+            fprintf(stderr, "FATAL ERROR WHEN INSERTING CHUNK\n");
+            exit(0);
+    }
+    
+    fprintf(stderr, "Inserted new chunk at (%d,%d)\n", new_chunk->tl_x, new_chunk->tl_y);
+
+    return new_chunk;
 }
 
 void chunk_free_all() {
@@ -158,12 +293,11 @@ unsigned char world_getxy(int x, int y) {
     if (x < 0 || WORLD->maxx <= x
      || y < 0 || WORLD->maxy <= y) return 0;
 
-    fprintf(stderr, "Getting (%d,%d) => %d\n", x, y, WORLD->world_array[x * WORLD->maxy + y]);
     return WORLD->world_array[x * WORLD->maxy + y];
 }
 
 void world_setxy(int x, int y, int tid) {
-    if (x < 0 && WORLD->maxx < x || y < 0 && WORLD->maxy < y) return;
+    if (x < 0 || WORLD->maxx < x || y < 0 || WORLD->maxy < y) return;
 
     WORLD->world_array[x * WORLD->maxy + y] = tid;
 }

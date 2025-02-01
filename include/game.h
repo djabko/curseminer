@@ -7,6 +7,18 @@
 typedef unsigned char color_t;
 
 typedef enum {
+    DIRECTION_NULL,
+    DIRECTION_UP,
+    DIRECTION_DOWN,
+    DIRECTION_LEFT,
+    DIRECTION_RIGHT,
+    DIRECTION_UP_LEFT,
+    DIRECTION_UP_RIGHT,
+    DIRECTION_DOWN_LEFT,
+    DIRECTION_DOWN_RIGHT
+} Direction;
+
+typedef enum {
     sk_null,
     sk_default,
     sk_gold,
