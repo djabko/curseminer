@@ -13,6 +13,7 @@ int ITERATOR = 0;
  */
 World *WORLD = NULL;
 ChunkDescriptor *CHUNK_DESCRIPTORS;
+int GLOBAL_CHUNK_COUNT = 0;
 int MAXID = 0;
 
 
@@ -22,8 +23,8 @@ int is_arena_full(ChunkArena *arena) {
 }
 
 // TODO: Reuse math code from UI.c
-int _che_dist(int x1, int y1, int x2, int y2) {
-    return round( max(x1 - x2, y1 - y2) );
+int _man_dist(int x1, int y1, int x2, int y2) {
+    return fabs(x1 - x2) + fabs(y1 - y2);
 }
 
 ChunkArena *chunk_init_arena(size_t mem_size, int chunk_length) {
@@ -94,6 +95,9 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
     chunk->left = left;
     chunk->right = right;
 
+    ChunkDescriptor *cd = CHUNK_DESCRIPTORS + GLOBAL_CHUNK_COUNT++;
+    *cd = (ChunkDescriptor) {.tl_x = x, .tl_y = y, .ptr = chunk};
+
     return chunk;
 }
 
@@ -104,10 +108,6 @@ Chunk *chunk_create(World *world, int x, int y) {
 
 Chunk *chunk_lookup(World *world, int x, int y) {
     int chunk_s = world->chunk_arenas->chunk_s;
-
-    if (x < 0 || chunk_s-1 < x || y < 0 || chunk_s-1 < y) {
-
-    }
 
     // Make sure (x,y) points to top-left corner of their chunk
     if (x < 0) x -= chunk_s;
@@ -128,32 +128,28 @@ Chunk *chunk_lookup(World *world, int x, int y) {
 
 // Find chunk closest to position (x,y)
 Chunk *chunk_nearest(World *world, int x, int y) {
-    ChunkArena *arena = world->chunk_arenas;
+    if (GLOBAL_CHUNK_COUNT < 1) return NULL;
 
-    if (arena == NULL || arena->start == NULL) return NULL;
+    int chunk_s = world->chunk_arenas->chunk_s;
+    x = (x / chunk_s) * chunk_s;
+    y = (y / chunk_s) * chunk_s;
 
-    x = (x / arena->chunk_s) * arena->chunk_s;
-    y = (y / arena->chunk_s) * arena->chunk_s;
+    ChunkDescriptor *nearest = CHUNK_DESCRIPTORS;
+    int dist = _man_dist(nearest->tl_x, nearest->tl_y, x, y);
 
-    int min_dist = 0;
-    Chunk *nearest = arena->start;
-    while (arena != NULL) {
-        for (Chunk *chunk = arena->start;
-             chunk < arena->free;
-             chunk = chunk_arena_next(arena, chunk)) {
+    for (ChunkDescriptor *cd = CHUNK_DESCRIPTORS+1; cd->ptr; cd++) {
 
-            int dist = _che_dist(nearest->tl_x, nearest->tl_y, chunk->tl_x,   chunk->tl_y);
+        int tmp = _man_dist(cd->tl_x, cd->tl_y, x, y);
+        log_debug("Diff of (%d,%d) and (%d,%d) = %d\n", x, y, cd->tl_x, cd->tl_y, tmp);
 
-            if (dist < min_dist && 0 < dist) {
-                min_dist = dist;
-                nearest = chunk;
-            }
+        if (tmp < dist && 0 < tmp) {
+            dist = tmp;
+            nearest = cd;
         }
-        arena = arena->next;
     }
 
     fprintf(stderr, "Found nearest neighbour to (%d,%d) at (%d,%d)\n", x, y, nearest->tl_x, nearest->tl_y);
-    return nearest;
+    return nearest->ptr;
 }
 
 Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
@@ -237,6 +233,7 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
             break;
 
         default:
+            // Should never happen
             fprintf(stderr, "FATAL ERROR WHEN INSERTING CHUNK\n");
             exit(0);
     }
@@ -278,9 +275,7 @@ World *world_init(int chunk_s, int maxid) {
     WORLD->entity_maxc = 32;
     WORLD->entities = qu_init( WORLD->entity_maxc );
 
-    Chunk *chunk1 = chunk_create(WORLD, 0, 0);
-    WORLD->world_array = chunk1->data;
-
+    chunk_create(WORLD, 0, 0);
     //world_gen();
 
     return WORLD;
