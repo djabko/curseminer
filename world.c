@@ -27,6 +27,12 @@ int _man_dist(int x1, int y1, int x2, int y2) {
     return fabs(x1 - x2) + fabs(y1 - y2);
 }
 
+// TODO: Standardize, this expensive function is often called three times successively 
+int topleft_coordinate(int coordinate, int chunk_s) {
+    if (0 <= coordinate) return chunk_s * (coordinate / chunk_s);
+    else return chunk_s * ((coordinate + 1) / chunk_s) - chunk_s;
+}
+
 ChunkArena *chunk_init_arena(size_t mem_size, int chunk_length) {
     
     int chunk_max = (mem_size - sizeof(ChunkArena)) / ( sizeof(Chunk) + chunk_length );
@@ -102,19 +108,19 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
 }
 
 Chunk *chunk_create(World *world, int x, int y) {
-    fprintf(stderr, "Created chunk [%d/%d]\n", world->chunk_arenas->count, world->chunk_arenas->max);
     return _chunk_create(world, x, y, NULL, NULL, NULL, NULL);
 }
 
 Chunk *chunk_lookup(World *world, int x, int y) {
     int chunk_s = world->chunk_arenas->chunk_s;
 
-    // Make sure (x,y) points to top-left corner of their chunk
-    if (x < 0) x -= chunk_s;
-    if (y < 0) y -= chunk_s;
+    if (x == 20 && y == -20) {
 
-    x = (x / chunk_s) * chunk_s;
-    y = (y / chunk_s) * chunk_s;
+    }
+
+    // Make sure (x,y) points to top-left corner of their chunk
+    x = topleft_coordinate(x, chunk_s);
+    y = topleft_coordinate(y, chunk_s);
 
     ChunkArena *arena = world->chunk_arenas;
     for (; arena != NULL; arena = arena->next) {
@@ -131,8 +137,8 @@ Chunk *chunk_nearest(World *world, int x, int y) {
     if (GLOBAL_CHUNK_COUNT < 1) return NULL;
 
     int chunk_s = world->chunk_arenas->chunk_s;
-    x = (x / chunk_s) * chunk_s;
-    y = (y / chunk_s) * chunk_s;
+    x = topleft_coordinate(x, chunk_s);
+    y = topleft_coordinate(y, chunk_s);
 
     ChunkDescriptor *nearest = CHUNK_DESCRIPTORS;
     int dist = _man_dist(nearest->tl_x, nearest->tl_y, x, y);
@@ -140,7 +146,6 @@ Chunk *chunk_nearest(World *world, int x, int y) {
     for (ChunkDescriptor *cd = CHUNK_DESCRIPTORS+1; cd->ptr; cd++) {
 
         int tmp = _man_dist(cd->tl_x, cd->tl_y, x, y);
-        log_debug("Diff of (%d,%d) and (%d,%d) = %d\n", x, y, cd->tl_x, cd->tl_y, tmp);
 
         if (tmp < dist && 0 < tmp) {
             dist = tmp;
@@ -148,7 +153,6 @@ Chunk *chunk_nearest(World *world, int x, int y) {
         }
     }
 
-    fprintf(stderr, "Found nearest neighbour to (%d,%d) at (%d,%d)\n", x, y, nearest->tl_x, nearest->tl_y);
     return nearest->ptr;
 }
 
@@ -158,8 +162,6 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
      * 3. Create new chunk
      * 4. Check for neighbours
      */
-
-    fprintf(stderr, "Inserting chunk to the %x of (%d,%d)\n", dir, source->tl_x, source->tl_y);
 
     int chunk_s = world->chunk_arenas->chunk_s;
 
@@ -234,12 +236,10 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
 
         default:
             // Should never happen
-            fprintf(stderr, "FATAL ERROR WHEN INSERTING CHUNK\n");
+            log_debug("FATAL ERROR WHEN INSERTING CHUNK");
             exit(0);
     }
     
-    fprintf(stderr, "Inserted new chunk at (%d,%d)\n", new_chunk->tl_x, new_chunk->tl_y);
-
     return new_chunk;
 }
 
@@ -282,16 +282,79 @@ World *world_init(int chunk_s, int maxid) {
 }
 
 unsigned char world_getxy(int x, int y) {
-    if (x < 0 || WORLD->maxx <= x
-     || y < 0 || WORLD->maxy <= y) return 0;
+    int chunk_s = WORLD->chunk_arenas->chunk_s;
+    Chunk *chunk = chunk_lookup(WORLD, x, y);
 
-    return WORLD->world_array[x * WORLD->maxy + y];
+    // Algorithm: keep inserting chunk to the nearest neighbour until a new chunk is present at (x,y)
+    if (!chunk) {
+        int tl_x = x;
+        int tl_y = y;
+
+        tl_x = topleft_coordinate(x, chunk_s);
+        tl_y = topleft_coordinate(y, chunk_s);
+
+        Chunk *nearest = chunk_nearest(WORLD, tl_x, tl_y);
+        int diff_x = tl_x - nearest->tl_x;
+        int diff_y = tl_y - nearest->tl_y;
+
+        while (diff_x != 0 || diff_y != 0) {
+            // Cases: x<tx, x>tx, y<ty, y>ty
+
+            // Change along x
+            if (fabs(diff_y) < fabs(diff_x)) {
+
+                // Nearest chunk is to the left, insert on it's right
+                if (0 < diff_x) {
+                    nearest = chunk_insert(WORLD, nearest, DIRECTION_RIGHT);
+
+                // Nearest chunk is to the right, insert on it's left
+                } else if (0 > diff_x) {
+                    nearest = chunk_insert(WORLD, nearest, DIRECTION_LEFT);
+                }
+
+            // Change along y
+            } else {
+                
+                // Nearest chunk is below, insert above
+                if (diff_y < 0) {
+                    nearest = chunk_insert(WORLD, nearest, DIRECTION_UP);
+
+                // Nearest chunk is above, insert below
+                } else if (diff_y > 0) {
+                    nearest = chunk_insert(WORLD, nearest, DIRECTION_DOWN);
+                }
+            }
+
+            if (!nearest) log_debug("ERROR: attempting to overwrite existing chunk!\n");
+
+            diff_x = tl_x - nearest->tl_x;
+            diff_y = tl_y - nearest->tl_y;
+        }
+
+        chunk = nearest;
+    }
+
+    // Convert coordinates to chunk-local
+    x = fabs(x % chunk_s);
+    y = fabs(y % chunk_s);
+    int ret = chunk->data[x * chunk_s + y];
+
+    return ret;
 }
 
 void world_setxy(int x, int y, int tid) {
-    if (x < 0 || WORLD->maxx < x || y < 0 || WORLD->maxy < y) return;
+    int chunk_s = WORLD->chunk_arenas->chunk_s;
+    Chunk *chunk = chunk_lookup(WORLD, x, y);
 
-    WORLD->world_array[x * WORLD->maxy + y] = tid;
+    x = fabs(x % chunk_s);
+    y = fabs(y % chunk_s);
+
+    if (!chunk) {
+        log_debug("ERROR: attempting to set nonexistent chunk at (%d,%d) to entity ID: %d", x, y, tid);
+        return;
+    }
+
+    chunk->data[x * chunk_s + y] = tid;
 }
 
 void world_free(int, int) {
