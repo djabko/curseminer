@@ -27,6 +27,7 @@ typedef enum {
     sk_redore,
     sk_player,
     sk_chaser_mob,
+    sk_end,
 } SkinTypeID;
 
 typedef enum {
@@ -37,7 +38,8 @@ typedef enum {
     ge_iron,
     ge_redore,
     ge_player,
-    ge_chaser_mob
+    ge_chaser_mob,
+    ge_end
 } EntityTypeID;
 
 

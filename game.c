@@ -97,14 +97,14 @@ int game_init() {
     init_entity_types();
     GAME->world = world_init(20, GAME->skins_c - 1);
     
-    int e_x = rand() % (GAME->world_view_x + 20);
-    int e_y = rand() % (GAME->world_view_y + 20);
+    int e_x = rand() % 20;
+    int e_y = rand() % 20;
     Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
     entity_set_keyboard_controller(player);
     GLOBALS.player = player;
 
-    e_x = rand() % (GAME->world_view_x + 20);
-    e_y = rand() % (GAME->world_view_y + 20);
+    e_x = rand() % 20;
+    e_y = rand() % 20;
     Entity* entity = entity_spawn(GAME->world, GAME->entity_types + ge_chaser_mob, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
     entity->speed = 100;
 
@@ -145,13 +145,12 @@ EntityType* game_world_getxy(int x, int y) {
         if (e->x == x && e->y == y) return e->type;
     }
 
-    int id = world_getxy(x + GAME->world_view_x, y + GAME->world_view_y);
+    int id = world_getxy(x, y);
+
     return GAME->entity_types + id;
 }
 
 int game_world_setxy(int x, int y, EntityTypeID tid) {
-    x += GAME->world_view_x;
-    y += GAME->world_view_y;
     world_setxy(x, y, tid);
     return 0;
 }

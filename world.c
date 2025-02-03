@@ -287,11 +287,8 @@ unsigned char world_getxy(int x, int y) {
 
     // Algorithm: keep inserting chunk to the nearest neighbour until a new chunk is present at (x,y)
     if (!chunk) {
-        int tl_x = x;
-        int tl_y = y;
-
-        tl_x = topleft_coordinate(x, chunk_s);
-        tl_y = topleft_coordinate(y, chunk_s);
+        int tl_x = topleft_coordinate(x, chunk_s);
+        int tl_y = topleft_coordinate(y, chunk_s);
 
         Chunk *nearest = chunk_nearest(WORLD, tl_x, tl_y);
         int diff_x = tl_x - nearest->tl_x;
@@ -344,15 +341,21 @@ unsigned char world_getxy(int x, int y) {
 
 void world_setxy(int x, int y, int tid) {
     int chunk_s = WORLD->chunk_arenas->chunk_s;
-    Chunk *chunk = chunk_lookup(WORLD, x, y);
-
-    x = fabs(x % chunk_s);
-    y = fabs(y % chunk_s);
+    int tl_x = topleft_coordinate(x, chunk_s);
+    int tl_y = topleft_coordinate(y, chunk_s);
+    Chunk *chunk = chunk_lookup(WORLD, tl_x, tl_y);
 
     if (!chunk) {
         log_debug("ERROR: attempting to set nonexistent chunk at (%d,%d) to entity ID: %d", x, y, tid);
         return;
     }
+    else if (ge_end <= tid) {
+        log_debug("ERROR: attempting to set (%d,%d) to invalid entity ID: %d", x, y, tid);
+        return;
+    }
+
+    x = fabs(x % chunk_s);
+    y = fabs(y % chunk_s);
 
     chunk->data[x * chunk_s + y] = tid;
 }
