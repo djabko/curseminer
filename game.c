@@ -134,9 +134,9 @@ EntityType* game_world_getxy(int x, int y) {
     y += GAME->world_view_y;
 
     /* world_view updating should take place in a separate task */
-    if (GLOBALS.player->x < GAME->world_view_x+1) GAME->world_view_x--;
+    if (GLOBALS.player->x < GAME->world_view_x) GAME->world_view_x--;
     if (GLOBALS.player->x > GAME->world_view_x + GLOBALS.view_port_maxx) GAME->world_view_x++;
-    if (GLOBALS.player->y < GAME->world_view_y+1) GAME->world_view_y--;
+    if (GLOBALS.player->y < GAME->world_view_y) GAME->world_view_y--;
     if (GLOBALS.player->y > GAME->world_view_y + GLOBALS.view_port_maxy) GAME->world_view_y++;
 
     Queue64* entity_qu = GAME->world->entities;

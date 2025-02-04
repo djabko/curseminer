@@ -73,7 +73,7 @@ void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
     }
 }
 
-void draw_line(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
+void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y2) {
     int dx = abs(x2 - x1);
     int dy = abs(y2 - y1);
     int sx = (x1 < x2) + (x2 <= x1) * -1;
@@ -111,6 +111,18 @@ void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, doub
     y2 = y1 + d * sin(angle);
 
     draw_line(win, c, x1, y1, x2, y2); 
+}
+
+void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
+    mvwaddch(stdscr, y1, x1, ACS_ULCORNER);
+    mvwaddch(stdscr, y1, x2, ACS_URCORNER);
+    mvwaddch(stdscr, y2, x1, ACS_LLCORNER);
+    mvwaddch(stdscr, y2, x2, ACS_LRCORNER);
+
+    draw_line(win, ACS_HLINE, x1+1, y1, x2-1, y1);
+    draw_line(win, ACS_HLINE, x1+1, y2, x2-1, y2);
+    draw_line(win, ACS_VLINE, x1, y1+1, x1, y2-1);
+    draw_line(win, ACS_VLINE, x2, y1+1, x2, y2-1);
 }
 
 void draw_rt_clock(WINDOW* win, int x, int y, int r) {
@@ -163,7 +175,6 @@ void draw_gamewin() {
         }
     }
 
-    box(gamewin.win, 0, 0);
     wnoutrefresh(gamewin.win);
 }
 
@@ -187,7 +198,6 @@ void draw_uiwin() {
 
     mvwprintw(uiwin.win, (TIME_MSEC/100)%(int)(LINES*.2), COLS*.4, "!"); // draw splash icon
 
-    box(uiwin.win, 0, 0);
     draw_keyboard_state(uiwin.win, (int)COLS*.5, 5);
     wnoutrefresh(uiwin.win);
 }
@@ -223,13 +233,17 @@ int init_colors() {
     return 1;
 }
 
-int init_window(window_t* window, int x, int y, int w, int h, const char* title) {
+int init_window(window_t* window, int x, int y, int w, int h, const char* title, SkinTypeID color) {
     window->win = newwin(h, w, y, x);
     window->x = x;
     window->y = y;
     window->w = w;
     window->h = h;
     strncpy(window->title, title, MAX_TITLE);
+
+    wattron(stdscr, COLOR_PAIR(color));
+    mvwprintw(stdscr, y-2, x, title);
+    draw_square(stdscr, x-1, y-1, x+w, y+h);
 
     return NULL < (void*) window->win;
 }
@@ -262,12 +276,22 @@ int UI_init(int nogui_mode) {
 
     getmaxyx(stdscr, LINES, COLS);
 
-    //init_window(&gamewin, LINES*.6, COLS*.6, LINES * .05, COLS*.05, "Game");
-    init_window(&gamewin, COLS*.05, LINES*.05, COLS*.6, LINES*.6, "Game");
-    GLOBALS.view_port_maxx = COLS * .6 - 2;
-    GLOBALS.view_port_maxy = LINES *.6 - 2;
+    int gwx, gwy, gww, gwh, uwx, uwy, uww, uwh;
+    gwx = COLS  * .05 - 1;
+    gwy = LINES * .08;
+    gww = COLS  * .6;
+    gwh = LINES * .6;
 
-    init_window(&uiwin, COLS*.05, LINES*.8, COLS*.8, LINES*.2, "UI");
+    uwx = COLS  * .05 - 1;
+    uwy = LINES * .8 - 1;
+    uww = COLS  * .8 - 1;
+    uwh = LINES * .2 - 1;
+
+    init_window(&gamewin, gwx, gwy, gww, gwh, "Game", ge_player);
+    init_window(&uiwin,   uwx, uwy, uww, uwh, "UI", ge_diamond);
+
+    GLOBALS.view_port_maxx = gww - 1;
+    GLOBALS.view_port_maxy = gwh - 1;
 
     int status = game_init();
     if (status != 0) {
@@ -277,6 +301,7 @@ int UI_init(int nogui_mode) {
     }
 
     init_colors();
+    wnoutrefresh(stdscr);
 
     return 1;
 }
