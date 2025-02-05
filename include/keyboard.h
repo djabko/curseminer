@@ -16,6 +16,7 @@ typedef enum KeyID {
     KB_A,
     KB_D,
     KB_C,
+    KB_G,
     KB_Q,
     KB_ESC,
     KB_END,

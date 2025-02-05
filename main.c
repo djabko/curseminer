@@ -70,8 +70,6 @@ int jobUI (Task* task, Stack64* stack) {
         miliseconds_t msec = TIMER_NOW.tv_usec / 1000;
         UI_update_time(sec * 1000 + msec);
 
-        log_debug("%lu + %lu = %lu\n", sec, msec, sec*1000+msec);
-
         int quit = UI_loop();
         if (quit)
             tk_kill(task);
@@ -80,11 +78,25 @@ int jobUI (Task* task, Stack64* stack) {
     return 0;
 }
 
+int tsinit2 = 0;
+TimeStamp last_widget_toggle;
 int jobInput (Task* task, Stack64* stack) {
+    if (!tsinit2) {
+        last_widget_toggle = TIMER_NOW;
+        tsinit2 = 1;
+    }
 
     keyboard_poll();
+
     if (kb_down(KB_Q))
         tk_kill(task);
+
+    else if (kb_down(KB_G) && 350 < timer_diff_milisec(&TIMER_NOW, &last_widget_toggle))
+        {
+        UI_toggle_widgetwin();
+        log_debug("Toggle widget win !!!");
+        last_widget_toggle = TIMER_NOW;
+        }
 
     return 0;
 }

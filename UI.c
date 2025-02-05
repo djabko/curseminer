@@ -25,9 +25,11 @@ typedef struct {
     WINDOW* win;
     int x, y, w, h;
     char title[MAX_TITLE];
+    int active, hidden;
+    SkinTypeID color;
 } window_t;
 
-window_t gamewin, uiwin = {};
+window_t gamewin, uiwin, widgetwin = {};
 
 typedef struct {
    double x, y; 
@@ -110,16 +112,47 @@ void draw_header() {
         mvaddch(3, i, '=');
 }
 
-void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
-    mvwaddch(stdscr, y1, x1, ACS_ULCORNER);
-    mvwaddch(stdscr, y1, x2, ACS_URCORNER);
-    mvwaddch(stdscr, y2, x1, ACS_LLCORNER);
-    mvwaddch(stdscr, y2, x2, ACS_LRCORNER);
+void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
+        chtype l1, chtype l2, chtype l3, chtype l4,
+        chtype c1, chtype c2, chtype c3, chtype c4) {
 
-    draw_line(win, ACS_HLINE, x1+1, y1, x2-1, y1);
-    draw_line(win, ACS_HLINE, x1+1, y2, x2-1, y2);
-    draw_line(win, ACS_VLINE, x1, y1+1, x1, y2-1);
-    draw_line(win, ACS_VLINE, x2, y1+1, x2, y2-1);
+    mvwaddch(stdscr, y1, x1, c1);
+    mvwaddch(stdscr, y1, x2, c2);
+    mvwaddch(stdscr, y2, x1, c3);
+    mvwaddch(stdscr, y2, x2, c4);
+
+    draw_line(win, l1, x1+1, y1, x2-1, y1);
+    draw_line(win, l2, x1+1, y2, x2-1, y2);
+    draw_line(win, l3, x1, y1+1, x1, y2-1);
+    draw_line(win, l4, x2, y1+1, x2, y2-1);
+ 
+}
+
+void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
+   _draw_square(win, x1, y1, x2, y2,
+            ACS_HLINE, ACS_HLINE, ACS_VLINE, ACS_VLINE,
+            ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+}
+
+void box_win(window_t *window) {
+    wattron(stdscr, COLOR_PAIR(window->color));
+    mvwprintw(stdscr, window->y-2, window->x, window->title);
+    draw_square(stdscr,
+            window->x - 1, window->y - 1,
+            window->x + window->w,
+            window->y + window->h);
+}
+
+void box_win_clear(window_t * window) {
+    chtype spc = ' ';
+
+    mvwprintw(stdscr, window->y-2, window->x, "                      ");
+
+    _draw_square(stdscr,
+            window->x - 1, window->y - 1,
+            window->x + window->w,
+            window->y + window->h,
+            spc, spc, spc, spc, spc, spc, spc, spc);
 }
 
 void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
@@ -202,6 +235,9 @@ void draw_uiwin() {
             abs(GLOBALS.player->vx)
             );
 
+    mvwprintw(uiwin.win, 3, 20, "Last pressed G: %d (State: %c)",
+            TIMER_NOW.tv_sec - GLOBALS.keyboard.keys[KB_G].last_pressed.tv_sec, widgetwin.active ? '*' : '.');
+
     EntityType* entity = game_world_getxy(1, 1);
     mvwprintw(uiwin.win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
@@ -211,17 +247,32 @@ void draw_uiwin() {
     wnoutrefresh(uiwin.win);
 }
 
+void draw_widgetwin_nogui() {}
+
+int WIDGET_WIN_CLOCK_RADIUS = 20;
+void draw_widgetwin() {
+    if (!widgetwin.active || widgetwin.hidden) return;
+
+    werase(widgetwin.win);
+    draw_rt_clock(widgetwin.win, widgetwin.w/2, widgetwin.h/2, WIDGET_WIN_CLOCK_RADIUS);
+    wnoutrefresh(widgetwin.win);
+
+    if (kb_down(KB_D)) WIDGET_WIN_CLOCK_RADIUS++;
+    if (kb_down(KB_A)) WIDGET_WIN_CLOCK_RADIUS--;
+}
+
 // Simulates drawing the screen without actually printing anything
 void draw_main_menu_nogui() {
     draw_gamewin_nogui();
     draw_uiwin_nogui();
 }
 
+// TODO: window queue
 void draw_main_menu() {
-    draw_gamewin();
-    draw_uiwin();
+    if (gamewin.active) draw_gamewin();
+    if (uiwin.active) draw_uiwin();
+    if (widgetwin.active) draw_widgetwin();
 }
-
 
 /* Init Functions */
 int init_colors() {
@@ -248,11 +299,12 @@ int init_window(window_t* window, int x, int y, int w, int h, const char* title,
     window->y = y;
     window->w = w;
     window->h = h;
+    window->color = color;
+    window->hidden = 0;
+    window->active = 1;
     strncpy(window->title, title, MAX_TITLE);
 
-    wattron(stdscr, COLOR_PAIR(color));
-    mvwprintw(stdscr, y-2, x, title);
-    draw_square(stdscr, x-1, y-1, x+w, y+h);
+    box_win(window);
 
     return NULL < (void*) window->win;
 }
@@ -298,6 +350,10 @@ int UI_init(int nogui_mode) {
 
     init_window(&gamewin, gwx, gwy, gww, gwh, "Game", ge_player);
     init_window(&uiwin,   uwx, uwy, uww, uwh, "UI", ge_diamond);
+    init_window(&widgetwin,   gwx+2, gwy+2, gww, gwh, "Widget", ge_redore);
+
+    widgetwin.active = 0;
+    box_win_clear(&widgetwin);
 
     GLOBALS.view_port_maxx = gww - 1;
     GLOBALS.view_port_maxy = gwh - 1;
@@ -332,3 +388,20 @@ int UI_exit() {
     return 1;
 }
 
+void UI_show_widgetwin() {
+    gamewin.active = 0;
+    widgetwin.active = 1;
+    box_win(&widgetwin);
+}
+
+void UI_hide_widgetwin() {
+    box_win_clear(&widgetwin);
+    gamewin.active = 1;
+    widgetwin.active = 0;
+    box_win(&gamewin);
+}
+
+void UI_toggle_widgetwin() {
+    if (widgetwin.active) UI_hide_widgetwin();
+    else UI_show_widgetwin();
+}
