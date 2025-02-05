@@ -19,7 +19,7 @@ Stack64* MENU_STACK = NULL;
 int LINES = 0;
 int COLS = 0;
 
-int TIME_MSEC = 0;
+miliseconds_t TIME_MSEC = 0;
 
 typedef struct {
     WINDOW* win;
@@ -63,6 +63,12 @@ int che_dist(Line* line) {
             );
 }
 
+static inline char sign_of_int(int x) {
+    if      (x == 0) return ' ';
+    else if (x < 0)  return '-';
+    else if (x > 0)  return '+';
+}
+
 
 /* Draw Functions */
 void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
@@ -104,15 +110,6 @@ void draw_header() {
         mvaddch(3, i, '=');
 }
 
-void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
-    double x2, y2;
-
-    x2 = x1 + d * cos(angle);
-    y2 = y1 + d * sin(angle);
-
-    draw_line(win, c, x1, y1, x2, y2); 
-}
-
 void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
     mvwaddch(stdscr, y1, x1, ACS_ULCORNER);
     mvwaddch(stdscr, y1, x2, ACS_URCORNER);
@@ -125,12 +122,22 @@ void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
     draw_line(win, ACS_VLINE, x2, y1+1, x2, y2-1);
 }
 
-void draw_rt_clock(WINDOW* win, int x, int y, int r) {
-    int time_sec = TIME_MSEC / 1000;
+void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
+    double x2, y2;
 
-    int sc = time_sec % 60;
-    int mn = time_sec % (60*60);
-    int hr = (time_sec+60*60) % (60*60*24);
+    x2 = x1 + d * cos(angle);
+    y2 = y1 + d * sin(angle);
+
+    draw_line(win, c, x1, y1, x2, y2); 
+}
+
+void draw_rt_clock(WINDOW* win, int x, int y, int r) {
+    seconds_t time_sec = TIME_MSEC / 1000;
+
+    utime_t sc = time_sec % 60;
+    utime_t mn = time_sec % (60*60);
+    utime_t hr = (time_sec+60*60) % (60*60*24);
+
     double angleS = sc * (2*M_PI/60) - (M_PI/2);
     double angleM = mn * (2*M_PI/(60*60)) - (M_PI/2);
     double angleH = hr * (2*M_PI/(24*60*60)) - (M_PI/2);
@@ -189,14 +196,16 @@ void draw_uiwin() {
 
     mvwprintw(uiwin.win, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
             GLOBALS.player->y, GLOBALS.player->x,
-            GLOBALS.player->vy<0 ? '-':'+', GLOBALS.player->vy,
-            GLOBALS.player->vx<0 ? '-':'+', GLOBALS.player->vx
+            sign_of_int(GLOBALS.player->vy),
+            abs(GLOBALS.player->vy),
+            sign_of_int(GLOBALS.player->vx),
+            abs(GLOBALS.player->vx)
             );
 
     EntityType* entity = game_world_getxy(1, 1);
     mvwprintw(uiwin.win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
-    mvwprintw(uiwin.win, (TIME_MSEC/100)%(int)(LINES*.2), COLS*.4, "!"); // draw splash icon
+    mvwprintw(uiwin.win, (TIME_MSEC/100)%uiwin.h, uiwin.w/2, "!"); // draw splash icon
 
     draw_keyboard_state(uiwin.win, (int)COLS*.5, 5);
     wnoutrefresh(uiwin.win);
@@ -250,7 +259,7 @@ int init_window(window_t* window, int x, int y, int w, int h, const char* title,
 
 
 /* Public functions used by other components */
-void UI_update_time(int msec) {
+void UI_update_time(miliseconds_t msec) {
     TIME_MSEC = msec;
 }
 

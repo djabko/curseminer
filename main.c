@@ -66,9 +66,11 @@ int jobUI (Task* task, Stack64* stack) {
         last_screen_refresh = TIMER_NOW;
         tsinit = 1;
 
-        int sec = TIMER_NOW.tv_sec;
-        int msec = TIMER_NOW.tv_usec / 1000;
+        miliseconds_t sec = TIMER_NOW.tv_sec;
+        miliseconds_t msec = TIMER_NOW.tv_usec / 1000;
         UI_update_time(sec * 1000 + msec);
+
+        log_debug("%lu + %lu = %lu\n", sec, msec, sec*1000+msec);
 
         int quit = UI_loop();
         if (quit)
