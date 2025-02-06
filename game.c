@@ -97,16 +97,27 @@ int game_init() {
     init_entity_types();
     GAME->world = world_init(20, GAME->skins_c - 1);
     
-    int e_x = rand() % 20;
-    int e_y = rand() % 20;
-    Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
+    int e_x, e_y;
+    Entity *player, *entity;
+
+    player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
     entity_set_keyboard_controller(player);
     GLOBALS.player = player;
 
-    e_x = rand() % 20;
-    e_y = rand() % 20;
-    Entity* entity = entity_spawn(GAME->world, GAME->entity_types + ge_chaser_mob, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
-    entity->speed = 100;
+    e_x = rand() % GLOBALS.view_port_maxx;
+    e_y = rand() % GLOBALS.view_port_maxy;
+    entity = entity_spawn(GAME->world, GAME->entity_types + ge_chaser_mob, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    entity->speed = 50;
+
+    e_x = rand() % GLOBALS.view_port_maxx;
+    e_y = rand() % GLOBALS.view_port_maxy;
+    entity = entity_spawn(GAME->world, GAME->entity_types + ge_diamond, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    entity->speed = 80;
+
+    e_x = rand() % GLOBALS.view_port_maxx;
+    e_y = rand() % GLOBALS.view_port_maxy;
+    entity = entity_spawn(GAME->world, GAME->entity_types + ge_redore, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    entity->speed = 150;
 
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);

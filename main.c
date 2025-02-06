@@ -94,7 +94,6 @@ int jobInput (Task* task, Stack64* stack) {
     else if (kb_down(KB_G) && 350 < timer_diff_milisec(&TIMER_NOW, &last_widget_toggle))
         {
         UI_toggle_widgetwin();
-        log_debug("Toggle widget win !!!");
         last_widget_toggle = TIMER_NOW;
         }
 

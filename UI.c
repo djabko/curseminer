@@ -169,7 +169,7 @@ void draw_rt_clock(WINDOW* win, int x, int y, int r) {
 
     utime_t sc = time_sec % 60;
     utime_t mn = time_sec % (60*60);
-    utime_t hr = (time_sec+60*60) % (60*60*24);
+    utime_t hr = (time_sec) % (60*60*12);
 
     double angleS = sc * (2*M_PI/60) - (M_PI/2);
     double angleM = mn * (2*M_PI/(60*60)) - (M_PI/2);
@@ -304,8 +304,6 @@ int init_window(window_t* window, int x, int y, int w, int h, const char* title,
     window->active = 1;
     strncpy(window->title, title, MAX_TITLE);
 
-    box_win(window);
-
     return NULL < (void*) window->win;
 }
 
@@ -351,9 +349,10 @@ int UI_init(int nogui_mode) {
     init_window(&gamewin, gwx, gwy, gww, gwh, "Game", ge_player);
     init_window(&uiwin,   uwx, uwy, uww, uwh, "UI", ge_diamond);
     init_window(&widgetwin,   gwx+2, gwy+2, gww, gwh, "Widget", ge_redore);
+    box_win(&gamewin);
+    box_win(&uiwin);
 
     widgetwin.active = 0;
-    box_win_clear(&widgetwin);
 
     GLOBALS.view_port_maxx = gww - 1;
     GLOBALS.view_port_maxy = gwh - 1;
