@@ -5,6 +5,7 @@
 #include "ncurses.h"
 
 #include "globals.h"
+#include "util.h"
 #include "stack64.h"
 #include "UI.h"
 #include "game.h"
@@ -14,6 +15,8 @@
 #define MAX_TITLE 32
 
 typedef void (*voidfunc) ();
+
+NoiseLattice *NOISE;
 
 Stack64* MENU_STACK = NULL;
 int LINES = 0;
@@ -31,44 +34,11 @@ typedef struct {
 
 window_t gamewin, uiwin, widgetwin = {};
 
-typedef struct {
-   double x, y; 
-} Position;
-
-typedef struct {
-   Position a, b;
-} Line;
-
-
-/* Math Helper Functions */
-double euc_dist(Line* line) {
-    return floor( 
-            sqrt(
-                pow(line->b.x - line->a.x, 2) +
-                pow(line->b.y - line->a.y, 2)
-                ));
-}
-
-int man_dist(Line* line) {
-    return round(
-            fabs(line->b.x - line->a.x) +
-            fabs(line->b.y - line->a.y)
-            );
-} 
-
-int che_dist(Line* line) {
-    return round(
-            max(
-                fabs(line->a.x - line->b.x),
-                fabs(line->a.y - line->b.y)
-                )
-            );
-}
-
 static inline char sign_of_int(int x) {
     if      (x == 0) return ' ';
     else if (x < 0)  return '-';
     else if (x > 0)  return '+';
+    return '\0';
 }
 
 
@@ -235,7 +205,7 @@ void draw_uiwin() {
             abs(GLOBALS.player->vx)
             );
 
-    mvwprintw(uiwin.win, 3, 20, "Last pressed G: %d (State: %c)",
+    mvwprintw(uiwin.win, 3, 20, "Last pressed G: %ld (State: %c)",
             TIMER_NOW.tv_sec - GLOBALS.keyboard.keys[KB_G].last_pressed.tv_sec, widgetwin.active ? '*' : '.');
 
     EntityType* entity = game_world_getxy(1, 1);
@@ -249,16 +219,49 @@ void draw_uiwin() {
 
 void draw_widgetwin_nogui() {}
 
-int WIDGET_WIN_CLOCK_RADIUS = 20;
+double WIDGET_WIN_MOD = 1;
+double WIDGET_WIN_MOD2 = 1;
 void draw_widgetwin() {
     if (!widgetwin.active || widgetwin.hidden) return;
-
     werase(widgetwin.win);
-    draw_rt_clock(widgetwin.win, widgetwin.w/2, widgetwin.h/2, WIDGET_WIN_CLOCK_RADIUS);
-    wnoutrefresh(widgetwin.win);
 
-    if (kb_down(KB_D)) WIDGET_WIN_CLOCK_RADIUS++;
-    if (kb_down(KB_A)) WIDGET_WIN_CLOCK_RADIUS--;
+    //draw_rt_clock(widgetwin.win, widgetwin.w/2, widgetwin.h/2, WIDGET_WIN_CLOCK_MOD);
+
+    double c = WIDGET_WIN_MOD;
+    double o = WIDGET_WIN_MOD2;
+    double rescale_factor = 1;
+    double frequency = 1;
+    double amplitude = 1;
+    double octaves = 1;
+    int y = 0;
+
+    for (int x=0; x<widgetwin.w; x++) {
+        double _x = ((double) x) / c + o;
+        double _y = 0;
+        for (int i=1; i<=octaves; i++) _y += value_noise_1D(NOISE, _x * frequency * i) * amplitude;
+        
+        int new_y = (int) (_y * 10) + widgetwin.h/2;
+
+        if (x > 0 && y != new_y)
+            while (y != new_y) {
+                int diff = new_y - y;
+                if (diff < 0) y--;
+                else y++;
+                mvwaddch(widgetwin.win, y, x, '+');
+            }
+
+        else {
+            y = new_y;
+            mvwaddch(widgetwin.win, y, x, '+');
+        }
+    }
+
+    if (kb_down(KB_D)) WIDGET_WIN_MOD2 += .1;
+    if (kb_down(KB_A)) WIDGET_WIN_MOD2 -= .1;
+    if (kb_down(KB_W)) WIDGET_WIN_MOD += .1;
+    if (kb_down(KB_S) && WIDGET_WIN_MOD > 1) WIDGET_WIN_MOD -= .1;
+
+    wnoutrefresh(widgetwin.win);
 }
 
 // Simulates drawing the screen without actually printing anything
@@ -347,8 +350,8 @@ int UI_init(int nogui_mode) {
     uwh = LINES * .2 - 1;
 
     init_window(&gamewin, gwx, gwy, gww, gwh, "Game", ge_player);
-    init_window(&uiwin,   uwx, uwy, uww, uwh, "UI", ge_diamond);
-    init_window(&widgetwin,   gwx+2, gwy+2, gww, gwh, "Widget", ge_redore);
+    init_window(&uiwin, uwx, uwy, uww, uwh, "UI", ge_diamond);
+    init_window(&widgetwin, gwx+2, gwy+2, gww, gwh, "Widget", ge_redore);
     box_win(&gamewin);
     box_win(&uiwin);
 
@@ -367,6 +370,7 @@ int UI_init(int nogui_mode) {
     init_colors();
     wnoutrefresh(stdscr);
 
+    NOISE = noise_init(100);
     return 1;
 }
 
@@ -404,3 +408,4 @@ void UI_toggle_widgetwin() {
     if (widgetwin.active) UI_hide_widgetwin();
     else UI_show_widgetwin();
 }
+

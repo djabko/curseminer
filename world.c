@@ -1,5 +1,6 @@
 #include <globals.h>
 #include <world.h>
+#include <util.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -20,11 +21,6 @@ int MAXID = 0;
 /* Internal Chunk Functions */
 int is_arena_full(ChunkArena *arena) {
     return arena->free == arena->end;
-}
-
-// TODO: Reuse math code from UI.c
-int _man_dist(int x1, int y1, int x2, int y2) {
-    return fabs(x1 - x2) + fabs(y1 - y2);
 }
 
 // TODO: Standardize, this expensive function is often called three times successively 
@@ -141,11 +137,11 @@ Chunk *chunk_nearest(World *world, int x, int y) {
     y = topleft_coordinate(y, chunk_s);
 
     ChunkDescriptor *nearest = CHUNK_DESCRIPTORS;
-    int dist = _man_dist(nearest->tl_x, nearest->tl_y, x, y);
+    int dist = man_dist(nearest->tl_x, nearest->tl_y, x, y);
 
     for (ChunkDescriptor *cd = CHUNK_DESCRIPTORS+1; cd->ptr; cd++) {
 
-        int tmp = _man_dist(cd->tl_x, cd->tl_y, x, y);
+        int tmp = man_dist(cd->tl_x, cd->tl_y, x, y);
 
         if (tmp < dist && 0 < tmp) {
             dist = tmp;
