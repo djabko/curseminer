@@ -16,6 +16,27 @@
 
 typedef void (*voidfunc) ();
 
+typedef struct window_t {
+    WINDOW *win;
+    Queue64 *draw_qu;
+    SkinTypeID color;
+    struct window_t *parent;
+
+    void (*draw_func)(struct window_t*);
+
+    int x, y, w, h;
+    char title[MAX_TITLE];
+    int active, hidden;
+} window_t;
+
+typedef struct {
+    int count, max;
+    Queue64 *window_qu;
+    window_t *mempool;
+} windowmgr_t;
+
+window_t *g_widgetwin;
+windowmgr_t WINDOW_MGR = {};
 NoiseLattice *NOISE;
 
 Stack64* MENU_STACK = NULL;
@@ -23,16 +44,6 @@ int LINES = 0;
 int COLS = 0;
 
 miliseconds_t TIME_MSEC = 0;
-
-typedef struct {
-    WINDOW* win;
-    int x, y, w, h;
-    char title[MAX_TITLE];
-    int active, hidden;
-    SkinTypeID color;
-} window_t;
-
-window_t gamewin, uiwin, widgetwin = {};
 
 static inline char sign_of_int(int x) {
     if      (x == 0) return ' ';
@@ -165,39 +176,39 @@ void draw_keyboard_state(WINDOW* scr, int x, int y) {
     }
 }
 
-void draw_gamewin_nogui() {
-    for (int x=0; x <= gamewin.w; x++) {
-        for (int y=0; y <= gamewin.h; y++) {
+void draw_gamewin_nogui(window_t *gamewin) {
+    for (int x=0; x <= gamewin->w; x++) {
+        for (int y=0; y <= gamewin->h; y++) {
             EntityType *e = game_world_getxy(x, y); 
         }
     }
 }
 
-void draw_gamewin() {
+void draw_gamewin(window_t *gamewin) {
     EntityType* entity;
 
-    for (int x=0; x <= gamewin.w; x++) {
-        for (int y=0; y <= gamewin.h; y++) {
+    for (int x=0; x <= gamewin->w; x++) {
+        for (int y=0; y <= gamewin->h; y++) {
 
             entity = game_world_getxy(x, y);
-            wattron(gamewin.win, COLOR_PAIR(entity->skin->id));
-            mvwaddch(gamewin.win, y, x, entity->skin->character);
+            wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
+            mvwaddch(gamewin->win, y, x, entity->skin->character);
         }
     }
 
-    wnoutrefresh(gamewin.win);
+    wnoutrefresh(gamewin->win);
 }
 
-void draw_uiwin_nogui() {
+void draw_uiwin_nogui(window_t *uiwin) {
     EntityType *e = game_world_getxy(1, 1);
 }
 
-void draw_uiwin() {
-    werase(uiwin.win);
+void draw_uiwin(window_t *uiwin) {
+    werase(uiwin->win);
 
-    draw_rt_clock(uiwin.win, uiwin.h/2+2, uiwin.h/2, uiwin.h/2);
+    draw_rt_clock(uiwin->win, uiwin->h/2+2, uiwin->h/2, uiwin->h/2);
 
-    mvwprintw(uiwin.win, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
+    mvwprintw(uiwin->win, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
             GLOBALS.player->y, GLOBALS.player->x,
             sign_of_int(GLOBALS.player->vy),
             abs(GLOBALS.player->vy),
@@ -205,76 +216,80 @@ void draw_uiwin() {
             abs(GLOBALS.player->vx)
             );
 
-    mvwprintw(uiwin.win, 3, 20, "Last pressed G: %ld (State: %c)",
-            TIMER_NOW.tv_sec - GLOBALS.keyboard.keys[KB_G].last_pressed.tv_sec, widgetwin.active ? '*' : '.');
-
     EntityType* entity = game_world_getxy(1, 1);
-    mvwprintw(uiwin.win, 7, 20, "Entity Type at (1,1): %d", entity->id);
+    mvwprintw(uiwin->win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
-    mvwprintw(uiwin.win, (TIME_MSEC/100)%uiwin.h, uiwin.w/2, "!"); // draw splash icon
+    mvwprintw(uiwin->win, (TIME_MSEC/100)%uiwin->h, uiwin->w/2, "!"); // draw splash icon
 
-    draw_keyboard_state(uiwin.win, (int)COLS*.5, 5);
-    wnoutrefresh(uiwin.win);
+    draw_keyboard_state(uiwin->win, (int)COLS*.5, 5);
+    wnoutrefresh(uiwin->win);
 }
 
-void draw_widgetwin_nogui() {}
+void draw_widgetwin_nogui(window_t *widgetwin) {}
 
-double WIDGET_WIN_MOD = 1;
-double WIDGET_WIN_MOD2 = 1;
-void draw_widgetwin() {
-    if (!widgetwin.active || widgetwin.hidden) return;
-    werase(widgetwin.win);
+int WIDGET_WIN_R = 10;
+void draw_widgetwin_rt_clock(window_t *widgetwin) {
+    werase(widgetwin->win);
 
-    //draw_rt_clock(widgetwin.win, widgetwin.w/2, widgetwin.h/2, WIDGET_WIN_CLOCK_MOD);
+    draw_rt_clock(widgetwin->win, widgetwin->w/2, widgetwin->h/2, WIDGET_WIN_R);
 
-    double c = WIDGET_WIN_MOD;
-    double o = WIDGET_WIN_MOD2;
+    if (kb_down(KB_D)) WIDGET_WIN_R += .1;
+    if (kb_down(KB_A)) WIDGET_WIN_R -= .1;
+
+    wnoutrefresh(widgetwin->win);
+}
+
+double WIDGET_WIN_C = 1;
+double WIDGET_WIN_O = 1;
+void draw_widgetwin_value_noise(window_t *widgetwin) {
+    if (!widgetwin->active || widgetwin->hidden) return;
+    werase(widgetwin->win);
+
+    double c = WIDGET_WIN_C;
+    double o = WIDGET_WIN_O;
     double rescale_factor = 1;
     double frequency = 1;
     double amplitude = 1;
     double octaves = 1;
     int y = 0;
 
-    for (int x=0; x<widgetwin.w; x++) {
+    for (int x=0; x<widgetwin->w; x++) {
         double _x = ((double) x) / c + o;
         double _y = 0;
         for (int i=1; i<=octaves; i++) _y += value_noise_1D(NOISE, _x * frequency * i) * amplitude;
         
-        int new_y = (int) (_y * 10) + widgetwin.h/2;
+        int new_y = (int) (_y * 10) + widgetwin->h/2;
 
         if (x > 0 && y != new_y)
             while (y != new_y) {
                 int diff = new_y - y;
                 if (diff < 0) y--;
                 else y++;
-                mvwaddch(widgetwin.win, y, x, '+');
+                mvwaddch(widgetwin->win, y, x, '+');
             }
 
         else {
             y = new_y;
-            mvwaddch(widgetwin.win, y, x, '+');
+            mvwaddch(widgetwin->win, y, x, '+');
         }
     }
 
-    if (kb_down(KB_D)) WIDGET_WIN_MOD2 += .1;
-    if (kb_down(KB_A)) WIDGET_WIN_MOD2 -= .1;
-    if (kb_down(KB_W)) WIDGET_WIN_MOD += .1;
-    if (kb_down(KB_S) && WIDGET_WIN_MOD > 1) WIDGET_WIN_MOD -= .1;
+    if (kb_down(KB_D)) WIDGET_WIN_O += .1;
+    if (kb_down(KB_A)) WIDGET_WIN_O -= .1;
+    if (kb_down(KB_W)) WIDGET_WIN_C += .1;
+    if (kb_down(KB_S) && WIDGET_WIN_C > 1) WIDGET_WIN_C -= .1;
 
-    wnoutrefresh(widgetwin.win);
+    wnoutrefresh(widgetwin->win);
 }
 
-// Simulates drawing the screen without actually printing anything
-void draw_main_menu_nogui() {
-    draw_gamewin_nogui();
-    draw_uiwin_nogui();
-}
-
-// TODO: window queue
 void draw_main_menu() {
-    if (gamewin.active) draw_gamewin();
-    if (uiwin.active) draw_uiwin();
-    if (widgetwin.active) draw_widgetwin();
+    Queue64* qu = WINDOW_MGR.window_qu;
+
+    qu_foreach(qu, window_t*, win) {
+        if (!(win->active) || win->hidden) continue;
+
+        win->draw_func(win);
+    }
 }
 
 /* Init Functions */
@@ -296,8 +311,11 @@ int init_colors() {
     return 1;
 }
 
-int init_window(window_t* window, int x, int y, int w, int h, const char* title, SkinTypeID color) {
+int init_window(window_t *window, window_t *parent, int x, int y, int w, int h, const char *title, SkinTypeID color) {
     window->win = newwin(h, w, y, x);
+    window->parent = parent;
+    window->draw_qu = qu_init(1);
+    window->draw_func = (void (*)(window_t*)) (window->draw_qu);
     window->x = x;
     window->y = y;
     window->w = w;
@@ -310,12 +328,53 @@ int init_window(window_t* window, int x, int y, int w, int h, const char* title,
     return NULL < (void*) window->win;
 }
 
+int window_insert_draw_func(window_t *win, void (draw_func)(window_t*)) {
+    if (!win) return -1;
+
+    qu_enqueue(win->draw_qu, (uint64_t) draw_func);
+    win->draw_func = draw_func;
+
+    return 1;
+}
+
+void free_window(window_t *window) {
+    free(window->draw_qu);
+}
+
+int window_mgr_init(int size) {
+    WINDOW_MGR.count = 0;
+    WINDOW_MGR.max = size;
+    WINDOW_MGR.window_qu = qu_init(size);
+    WINDOW_MGR.mempool = calloc(sizeof(window_t), size);
+
+    return WINDOW_MGR.mempool != NULL;
+}
+
+window_t *window_mgr_add(window_t *parent, int x, int y, int w, int h, const char* title, SkinTypeID color) {
+    if (WINDOW_MGR.count >= WINDOW_MGR.max) return NULL;
+
+    window_t *win = &WINDOW_MGR.mempool[ WINDOW_MGR.count++ ];
+    init_window(win, parent, x, y, w, h, title, color);
+    qu_enqueue(WINDOW_MGR.window_qu, (uint64_t) win);
+
+    return win;
+}
+
+void window_mgr_free() {
+    qu_foreach(WINDOW_MGR.window_qu, window_t*, win) {
+        free_window(win);
+    }
+
+    free(WINDOW_MGR.window_qu);
+    free(WINDOW_MGR.mempool);
+    memset(&WINDOW_MGR, 0, sizeof(WINDOW_MGR));
+}
+
 
 /* Public functions used by other components */
 void UI_update_time(miliseconds_t msec) {
     TIME_MSEC = msec;
 }
-
 
 int UI_init(int nogui_mode) {
     MENU_STACK = st_init(16);
@@ -331,10 +390,9 @@ int UI_init(int nogui_mode) {
 
         ESCDELAY = 25;
 
-        st_push(MENU_STACK, (uint64_t) draw_main_menu);
-    } else {
-        st_push(MENU_STACK, (uint64_t) draw_main_menu_nogui);   
     }
+
+    st_push(MENU_STACK, (uint64_t) draw_main_menu);
 
     getmaxyx(stdscr, LINES, COLS);
 
@@ -349,25 +407,33 @@ int UI_init(int nogui_mode) {
     uww = COLS  * .8 - 1;
     uwh = LINES * .2 - 1;
 
-    init_window(&gamewin, gwx, gwy, gww, gwh, "Game", ge_player);
-    init_window(&uiwin, uwx, uwy, uww, uwh, "UI", ge_diamond);
-    init_window(&widgetwin, gwx+2, gwy+2, gww, gwh, "Widget", ge_redore);
-    box_win(&gamewin);
-    box_win(&uiwin);
+    window_t *gamewin, *uiwin;
 
-    widgetwin.active = 0;
+    window_mgr_init(4);
+    gamewin    = window_mgr_add(NULL, gwx, gwy, gww, gwh, "Game", ge_player);
+    uiwin      = window_mgr_add(NULL, uwx, uwy, uww, uwh, "UI", ge_diamond);
+    g_widgetwin  = window_mgr_add(gamewin, gwx+2, gwy+2, gww, gwh, "Widget", ge_redore);
+
+    window_insert_draw_func(gamewin,        nogui_mode ? draw_gamewin_nogui     : draw_gamewin);
+    window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);
+    window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
 
     GLOBALS.view_port_maxx = gww - 1;
     GLOBALS.view_port_maxy = gwh - 1;
 
     int status = game_init();
     if (status != 0) {
-        log_debug("Error initializing game: %d", status);
         UI_exit();
         return 0;
     }
 
     init_colors();
+
+    // These functions require colors initialized
+    box_win(gamewin);
+    box_win(uiwin);
+    g_widgetwin->active = 0;
+
     wnoutrefresh(stdscr);
 
     NOISE = noise_init(100);
@@ -384,28 +450,30 @@ int UI_loop() {
 }
 
 int UI_exit() {
-    delwin(gamewin.win);
-    delwin(uiwin.win);
+    window_mgr_free();
     endwin();
     free(MENU_STACK);
     return 1;
 }
 
-void UI_show_widgetwin() {
-    gamewin.active = 0;
-    widgetwin.active = 1;
-    box_win(&widgetwin);
+void UI_show_window(window_t *win) {
+    win->active = 1;
+    if (win->parent) win->parent->active = 0;
+
+    box_win(win);
 }
 
-void UI_hide_widgetwin() {
-    box_win_clear(&widgetwin);
-    gamewin.active = 1;
-    widgetwin.active = 0;
-    box_win(&gamewin);
+void UI_hide_window(window_t *win) {
+    box_win_clear(win);
+
+    if (win->parent) win->parent->active = 1;
+    win->active = 0;
+
+    box_win(win);
 }
 
 void UI_toggle_widgetwin() {
-    if (widgetwin.active) UI_hide_widgetwin();
-    else UI_show_widgetwin();
+    if (g_widgetwin->active) UI_hide_window(g_widgetwin);
+    else UI_show_window(g_widgetwin);
 }
 
