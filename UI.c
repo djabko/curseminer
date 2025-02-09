@@ -37,7 +37,7 @@ typedef struct {
 
 window_t *g_widgetwin;
 windowmgr_t WINDOW_MGR = {};
-NoiseLattice *NOISE;
+NoiseLattice *LATTICE1D;
 
 Stack64* MENU_STACK = NULL;
 int LINES = 0;
@@ -256,8 +256,8 @@ void draw_widgetwin_value_noise(window_t *widgetwin) {
     for (int x=0; x<widgetwin->w; x++) {
         double _x = ((double) x) / c + o;
         double _y = 0;
-        for (int i=1; i<=octaves; i++) _y += value_noise_1D(NOISE, _x * frequency * i) * amplitude;
-        
+        for (int i=1; i<=octaves; i++) _y += value_noise_1D(LATTICE1D, _x * frequency * i, smoothstep) * amplitude;
+
         int new_y = (int) (_y * 10) + widgetwin->h/2;
 
         if (x > 0 && y != new_y)
@@ -417,6 +417,7 @@ int UI_init(int nogui_mode) {
     window_insert_draw_func(gamewin,        nogui_mode ? draw_gamewin_nogui     : draw_gamewin);
     window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);
     window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
+    window_insert_draw_func(g_widgetwin,    draw_widgetwin_value_noise);
 
     GLOBALS.view_port_maxx = gww - 1;
     GLOBALS.view_port_maxy = gwh - 1;
@@ -436,7 +437,7 @@ int UI_init(int nogui_mode) {
 
     wnoutrefresh(stdscr);
 
-    NOISE = noise_init(100);
+    LATTICE1D = noise_init(100, 1, 100);
     return 1;
 }
 

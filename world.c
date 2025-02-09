@@ -14,11 +14,12 @@ int ITERATOR = 0;
  */
 World *WORLD = NULL;
 ChunkDescriptor *CHUNK_DESCRIPTORS;
+NoiseLattice *LATTICE2D;
 int GLOBAL_CHUNK_COUNT = 0;
 int MAXID = 0;
 
 
-/* Internal Chunk Functions */
+/* Internal Helper Functions */
 int is_arena_full(ChunkArena *arena) {
     return arena->free == arena->end;
 }
@@ -84,6 +85,30 @@ Chunk *chunk_get_free(World *world) {
     return re;
 }
 
+int chunk_populate(World *world, Chunk *chunk) {
+    static const double resolution = 8.0;
+    int chunk_s = world->chunk_arenas->chunk_s;
+
+    for (int x=0; x<chunk_s; x++) {
+        for (int y=0; y<chunk_s; y++) {
+            int id;
+            double _x = (double) x / resolution;
+            double _y = (double) y / resolution;
+            double v = value_noise_2D(LATTICE2D, _x, _y, smoothstep);
+
+            if (v <= .5) id = ge_air;
+            else if (v <= .7) id = ge_stone;
+            else if (v <= .8) id = ge_iron;
+            else if (v <= .9) id = ge_redore;
+            else if (v <= .95) id = ge_gold;
+            else if (v <= .98) id = ge_diamond;
+            else id = 0;
+
+            chunk->data[x * chunk_s + y] = id;
+        }
+    }
+}
+
 Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chunk *left, Chunk *right) {
 
     Chunk *chunk = chunk_get_free(world);
@@ -99,6 +124,8 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
 
     ChunkDescriptor *cd = CHUNK_DESCRIPTORS + GLOBAL_CHUNK_COUNT++;
     *cd = (ChunkDescriptor) {.tl_x = x, .tl_y = y, .ptr = chunk};
+
+    chunk_populate(world, chunk);
 
     return chunk;
 }
@@ -250,18 +277,12 @@ void chunk_free_all() {
 
 
 /* Interface World Functions */
-void world_gen() {
-    if (WORLD->world_array == NULL) return;
-
-    for (int i=ge_air; i < (WORLD->maxx) * (WORLD->maxy); i++)
-        WORLD->world_array[i] = rand() % MAXID;
-}
-
 World *world_init(int chunk_s, int maxid) {
     if (WORLD != NULL) return 0;
     
     WORLD = calloc(1, sizeof(World));
     CHUNK_DESCRIPTORS = calloc(PAGE_SIZE, sizeof(ChunkDescriptor));
+    LATTICE2D = noise_init(100000, 2, 100);
 
     MAXID = maxid;
     WORLD->maxx = chunk_s;
@@ -272,7 +293,6 @@ World *world_init(int chunk_s, int maxid) {
     WORLD->entities = qu_init( WORLD->entity_maxc );
 
     chunk_create(WORLD, 0, 0);
-    //world_gen();
 
     return WORLD;
 }
