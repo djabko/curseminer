@@ -44,11 +44,11 @@ typedef struct NoiseLattice {
 static NoiseLattice *noise_init(int count, int dimensions, int length) {
     static int resolution = 100000;
     
-    srand(TIMER_NOW.tv_usec);
-
     NoiseLattice *noise = calloc(sizeof(NoiseLattice) + sizeof(double) * count, 1);
     double *gradients = (double*) (noise+1);
 
+
+    srand(TIMER_NOW.tv_usec);
     for (int i=0; i<count; i++) {
         gradients[i] = fabs((double) (rand() % resolution) / resolution);
     }
@@ -81,6 +81,9 @@ static double value_noise_2D(NoiseLattice *lattice, double x, double y, double (
      * 3. Interpolate the results
      */
 
+    x = fabs(x);
+    y = fabs(y);
+
     double *gradients = lattice->gradients;
     int i_x = (int) x;
     int i_y = (int) y;
@@ -95,11 +98,13 @@ static double value_noise_2D(NoiseLattice *lattice, double x, double y, double (
     double t_x = x - i_x;
     double t_y = y - i_y;
 
-    return lerp(
+    double re = lerp(
             lerp(tl, tr, smoothing_func(t_x)),
             lerp(bl, br, smoothing_func(t_x)),
             t_y
             );
+
+    return re;
 }
 
 static inline void noise_free(NoiseLattice *noise) {

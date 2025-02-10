@@ -85,26 +85,41 @@ Chunk *chunk_get_free(World *world) {
     return re;
 }
 
+int chunk_populate_p(double noise_value, double sparsity) {
+    double v = noise_value;
+    double p = sparsity;
+    double e = 1 - p;
+
+    int id = 0;
+
+    if (v <= p) id = ge_air;
+    else if (v <= p+e*.5) id = ge_stone;
+    else if (v <= p+e*.875) id = ge_iron;
+    else if (v <= p+e*.9375) id = ge_redore;
+    else if (v <= p+e*.96875) id = ge_gold;
+    else if (v <= p+e*.984375) id = ge_diamond;
+
+    return id;
+}
+
 int chunk_populate(World *world, Chunk *chunk) {
-    static const double resolution = 8.0;
+    static const double resolution = 20.0;
     int chunk_s = world->chunk_arenas->chunk_s;
 
-    for (int x=0; x<chunk_s; x++) {
-        for (int y=0; y<chunk_s; y++) {
-            int id;
-            double _x = (double) x / resolution;
-            double _y = (double) y / resolution;
+    int startx = chunk->tl_x;
+    int starty = chunk->tl_y;
+    int endx = startx + chunk_s;
+    int endy = starty + chunk_s;
+    for (int x=startx; x<endx; x++) {
+        for (int y=starty; y<endy; y++) {
+            double _x = ((double) x) / resolution;
+            double _y = ((double) y) / resolution;
             double v = value_noise_2D(LATTICE2D, _x, _y, smoothstep);
 
-            if (v <= .5) id = ge_air;
-            else if (v <= .7) id = ge_stone;
-            else if (v <= .8) id = ge_iron;
-            else if (v <= .9) id = ge_redore;
-            else if (v <= .95) id = ge_gold;
-            else if (v <= .98) id = ge_diamond;
-            else id = 0;
+            double p = .60;
+            int id = chunk_populate_p(v, p);
 
-            chunk->data[x * chunk_s + y] = id;
+            world_setxy(x, y, id);
         }
     }
 }
@@ -311,7 +326,10 @@ unsigned char world_getxy(int x, int y) {
         int diff_y = tl_y - nearest->tl_y;
 
         while (diff_x != 0 || diff_y != 0) {
-            // Cases: x<tx, x>tx, y<ty, y>ty
+
+            // Used only for debugging
+            int old_tl_x = nearest->tl_x;
+            int old_tl_y = nearest->tl_y;
 
             // Change along x
             if (fabs(diff_y) < fabs(diff_x)) {
@@ -338,7 +356,7 @@ unsigned char world_getxy(int x, int y) {
                 }
             }
 
-            if (!nearest) log_debug("ERROR: attempting to overwrite existing chunk!\n");
+            if (!nearest) log_debug("ERROR: attempting to overwrite existing chunk (%d,%d)!\n", old_tl_x, old_tl_y);
 
             diff_x = tl_x - nearest->tl_x;
             diff_y = tl_y - nearest->tl_y;
