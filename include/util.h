@@ -26,7 +26,7 @@ static inline double lerp(double a, double b, double t) {
 }
 
 static inline double smoothstep(double t) {
-    return t * t * (3 - 2 * t);
+    return 3 * t * t - 2 * t * t * t;
 }
 
 static inline double fade(double t) {
@@ -47,10 +47,11 @@ static NoiseLattice *noise_init(int count, int dimensions, int length) {
     NoiseLattice *noise = calloc(sizeof(NoiseLattice) + sizeof(double) * count, 1);
     double *gradients = (double*) (noise+1);
 
-
     srand(TIMER_NOW.tv_usec);
     for (int i=0; i<count; i++) {
-        gradients[i] = fabs((double) (rand() % resolution) / resolution);
+        int r = rand() % (resolution*2);
+        double random = r - resolution;
+        gradients[i] = random / resolution;
     }
     
     noise->count = count;
@@ -81,9 +82,6 @@ static double value_noise_2D(NoiseLattice *lattice, double x, double y, double (
      * 3. Interpolate the results
      */
 
-    x = fabs(x);
-    y = fabs(y);
-
     double *gradients = lattice->gradients;
     int i_x = (int) x;
     int i_y = (int) y;
@@ -104,6 +102,19 @@ static double value_noise_2D(NoiseLattice *lattice, double x, double y, double (
             t_y
             );
 
+    return re;
+}
+
+static double perlin_noise_1D(NoiseLattice *lattice, double x, double (*smoothing_func)(double)) {
+    double *gradients = lattice->gradients;
+
+    int low = (int) x;
+    int high = low + 1;
+    double g0 = gradients[low] > 0 ? 1.0 : -1.0;
+    double g1 = gradients[high] > 0 ? 1.0 : -1.0;
+    double t = smoothing_func(x - low);
+
+    double re = 2.0 * lerp(gradients[low] * (x - low), gradients[high] * (high - x), t);
     return re;
 }
 

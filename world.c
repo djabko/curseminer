@@ -90,6 +90,9 @@ int chunk_populate_p(double noise_value, double sparsity) {
     double p = sparsity;
     double e = 1 - p;
 
+    // Normalize to range {0.0, 1.0}
+    v = (v + 1) / 2;
+
     int id = 0;
 
     if (v <= p) id = ge_air;

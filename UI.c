@@ -241,7 +241,7 @@ void draw_widgetwin_rt_clock(window_t *widgetwin) {
 
 double WIDGET_WIN_C = 1;
 double WIDGET_WIN_O = 1;
-void draw_widgetwin_value_noise(window_t *widgetwin) {
+void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*, double, double (*)(double))) {
     if (!widgetwin->active || widgetwin->hidden) return;
     werase(widgetwin->win);
 
@@ -256,7 +256,7 @@ void draw_widgetwin_value_noise(window_t *widgetwin) {
     for (int x=0; x<widgetwin->w; x++) {
         double _x = ((double) x) / c + o;
         double _y = 0;
-        for (int i=1; i<=octaves; i++) _y += value_noise_1D(LATTICE1D, _x * frequency * i, smoothstep) * amplitude;
+        for (int i=1; i<=octaves; i++) _y += noise_func(LATTICE1D, _x * frequency * i, fade) * amplitude;
 
         int new_y = (int) (_y * 10) + widgetwin->h/2;
 
@@ -280,6 +280,14 @@ void draw_widgetwin_value_noise(window_t *widgetwin) {
     if (kb_down(KB_S) && WIDGET_WIN_C > 1) WIDGET_WIN_C -= .1;
 
     wnoutrefresh(widgetwin->win);
+}
+
+void draw_widgetwin_value_noise(window_t *widgetwin) {
+    draw_widgetwin_noise(widgetwin, value_noise_1D);
+}
+
+void draw_widgetwin_perlin_noise(window_t *widgetwin) {
+    draw_widgetwin_noise(widgetwin, perlin_noise_1D);
 }
 
 void draw_main_menu() {
@@ -417,7 +425,7 @@ int UI_init(int nogui_mode) {
     window_insert_draw_func(gamewin,        nogui_mode ? draw_gamewin_nogui     : draw_gamewin);
     window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);
     window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
-    window_insert_draw_func(g_widgetwin,    draw_widgetwin_value_noise);
+    window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
 
     GLOBALS.view_port_maxx = gww - 1;
     GLOBALS.view_port_maxy = gwh - 1;
