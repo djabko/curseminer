@@ -115,9 +115,9 @@ int chunk_populate(World *world, Chunk *chunk) {
     int endy = starty + chunk_s;
     for (int x=startx; x<endx; x++) {
         for (int y=starty; y<endy; y++) {
-            double _x = ((double) x) / resolution;
-            double _y = ((double) y) / resolution;
-            double v = value_noise_2D(LATTICE2D, _x, _y, smoothstep);
+            double _x = fabs(((double) x) / resolution);
+            double _y = fabs(((double) y) / resolution);
+            double v = perlin_noise_2D(LATTICE2D, _x, _y);
 
             double p = .60;
             int id = chunk_populate_p(v, p);
@@ -125,6 +125,8 @@ int chunk_populate(World *world, Chunk *chunk) {
             world_setxy(x, y, id);
         }
     }
+
+    return 1;
 }
 
 Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chunk *left, Chunk *right) {
@@ -300,7 +302,9 @@ World *world_init(int chunk_s, int maxid) {
     
     WORLD = calloc(1, sizeof(World));
     CHUNK_DESCRIPTORS = calloc(PAGE_SIZE, sizeof(ChunkDescriptor));
-    LATTICE2D = noise_init(100000, 2, 100);
+
+    int latlen = 100;
+    LATTICE2D = noise_init(latlen * latlen, 2, latlen, fade);
 
     MAXID = maxid;
     WORLD->maxx = chunk_s;

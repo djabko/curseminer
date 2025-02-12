@@ -241,7 +241,7 @@ void draw_widgetwin_rt_clock(window_t *widgetwin) {
 
 double WIDGET_WIN_C = 1;
 double WIDGET_WIN_O = 1;
-void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*, double, double (*)(double))) {
+void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*, double)) {
     if (!widgetwin->active || widgetwin->hidden) return;
     werase(widgetwin->win);
 
@@ -256,7 +256,7 @@ void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*
     for (int x=0; x<widgetwin->w; x++) {
         double _x = ((double) x) / c + o;
         double _y = 0;
-        for (int i=1; i<=octaves; i++) _y += noise_func(LATTICE1D, _x * frequency * i, fade) * amplitude;
+        for (int i=1; i<=octaves; i++) _y += noise_func(LATTICE1D, _x * frequency * i) * amplitude;
 
         int new_y = (int) (_y * 10) + widgetwin->h/2;
 
@@ -445,7 +445,7 @@ int UI_init(int nogui_mode) {
 
     wnoutrefresh(stdscr);
 
-    LATTICE1D = noise_init(100, 1, 100);
+    LATTICE1D = noise_init(100, 1, 100, smoothstep);
     return 1;
 }
 
