@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 16
+#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 1
 
 int ITERATOR = 0;
 /* Global Variables
@@ -30,23 +30,25 @@ int topleft_coordinate(int coordinate, int chunk_s) {
     else return chunk_s * ((coordinate + 1) / chunk_s) - chunk_s;
 }
 
-ChunkArena *chunk_init_arena(size_t mem_size, int chunk_length) {
-    
-    int chunk_max = (mem_size - sizeof(ChunkArena)) / ( sizeof(Chunk) + chunk_length );
+ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
+
+    size_t chunk_stride = sizeof(Chunk) + chunk_size * chunk_size;
+    int chunk_max = (mem_size - sizeof(ChunkArena)) / chunk_stride;
 
     // Make sure allocated memory has enough space for at least 1 chunk
-    mem_size = mem_size < sizeof(ChunkArena) + sizeof(Chunk) + chunk_length
+    mem_size = mem_size < sizeof(ChunkArena) + sizeof(Chunk) + chunk_size
         ? DEFAULT_CHUNK_ARENA_SIZE : mem_size;
 
     ChunkArena *arena = calloc(mem_size, 1);
+
     Chunk *start = (Chunk*) (arena + 1);
 
     arena->count = 0;
     arena->max = chunk_max;
-    arena->chunk_s = chunk_length;
+    arena->chunk_s = chunk_size;
     arena->start = start;
     arena->free = start;
-    arena->end = start + chunk_max;
+    arena->end = (Chunk*) ((uintptr_t)start + chunk_max * chunk_stride);
     arena->next = NULL;
 
     return arena;
@@ -67,13 +69,13 @@ Chunk *chunk_arena_next(ChunkArena *arena, Chunk *chunk) {
 Chunk *chunk_get_free(World *world) {
     ChunkArena *prev;
     ChunkArena *arena = world->chunk_arenas;
-    while (is_arena_full(arena)) {
+    while (arena && is_arena_full(arena)) {
         prev = arena;
         arena = arena->next;
     }
 
     if (arena == NULL) {
-        arena = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, WORLD->maxx * WORLD->maxy);
+        arena = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, WORLD->maxx);
         prev->next = arena;
     } 
     
@@ -133,6 +135,7 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
 
     Chunk *chunk = chunk_get_free(world);
     chunk->data = (char*) (chunk + 1);
+
     chunk->tl_x = x;
     chunk->tl_y = y;
     chunk->type = CHUNK_TYPE_NORMAL;
