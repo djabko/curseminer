@@ -6,13 +6,12 @@
 #include <stdio.h>
 #include <math.h>
 
-#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 1
+#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 8
 
 int ITERATOR = 0;
 /* Global Variables
  * Initialized in world_init() 
  */
-World *WORLD = NULL;
 ChunkDescriptor *CHUNK_DESCRIPTORS;
 NoiseLattice *LATTICE2D;
 int GLOBAL_CHUNK_COUNT = 0;
@@ -45,7 +44,6 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 
     arena->count = 0;
     arena->max = chunk_max;
-    arena->chunk_s = chunk_size;
     arena->start = start;
     arena->free = start;
     arena->end = (Chunk*) ((uintptr_t)start + chunk_max * chunk_stride);
@@ -55,10 +53,10 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 }
 
 // Retrieves the next chunk in memory arena or NULL
-Chunk *chunk_arena_next(ChunkArena *arena, Chunk *chunk) {
+Chunk *chunk_arena_next(World* world, ChunkArena *arena, Chunk *chunk) {
     if (arena == NULL || chunk == NULL || (chunk < arena->start && arena->end <= chunk)) return NULL;
 
-    size_t stride = sizeof(Chunk) + arena->chunk_s * arena->chunk_s;
+    size_t stride = sizeof(Chunk) + world->chunk_s * world->chunk_s;
     uintptr_t ptr = (uintptr_t) (chunk);
     ptr += stride;
 
@@ -75,13 +73,13 @@ Chunk *chunk_get_free(World *world) {
     }
 
     if (arena == NULL) {
-        arena = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, WORLD->maxx);
+        arena = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, world->chunk_s);
         prev->next = arena;
     } 
     
     Chunk *re = arena->free;
 
-    arena->free = chunk_arena_next(arena, arena->free);
+    arena->free = chunk_arena_next(world, arena, arena->free);
     arena->count++;
 
     return re;
@@ -109,7 +107,7 @@ int chunk_populate_p(double noise_value, double sparsity) {
 
 int chunk_populate(World *world, Chunk *chunk) {
     static const double resolution = 20.0;
-    int chunk_s = world->chunk_arenas->chunk_s;
+    int chunk_s = world->chunk_s;
 
     int startx = chunk->tl_x;
     int starty = chunk->tl_y;
@@ -124,7 +122,7 @@ int chunk_populate(World *world, Chunk *chunk) {
             double p = .60;
             int id = chunk_populate_p(v, p);
 
-            world_setxy(x, y, id);
+            world_setxy(world, x, y, id);
         }
     }
 
@@ -158,7 +156,7 @@ Chunk *chunk_create(World *world, int x, int y) {
 }
 
 Chunk *chunk_lookup(World *world, int x, int y) {
-    int chunk_s = world->chunk_arenas->chunk_s;
+    int chunk_s = world->chunk_s;
 
     if (x == 20 && y == -20) {
 
@@ -182,7 +180,7 @@ Chunk *chunk_lookup(World *world, int x, int y) {
 Chunk *chunk_nearest(World *world, int x, int y) {
     if (GLOBAL_CHUNK_COUNT < 1) return NULL;
 
-    int chunk_s = world->chunk_arenas->chunk_s;
+    int chunk_s = world->chunk_s;
     x = topleft_coordinate(x, chunk_s);
     y = topleft_coordinate(y, chunk_s);
 
@@ -209,7 +207,7 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
      * 4. Check for neighbours
      */
 
-    int chunk_s = world->chunk_arenas->chunk_s;
+    int chunk_s = world->chunk_s;
 
     Chunk *new_chunk = NULL;
 
@@ -289,8 +287,8 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
     return new_chunk;
 }
 
-void chunk_free_all() {
-    ChunkArena *arena = WORLD->chunk_arenas;
+void chunk_free_all(World *world) {
+    ChunkArena *arena = world->chunk_arenas;
     while (arena) {
         ChunkArena* rm = arena;
         arena = arena->next;
@@ -301,37 +299,34 @@ void chunk_free_all() {
 
 /* Interface World Functions */
 World *world_init(int chunk_s, int maxid) {
-    if (WORLD != NULL) return 0;
-    
-    WORLD = calloc(1, sizeof(World));
+    World *new_world = calloc(1, sizeof(World));
     CHUNK_DESCRIPTORS = calloc(PAGE_SIZE, sizeof(ChunkDescriptor));
 
     int latlen = 100;
     LATTICE2D = noise_init(latlen * latlen, 2, latlen, fade);
 
     MAXID = maxid;
-    WORLD->maxx = chunk_s;
-    WORLD->maxy = chunk_s;
-    WORLD->chunk_arenas = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, chunk_s);
-    WORLD->entity_c = 0;
-    WORLD->entity_maxc = 32;
-    WORLD->entities = qu_init( WORLD->entity_maxc );
+    new_world->chunk_s = chunk_s;
+    new_world->chunk_arenas = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, chunk_s);
+    new_world->entity_c = 0;
+    new_world->entity_maxc = 32;
+    new_world->entities = qu_init( new_world->entity_maxc );
 
-    chunk_create(WORLD, 0, 0);
+    chunk_create(new_world, 0, 0);
 
-    return WORLD;
+    return new_world;
 }
 
-unsigned char world_getxy(int x, int y) {
-    int chunk_s = WORLD->chunk_arenas->chunk_s;
-    Chunk *chunk = chunk_lookup(WORLD, x, y);
+unsigned char world_getxy(World* world, int x, int y) {
+    int chunk_s = world->chunk_s;
+    Chunk *chunk = chunk_lookup(world, x, y);
 
     // Algorithm: keep inserting chunk to the nearest neighbour until a new chunk is present at (x,y)
     if (!chunk) {
         int tl_x = topleft_coordinate(x, chunk_s);
         int tl_y = topleft_coordinate(y, chunk_s);
 
-        Chunk *nearest = chunk_nearest(WORLD, tl_x, tl_y);
+        Chunk *nearest = chunk_nearest(world, tl_x, tl_y);
         int diff_x = tl_x - nearest->tl_x;
         int diff_y = tl_y - nearest->tl_y;
 
@@ -346,11 +341,11 @@ unsigned char world_getxy(int x, int y) {
 
                 // Nearest chunk is to the left, insert on it's right
                 if (0 < diff_x) {
-                    nearest = chunk_insert(WORLD, nearest, DIRECTION_RIGHT);
+                    nearest = chunk_insert(world, nearest, DIRECTION_RIGHT);
 
                 // Nearest chunk is to the right, insert on it's left
                 } else if (0 > diff_x) {
-                    nearest = chunk_insert(WORLD, nearest, DIRECTION_LEFT);
+                    nearest = chunk_insert(world, nearest, DIRECTION_LEFT);
                 }
 
             // Change along y
@@ -358,11 +353,11 @@ unsigned char world_getxy(int x, int y) {
                 
                 // Nearest chunk is below, insert above
                 if (diff_y < 0) {
-                    nearest = chunk_insert(WORLD, nearest, DIRECTION_UP);
+                    nearest = chunk_insert(world, nearest, DIRECTION_UP);
 
                 // Nearest chunk is above, insert below
                 } else if (diff_y > 0) {
-                    nearest = chunk_insert(WORLD, nearest, DIRECTION_DOWN);
+                    nearest = chunk_insert(world, nearest, DIRECTION_DOWN);
                 }
             }
 
@@ -383,11 +378,11 @@ unsigned char world_getxy(int x, int y) {
     return ret;
 }
 
-void world_setxy(int x, int y, int tid) {
-    int chunk_s = WORLD->chunk_arenas->chunk_s;
+void world_setxy(World *world, int x, int y, int tid) {
+    int chunk_s = world->chunk_s;
     int tl_x = topleft_coordinate(x, chunk_s);
     int tl_y = topleft_coordinate(y, chunk_s);
-    Chunk *chunk = chunk_lookup(WORLD, tl_x, tl_y);
+    Chunk *chunk = chunk_lookup(world, tl_x, tl_y);
 
     if (!chunk) {
         log_debug("ERROR: attempting to set nonexistent chunk at (%d,%d) to entity ID: %d", x, y, tid);
@@ -404,11 +399,9 @@ void world_setxy(int x, int y, int tid) {
     chunk->data[x * chunk_s + y] = tid;
 }
 
-void world_free(int, int) {
-    if (WORLD->world_array == NULL) return;
-    chunk_free_all();
-    free(WORLD->entities);
-    free(WORLD->world_array);
-    free(WORLD);
+void world_free(World *world) {
+    chunk_free_all(world);
+    free(world->entities);
+    free(world);
 }
 

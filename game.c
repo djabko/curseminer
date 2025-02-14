@@ -128,8 +128,7 @@ int game_init() {
 }
 
 void game_free() {
-    world_free();
-    free(GAME->world);
+    world_free(GAME->world);
     free(GAME->entity_types);
     free(GAME->skins);
     free(GAME);
@@ -156,13 +155,13 @@ EntityType* game_world_getxy(int x, int y) {
         if (e->x == x && e->y == y) return e->type;
     }
 
-    int id = world_getxy(x, y);
+    int id = world_getxy(GAME->world, x, y);
 
     return GAME->entity_types + id;
 }
 
 int game_world_setxy(int x, int y, EntityTypeID tid) {
-    world_setxy(x, y, tid);
+    world_setxy(GAME->world, x, y, tid);
     return 0;
 }
 

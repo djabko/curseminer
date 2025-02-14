@@ -36,21 +36,20 @@ typedef struct ChunkDescriptor {
 
 typedef struct ChunkArena {
     int count, max;
-    size_t chunk_s;
     Chunk *start, *free, *end;
     struct ChunkArena* next;
 } ChunkArena;
 
 typedef struct World {
-    char *world_array;
     ChunkArena *chunk_arenas;
     Queue64 *entities; // TODO: should be a linked list
-    int maxx, maxy, entity_c, entity_maxc;
+                       
+    int chunk_s, entity_c, entity_maxc;
 } World;
 
 World* world_init(int, int);
-unsigned char world_getxy(int, int);
-void world_setxy(int, int, int);
-void world_free();
+unsigned char world_getxy(World*, int, int);
+void world_setxy(World*, int, int, int);
+void world_free(World*);
 
 #endif
