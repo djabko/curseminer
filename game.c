@@ -95,7 +95,7 @@ int game_init() {
 
     init_skins();
     init_entity_types();
-    GAME->world = world_init(20, GAME->skins_c - 1);
+    GAME->world = world_init(20, GAME->skins_c - 1, PAGE_SIZE * 3);
     
     int e_x, e_y;
     Entity *player, *entity;
@@ -156,6 +156,9 @@ EntityType* game_world_getxy(int x, int y) {
     }
 
     int id = world_getxy(GAME->world, x, y);
+
+    if (id < ge_air || ge_end <= id) 
+        log_debug("ERROR: attempting to access invalid id %d at position (%d,%d)", id, x, y);
 
     return GAME->entity_types + id;
 }

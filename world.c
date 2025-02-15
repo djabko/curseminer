@@ -4,9 +4,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
-#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 8
+#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 1
 
 int ITERATOR = 0;
 /* Global Variables
@@ -32,11 +33,12 @@ int topleft_coordinate(int coordinate, int chunk_s) {
 ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 
     size_t chunk_stride = sizeof(Chunk) + chunk_size * chunk_size;
+    size_t min_mem = sizeof(ChunkArena) + chunk_stride;
     int chunk_max = (mem_size - sizeof(ChunkArena)) / chunk_stride;
 
     // Make sure allocated memory has enough space for at least 1 chunk
-    mem_size = mem_size < sizeof(ChunkArena) + sizeof(Chunk) + chunk_size
-        ? DEFAULT_CHUNK_ARENA_SIZE : mem_size;
+    if (mem_size < min_mem)
+        log_debug("ERROR: attempting to allocate arena of %luB, which is too small for chunk allocation (%luB)", mem_size, min_mem);
 
     ChunkArena *arena = calloc(mem_size, 1);
 
@@ -48,6 +50,7 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
     arena->free = start;
     arena->end = (Chunk*) ((uintptr_t)start + chunk_max * chunk_stride);
     arena->next = NULL;
+    arena->descriptors = CHUNK_DESCRIPTORS + GLOBAL_CHUNK_COUNT; 
 
     return arena;
 }
@@ -56,28 +59,55 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 Chunk *chunk_arena_next(World* world, ChunkArena *arena, Chunk *chunk) {
     if (arena == NULL || chunk == NULL || (chunk < arena->start && arena->end <= chunk)) return NULL;
 
-    size_t stride = sizeof(Chunk) + world->chunk_s * world->chunk_s;
     uintptr_t ptr = (uintptr_t) (chunk);
-    ptr += stride;
+    ptr += world->chunk_mem_stride;
 
     return (Chunk*) ptr;
 }
 
 // Returns a free area of memory for chunk allocation
-Chunk *chunk_get_free(World *world) {
-    ChunkArena *prev;
+Chunk *chunk_get_free(World *world, ChunkDescriptor **cd) {
+    ChunkArena *prev = NULL;
     ChunkArena *arena = world->chunk_arenas;
+
+    // Look for arena with free space
     while (arena && is_arena_full(arena)) {
         prev = arena;
         arena = arena->next;
     }
 
+    // All arenas are full
     if (arena == NULL) {
-        arena = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, world->chunk_s);
-        prev->next = arena;
+
+        size_t minmem = sizeof(ChunkArena) + world->chunk_mem_used + world->chunk_mem_stride;
+
+        // Allocate new arena
+        if (minmem <= world->chunk_mem_max) {
+
+            // TODO: this check should be done in chunk_init_arena()
+            size_t mem = world->chunk_mem_max - world->chunk_mem_used;
+            mem = mem <= DEFAULT_CHUNK_ARENA_SIZE ? mem : DEFAULT_CHUNK_ARENA_SIZE;
+            arena = chunk_init_arena(mem, world->chunk_s);
+
+            if (!world->chunk_arenas) world->chunk_arenas = arena;
+            if (prev) prev->next = arena;
+
+            world->chunk_mem_used += mem;
+
+        // Cannot allocate new arena without violating memory constraints, in this case reuse oldest arena
+        } else {
+            arena = world->chunk_arenas;
+            prev->next = arena;
+            world->chunk_arenas = world->chunk_arenas->next;
+            
+            arena->count = 0;
+            arena->free = arena->start;
+            memset(arena->descriptors, 0, arena->max * sizeof(ChunkDescriptor));
+        }
     } 
     
     Chunk *re = arena->free;
+    *cd = arena->descriptors + arena->count;
 
     arena->free = chunk_arena_next(world, arena, arena->free);
     arena->count++;
@@ -113,16 +143,20 @@ int chunk_populate(World *world, Chunk *chunk) {
     int starty = chunk->tl_y;
     int endx = startx + chunk_s;
     int endy = starty + chunk_s;
+
     for (int x=startx; x<endx; x++) {
         for (int y=starty; y<endy; y++) {
-            double _x = fabs(((double) x) / resolution);
-            double _y = fabs(((double) y) / resolution);
-            double v = perlin_noise_2D(LATTICE2D, _x, _y);
+            double lattice_x = fabs(((double) x) / resolution);
+            double lattice_y = fabs(((double) y) / resolution);
+            double v = perlin_noise_2D(LATTICE2D, lattice_x, lattice_y);
 
             double p = .60;
-            int id = chunk_populate_p(v, p);
+            int tid = chunk_populate_p(v, p);
 
-            world_setxy(world, x, y, id);
+            int _x = abs(x) % chunk_s;
+            int _y = abs(y) % chunk_s;
+
+            chunk->data[_x * chunk_s + (_y % chunk_s)] = tid;
         }
     }
 
@@ -131,7 +165,8 @@ int chunk_populate(World *world, Chunk *chunk) {
 
 Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chunk *left, Chunk *right) {
 
-    Chunk *chunk = chunk_get_free(world);
+    ChunkDescriptor *cd;
+    Chunk *chunk = chunk_get_free(world, &cd);
     chunk->data = (char*) (chunk + 1);
 
     chunk->tl_x = x;
@@ -143,7 +178,7 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
     chunk->left = left;
     chunk->right = right;
 
-    ChunkDescriptor *cd = CHUNK_DESCRIPTORS + GLOBAL_CHUNK_COUNT++;
+    GLOBAL_CHUNK_COUNT++;
     *cd = (ChunkDescriptor) {.tl_x = x, .tl_y = y, .ptr = chunk};
 
     chunk_populate(world, chunk);
@@ -298,7 +333,7 @@ void chunk_free_all(World *world) {
 
 
 /* Interface World Functions */
-World *world_init(int chunk_s, int maxid) {
+World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     World *new_world = calloc(1, sizeof(World));
     CHUNK_DESCRIPTORS = calloc(PAGE_SIZE, sizeof(ChunkDescriptor));
 
@@ -307,10 +342,13 @@ World *world_init(int chunk_s, int maxid) {
 
     MAXID = maxid;
     new_world->chunk_s = chunk_s;
-    new_world->chunk_arenas = chunk_init_arena(DEFAULT_CHUNK_ARENA_SIZE, chunk_s);
+    new_world->chunk_arenas = NULL;
     new_world->entity_c = 0;
     new_world->entity_maxc = 32;
     new_world->entities = qu_init( new_world->entity_maxc );
+    new_world->chunk_mem_used = 0;
+    new_world->chunk_mem_max = chunk_mem_max;
+    new_world->chunk_mem_stride = sizeof(Chunk) + chunk_s * chunk_s;
 
     chunk_create(new_world, 0, 0);
 
@@ -374,6 +412,11 @@ unsigned char world_getxy(World* world, int x, int y) {
     x = fabs(x % chunk_s);
     y = fabs(y % chunk_s);
     int ret = chunk->data[x * chunk_s + y];
+
+    if (ret < 0 || ge_end <= ret) {
+
+        log_debug("FATAL ERROR");
+    }
 
     return ret;
 }

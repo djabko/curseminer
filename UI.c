@@ -221,6 +221,8 @@ void draw_uiwin(window_t *uiwin) {
 
     mvwprintw(uiwin->win, (TIME_MSEC/100)%uiwin->h, uiwin->w/2, "!"); // draw splash icon
 
+    mvwprintw(uiwin->win, 3, (int)COLS*.5, "Memory used: %lu/%lu", GLOBALS.game->world->chunk_mem_used, GLOBALS.game->world->chunk_mem_max);
+
     draw_keyboard_state(uiwin->win, (int)COLS*.5, 5);
     wnoutrefresh(uiwin->win);
 }
