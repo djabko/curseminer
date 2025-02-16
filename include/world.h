@@ -46,7 +46,7 @@ typedef struct World {
     ChunkArena *chunk_arenas;
     Queue64 *entities; // TODO: should be a linked list
                        
-    int chunk_s, entity_c, entity_maxc;
+    int chunk_s, entity_c, entity_maxc, chunk_max;
     size_t chunk_mem_used, chunk_mem_stride, chunk_mem_max;
 } World;
 

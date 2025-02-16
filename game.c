@@ -95,7 +95,7 @@ int game_init() {
 
     init_skins();
     init_entity_types();
-    GAME->world = world_init(20, GAME->skins_c - 1, PAGE_SIZE * 3);
+    GAME->world = world_init(20, GAME->skins_c - 1, PAGE_SIZE * 64);
     
     int e_x, e_y;
     Entity *player, *entity;

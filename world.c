@@ -7,7 +7,7 @@
 #include <string.h>
 #include <math.h>
 
-#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 1
+#define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 16
 
 int ITERATOR = 0;
 /* Global Variables
@@ -83,7 +83,6 @@ Chunk *chunk_get_free(World *world, ChunkDescriptor **cd) {
 
         // Allocate new arena
         if (minmem <= world->chunk_mem_max) {
-
             // TODO: this check should be done in chunk_init_arena()
             size_t mem = world->chunk_mem_max - world->chunk_mem_used;
             mem = mem <= DEFAULT_CHUNK_ARENA_SIZE ? mem : DEFAULT_CHUNK_ARENA_SIZE;
@@ -97,12 +96,14 @@ Chunk *chunk_get_free(World *world, ChunkDescriptor **cd) {
         // Cannot allocate new arena without violating memory constraints, in this case reuse oldest arena
         } else {
             arena = world->chunk_arenas;
-            prev->next = arena;
             world->chunk_arenas = world->chunk_arenas->next;
+            prev->next = arena;
+            arena->next = NULL;
             
+            GLOBAL_CHUNK_COUNT -= arena->count;
             arena->count = 0;
             arena->free = arena->start;
-            memset(arena->descriptors, 0, arena->max * sizeof(ChunkDescriptor));
+            memset((void*) arena->descriptors, 0, arena->max * sizeof(ChunkDescriptor));
         }
     } 
     
@@ -193,19 +194,17 @@ Chunk *chunk_create(World *world, int x, int y) {
 Chunk *chunk_lookup(World *world, int x, int y) {
     int chunk_s = world->chunk_s;
 
-    if (x == 20 && y == -20) {
-
-    }
-
     // Make sure (x,y) points to top-left corner of their chunk
     x = topleft_coordinate(x, chunk_s);
     y = topleft_coordinate(y, chunk_s);
 
     ChunkArena *arena = world->chunk_arenas;
-    for (; arena != NULL; arena = arena->next) {
-        for (ChunkDescriptor *cd = CHUNK_DESCRIPTORS; cd->ptr; cd++) {
-            if (cd->tl_x == x && cd->tl_y == y) return cd->ptr;
-        }
+    ChunkDescriptor *start, *end, *cd;
+    start = CHUNK_DESCRIPTORS;
+    end = start + world->chunk_max;
+
+    for (cd = start; cd < end; cd++) {
+        if (cd->tl_x == x && cd->tl_y == y) return cd->ptr;
     }
 
     return NULL;
@@ -222,7 +221,12 @@ Chunk *chunk_nearest(World *world, int x, int y) {
     ChunkDescriptor *nearest = CHUNK_DESCRIPTORS;
     int dist = man_dist(nearest->tl_x, nearest->tl_y, x, y);
 
-    for (ChunkDescriptor *cd = CHUNK_DESCRIPTORS+1; cd->ptr; cd++) {
+    ChunkDescriptor *start, *end, *cd;
+    start = CHUNK_DESCRIPTORS + 1;
+    end = CHUNK_DESCRIPTORS + world->chunk_max;
+
+    for (cd = start; cd < end; cd++) {
+        if (!cd->ptr) continue;
 
         int tmp = man_dist(cd->tl_x, cd->tl_y, x, y);
 
@@ -250,8 +254,6 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
     Chunk *top, *bottom, *left, *right;
     switch (dir) {
         case DIRECTION_UP:
-            if (source->top) return NULL;
-
             x = source->tl_x;
             y = source->tl_y - chunk_s;
 
@@ -266,8 +268,6 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
             break;
 
         case DIRECTION_DOWN:
-            if (source->bottom) return NULL;
-
             x = source->tl_x;
             y = source->tl_y + chunk_s;
 
@@ -282,8 +282,6 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
             break;
 
         case DIRECTION_LEFT:
-            if (source->left) return NULL;
-
             x = source->tl_x - chunk_s;
             y = source->tl_y;
 
@@ -298,8 +296,6 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
             break;
 
         case DIRECTION_RIGHT:
-            if (source->right) return NULL;
-
             x = source->tl_x + chunk_s;
             y = source->tl_y;
 
@@ -335,10 +331,10 @@ void chunk_free_all(World *world) {
 /* Interface World Functions */
 World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     World *new_world = calloc(1, sizeof(World));
-    CHUNK_DESCRIPTORS = calloc(PAGE_SIZE, sizeof(ChunkDescriptor));
 
-    int latlen = 100;
-    LATTICE2D = noise_init(latlen * latlen, 2, latlen, fade);
+    size_t chunk_mem_stride = sizeof(Chunk) + chunk_s * chunk_s;
+    int chunk_max = chunk_mem_max / chunk_mem_stride;
+    CHUNK_DESCRIPTORS = calloc(chunk_max, sizeof(ChunkDescriptor));
 
     MAXID = maxid;
     new_world->chunk_s = chunk_s;
@@ -346,9 +342,13 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     new_world->entity_c = 0;
     new_world->entity_maxc = 32;
     new_world->entities = qu_init( new_world->entity_maxc );
+    new_world->chunk_max = chunk_max;
     new_world->chunk_mem_used = 0;
     new_world->chunk_mem_max = chunk_mem_max;
-    new_world->chunk_mem_stride = sizeof(Chunk) + chunk_s * chunk_s;
+    new_world->chunk_mem_stride = chunk_mem_stride;
+
+    int latlen = 100;
+    LATTICE2D = noise_init(latlen * latlen, 2, latlen, fade);
 
     chunk_create(new_world, 0, 0);
 
@@ -365,6 +365,8 @@ unsigned char world_getxy(World* world, int x, int y) {
         int tl_y = topleft_coordinate(y, chunk_s);
 
         Chunk *nearest = chunk_nearest(world, tl_x, tl_y);
+        if (!nearest) log_debug("ERROR: unable to find chunk closes to position (%d,%d); GLOBAL_CHUNK_COUNT: %d", tl_x, tl_y, GLOBAL_CHUNK_COUNT);
+
         int diff_x = tl_x - nearest->tl_x;
         int diff_y = tl_y - nearest->tl_y;
 
@@ -399,7 +401,7 @@ unsigned char world_getxy(World* world, int x, int y) {
                 }
             }
 
-            if (!nearest) log_debug("ERROR: attempting to overwrite existing chunk (%d,%d)!\n", old_tl_x, old_tl_y);
+            if (!nearest) log_debug("ERROR: failed to insert chunk at (%d,%d)!\n", old_tl_x, old_tl_y);
 
             diff_x = tl_x - nearest->tl_x;
             diff_y = tl_y - nearest->tl_y;
