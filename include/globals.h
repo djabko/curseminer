@@ -5,7 +5,6 @@
 
 #include "keyboard.h"
 #include "game.h"
-#include "window.h"
 
 #define DEBUG
 
@@ -45,7 +44,6 @@
 struct Globals{
     int view_port_maxx, view_port_maxy;
     Keyboard keyboard;
-    WindowContext window;
     Entity* player;
     GameContext* game;
 };

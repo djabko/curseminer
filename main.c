@@ -14,14 +14,6 @@
 
 struct Globals GLOBALS = {
     .keyboard = {{{-1, {0}, -1, -1}}},
-    .window = {
-        .width=2<<6, 
-        .height=2<<5, 
-        .title="My game",
-        .w = NULL,
-        .monitor = NULL,
-        .share = NULL
-    },
     .player = NULL
 };
 
