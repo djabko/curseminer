@@ -116,9 +116,13 @@ Chunk *chunk_get_free(World *world, ChunkDescriptor **cd) {
     return re;
 }
 
-int chunk_populate_p(double noise_value, double sparsity) {
-    double v = noise_value;
-    double p = sparsity;
+int chunk_populate_void(double noise_sample) {
+    return ge_air;
+}
+
+int chunk_populate_plains(double noise_sample) {
+    double v = noise_sample;
+    double p = 0.7;
     double e = 1 - p;
 
     // Normalize to range {0.0, 1.0}
@@ -128,17 +132,103 @@ int chunk_populate_p(double noise_value, double sparsity) {
 
     if (v <= p) id = ge_air;
     else if (v <= p+e*.5) id = ge_stone;
-    else if (v <= p+e*.875) id = ge_iron;
-    else if (v <= p+e*.9375) id = ge_redore;
-    else if (v <= p+e*.96875) id = ge_gold;
-    else if (v <= p+e*.984375) id = ge_diamond;
+    else if (v <= p+e*.6) id = ge_iron;
+    else id = ge_redore;
 
     return id;
 }
 
+int chunk_populate_forest(double noise_sample) {
+    // Stub code
+    return chunk_populate_void(noise_sample);
+}
+
+int chunk_populate_ocean(double noise_sample) {
+    // Stub code
+    return chunk_populate_void(noise_sample);
+}
+
+int chunk_populate_mountains(double noise_sample) {
+    double v = noise_sample;
+    double p = 0.5;
+    double e = 1 - p;
+
+    v = (v + 1) / 2;
+
+    int id = 0;
+
+    if (v <= p) id = ge_air;
+    else if (v <= p+e*.4) id = ge_stone;
+    else if (v <= p+e*.6) id = ge_iron;
+    else if (v <= p+e*.7) id = ge_redore;
+    else if (v <= p+e*.8) id = ge_gold;
+    else if (v <= p+e*.9) id = ge_diamond;
+
+    return id;
+}
+
+int chunk_populate_mine(double noise_sample) {
+    double v = noise_sample;
+    double p = 0.65;
+    double e = 1 - p;
+
+    v = (v + 1) / 2;
+
+    int id = 0;
+
+    if (v <= p) id = ge_air;
+    else if (v <= p+e*.5) id = ge_stone;
+    else if (v <= p+e*.75) id = ge_iron;
+    else if (v <= p+e*.87) id = ge_redore;
+    else if (v <= p+e*.98) id = ge_gold;
+    else if (v <= p+e*.99) id = ge_diamond;
+
+    return id;
+}
+
+int chunk_populate_redore(double noise_sample) {
+    // Stub code
+    return chunk_populate_void(noise_sample);
+}
+
 int chunk_populate(World *world, Chunk *chunk) {
-    static const double resolution = 20.0;
+    int (*populate_f) (double);
+    double (*noise_f) (NoiseLattice*, double, double);
+
+    noise_f = perlin_noise_2D;
+
+    switch (chunk->type) {
+        case CHUNK_TYPE_PLAINS:
+            populate_f = chunk_populate_plains;
+            break;
+
+        case CHUNK_TYPE_FOREST:
+            populate_f = chunk_populate_forest;
+            break;
+
+        case CHUNK_TYPE_OCEAN:
+            populate_f = chunk_populate_ocean;
+            break;
+
+        case CHUNK_TYPE_MOUNTAINS:
+            populate_f = chunk_populate_mountains;
+            break;
+
+        case CHUNK_TYPE_REDORE:
+            populate_f = chunk_populate_redore;
+            break;
+
+        case CHUNK_TYPE_MINE:
+            populate_f = chunk_populate_mine;
+            noise_f = perlin_noise_2D_var;
+            break;
+
+        default:
+            populate_f = chunk_populate_void;
+    }
+
     int chunk_s = world->chunk_s;
+    double resolution = 20.0;
 
     int startx = chunk->tl_x;
     int starty = chunk->tl_y;
@@ -149,10 +239,9 @@ int chunk_populate(World *world, Chunk *chunk) {
         for (int y=starty; y<endy; y++) {
             double lattice_x = fabs(((double) x) / resolution);
             double lattice_y = fabs(((double) y) / resolution);
-            double v = perlin_noise_2D(LATTICE2D, lattice_x, lattice_y);
+            double v = noise_f(LATTICE2D, lattice_x, lattice_y);
 
-            double p = .60;
-            int tid = chunk_populate_p(v, p);
+            int tid = populate_f(v);
 
             int _x = abs(x) % chunk_s;
             int _y = abs(y) % chunk_s;
@@ -172,7 +261,7 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
 
     chunk->tl_x = x;
     chunk->tl_y = y;
-    chunk->type = CHUNK_TYPE_NORMAL;
+    chunk->type = CHUNK_TYPE_MINE;
 
     chunk->top = top;
     chunk->bottom = bottom;
@@ -446,6 +535,7 @@ void world_setxy(World *world, int x, int y, int tid) {
 
 void world_free(World *world) {
     chunk_free_all(world);
+    noise_free(LATTICE2D);
     free(world->entities);
     free(world);
 }

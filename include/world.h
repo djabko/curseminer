@@ -16,9 +16,13 @@ typedef struct Entity {
 } Entity;
 
 typedef enum ChunkType {
-    CHUNK_TYPE_NORMAL,
+    CHUNK_TYPE_VOID,
+    CHUNK_TYPE_PLAINS,
     CHUNK_TYPE_FOREST,
-    CHUNK_TYPE_OCEAN
+    CHUNK_TYPE_OCEAN,
+    CHUNK_TYPE_MOUNTAINS,
+    CHUNK_TYPE_REDORE,
+    CHUNK_TYPE_MINE,
 } ChunkType;
 
 typedef struct Chunk {

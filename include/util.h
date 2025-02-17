@@ -60,10 +60,15 @@ static NoiseLattice *noise_init(int count, int dimensions, int length, double (*
 
     srand(TIMER_NOW.tv_usec);
     for (int i=0; i<count; i++) {
-        int r = rand() % (resolution*2);
-        double random = r - resolution;
+        int r;
+        double random;
 
+        r = rand() % (resolution*2);
+        random = r - resolution;
         gradients[i].x = random / resolution;
+        
+        r = rand() % (resolution*2);
+        random = r - resolution;
         gradients[i].y = random / resolution;
     }
     
@@ -137,10 +142,45 @@ static double perlin_noise_1D(NoiseLattice *lattice, double x) {
 static double perlin_noise_2D(NoiseLattice *lattice, double x, double y) {
     Vec2 *gradients = lattice->gradients;
 
-    int i_x = (int) x;
-    int i_y = (int) y;
-    int _i_x = (int) x % (lattice->length - 1);
-    int _i_y = (int) y % (lattice->length - 1);
+    int _i_x = ((int) x) % (lattice->length - 1);
+    int _i_y = ((int) y )% (lattice->length - 1);
+
+    int g0x = _i_x + 0;
+    int g0y = _i_y + 0;
+    int g1x = _i_x + 1;
+    int g1y = _i_y + 0;
+    int g2x = _i_x + 0;
+    int g2y = _i_y + 1;
+    int g3x = _i_x + 1;
+    int g3y = _i_y + 1;
+
+    Vec2 g0 = gradients[g0y * lattice->length + g0x];
+    Vec2 g1 = gradients[g1y * lattice->length + g1x];
+    Vec2 g2 = gradients[g2y * lattice->length + g2x];
+    Vec2 g3 = gradients[g3y * lattice->length + g3x];
+
+    double d0 = vec2_dot(g0.x, g0.y, x - g0x, y - g0y);
+    double d1 = vec2_dot(g1.x, g1.y, g1x - x, y - g1y);
+    double d2 = vec2_dot(g2.x, g2.y, x - g2x, g2y - y);
+    double d3 = vec2_dot(g3.x, g3.y, g3x - x, g3y - y);
+
+    double t_x = lattice->smoothing_func(x - (int) x);
+    double t_y = lattice->smoothing_func(y - (int) y);
+
+    double re = lerp(
+            lerp(d0, d1, t_x),
+            lerp(d2, d3, t_x),
+            t_y
+            );
+
+    return re * 2.0;
+}
+
+static double perlin_noise_2D_var(NoiseLattice *lattice, double x, double y) {
+    Vec2 *gradients = lattice->gradients;
+
+    int _i_x = ((int) x)% (lattice->length - 1);
+    int _i_y = ((int) y) % (lattice->length - 1);
 
     Vec2 g0 = gradients[(_i_y + 0) * lattice->length + _i_x + 0];
     Vec2 g1 = gradients[(_i_y + 0) * lattice->length + _i_x + 1];
@@ -152,10 +192,10 @@ static double perlin_noise_2D(NoiseLattice *lattice, double x, double y) {
     double d2 = vec2_dot(g2.x, g2.y, x - g2.x, g2.y - y);
     double d3 = vec2_dot(g3.x, g3.y, g3.x - x, g3.y - y);
 
-    double t_x = lattice->smoothing_func(x - i_x);
-    double t_y = lattice->smoothing_func(y - i_y);
+    double t_x = lattice->smoothing_func(x - (int) x);
+    double t_y = lattice->smoothing_func(y - (int) y);
 
-    double re = 2.0 * lerp(
+    double re = lerp(
             lerp(d0, d1, t_x),
             lerp(d2, d3, t_x),
             t_y
@@ -163,6 +203,7 @@ static double perlin_noise_2D(NoiseLattice *lattice, double x, double y) {
 
     return re;
 }
+
 
 static inline void noise_free(NoiseLattice *noise) {
     free(noise);

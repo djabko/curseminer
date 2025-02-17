@@ -52,6 +52,7 @@ int exit_state() {
     log_debug("Exiting...");
 
     UI_exit();
+    game_free();
     scheduler_free();
 
     return 0;
