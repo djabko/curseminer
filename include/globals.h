@@ -6,8 +6,6 @@
 #include "keyboard.h"
 #include "game.h"
 
-#define DEBUG
-
 /* Useful Macros */
 #define PAGE_SIZE getpagesize()
 
