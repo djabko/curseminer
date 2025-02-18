@@ -14,7 +14,7 @@ int ITERATOR = 0;
  * Initialized in world_init() 
  */
 ChunkDescriptor *CHUNK_DESCRIPTORS;
-NoiseLattice *LATTICE2D;
+NoiseLattice *LATTICE_2D;
 int GLOBAL_CHUNK_COUNT = 0;
 int MAXID = 0;
 
@@ -191,6 +191,27 @@ int chunk_populate_redore(double noise_sample) {
     return chunk_populate_void(noise_sample);
 }
 
+ChunkType chunk_determine_type(World *world, Chunk *chunk) {
+    int latlen = LATTICE_2D->length;
+    double resolution = 200.0;
+    double f_x = ((double) chunk->tl_x) / resolution;
+    double f_y = ((double) chunk->tl_y) / resolution;
+
+    if (f_x < 0) f_x = latlen + fmod(f_x, latlen - 1) - 1;
+    if (f_y < 0) f_y = latlen + fmod(f_y, latlen - 1) - 1;
+
+    double v = perlin_noise_2D(LATTICE_2D, f_x, f_y);
+
+    unsigned char is_pls = -0.25 < v && v < +0.25;
+    unsigned char is_mts = +0.25 <= v && v <= +0.50;
+    unsigned char is_mns = -0.50 <= v && v <= -0.25;
+
+    if (is_pls) return CHUNK_TYPE_PLAINS;
+    else if (is_mts) return CHUNK_TYPE_MOUNTAINS;
+    else if (is_mns) return CHUNK_TYPE_MINE;
+    else return CHUNK_TYPE_VOID;
+}
+
 int chunk_populate(World *world, Chunk *chunk) {
     int (*populate_f) (double);
     double (*noise_f) (NoiseLattice*, double, double);
@@ -239,7 +260,7 @@ int chunk_populate(World *world, Chunk *chunk) {
         for (int y=starty; y<endy; y++) {
             double lattice_x = fabs(((double) x) / resolution);
             double lattice_y = fabs(((double) y) / resolution);
-            double v = noise_f(LATTICE2D, lattice_x, lattice_y);
+            double v = noise_f(LATTICE_2D, lattice_x, lattice_y);
 
             int tid = populate_f(v);
 
@@ -261,7 +282,6 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
 
     chunk->tl_x = x;
     chunk->tl_y = y;
-    chunk->type = CHUNK_TYPE_MINE;
 
     chunk->top = top;
     chunk->bottom = bottom;
@@ -271,6 +291,7 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
     GLOBAL_CHUNK_COUNT++;
     *cd = (ChunkDescriptor) {.tl_x = x, .tl_y = y, .ptr = chunk};
 
+    chunk->type = chunk_determine_type(world, chunk);
     chunk_populate(world, chunk);
 
     return chunk;
@@ -437,7 +458,7 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     new_world->chunk_mem_stride = chunk_mem_stride;
 
     int latlen = 100;
-    LATTICE2D = noise_init(latlen * latlen, 2, latlen, fade);
+    LATTICE_2D = noise_init(latlen * latlen, 2, latlen, fade);
 
     chunk_create(new_world, 0, 0);
 
@@ -535,7 +556,7 @@ void world_setxy(World *world, int x, int y, int tid) {
 
 void world_free(World *world) {
     chunk_free_all(world);
-    noise_free(LATTICE2D);
+    noise_free(LATTICE_2D);
     free(world->entities);
     free(world);
 }
