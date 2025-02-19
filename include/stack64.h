@@ -56,16 +56,18 @@ void qu_print(Queue64*);
 
 
 /* 8 Byte Hashtable */
-struct HashTableEntry {
+typedef struct HashTableEntry {
     unsigned long key;
-    int value;
-};
+    int64_t value;
+} HashTableEntry;
+
 typedef struct HashTable {
     int count, max;
     struct HashTableEntry* entries;
 } HashTable;
 
-int ht_init(int size);
-int cache_lookup(HashTable* ht, char* str);
+HashTable *ht_init(int size);
+int ht_insert(HashTable*, unsigned long, int64_t);
+int64_t ht_lookup(HashTable*, unsigned long);
 
 #endif
