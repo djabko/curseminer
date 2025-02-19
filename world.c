@@ -13,13 +13,20 @@ int ITERATOR = 0;
 /* Global Variables
  * Initialized in world_init() 
  */
-ChunkDescriptor *CHUNK_DESCRIPTORS;
+HashTable *CHUNK_HASHTABLE;
 NoiseLattice *LATTICE_2D;
 int GLOBAL_CHUNK_COUNT = 0;
 int MAXID = 0;
 
 
 /* Internal Helper Functions */
+
+#define CHUNK_HASH_PRIME 51203
+unsigned long chunk_ht_hash(int x, int y, int chunk_s) {
+    return CHUNK_HASH_PRIME * (x / chunk_s) + (y / chunk_s);
+
+} inline unsigned long chunk_ht_hash(int, int, int);
+
 int is_arena_full(ChunkArena *arena) {
     return arena->free == arena->end;
 }
@@ -50,7 +57,6 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
     arena->free = start;
     arena->end = (Chunk*) ((uintptr_t)start + chunk_max * chunk_stride);
     arena->next = NULL;
-    arena->descriptors = CHUNK_DESCRIPTORS + GLOBAL_CHUNK_COUNT; 
 
     return arena;
 }
@@ -66,7 +72,7 @@ Chunk *chunk_arena_next(World* world, ChunkArena *arena, Chunk *chunk) {
 }
 
 // Returns a free area of memory for chunk allocation
-Chunk *chunk_get_free(World *world, ChunkDescriptor **cd) {
+Chunk *chunk_get_free(World *world) {
     ChunkArena *prev = NULL;
     ChunkArena *arena = world->chunk_arenas;
 
@@ -103,12 +109,12 @@ Chunk *chunk_get_free(World *world, ChunkDescriptor **cd) {
             GLOBAL_CHUNK_COUNT -= arena->count;
             arena->count = 0;
             arena->free = arena->start;
-            memset((void*) arena->descriptors, 0, arena->max * sizeof(ChunkDescriptor));
+
+            // TODO: remove chunks from hashtable
         }
     } 
     
     Chunk *re = arena->free;
-    *cd = arena->descriptors + arena->count;
 
     arena->free = chunk_arena_next(world, arena, arena->free);
     arena->count++;
@@ -275,9 +281,7 @@ int chunk_populate(World *world, Chunk *chunk) {
 }
 
 Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chunk *left, Chunk *right) {
-
-    ChunkDescriptor *cd;
-    Chunk *chunk = chunk_get_free(world, &cd);
+    Chunk *chunk = chunk_get_free(world);
     chunk->data = (char*) (chunk + 1);
 
     chunk->tl_x = x;
@@ -289,10 +293,11 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
     chunk->right = right;
 
     GLOBAL_CHUNK_COUNT++;
-    *cd = (ChunkDescriptor) {.tl_x = x, .tl_y = y, .ptr = chunk};
-
     chunk->type = chunk_determine_type(world, chunk);
     chunk_populate(world, chunk);
+
+    unsigned long key = chunk_ht_hash(chunk->tl_x, chunk->tl_y, world->chunk_s);
+    ht_insert(CHUNK_HASHTABLE, key, (int64_t) chunk);
 
     return chunk;
 }
@@ -308,16 +313,10 @@ Chunk *chunk_lookup(World *world, int x, int y) {
     x = topleft_coordinate(x, chunk_s);
     y = topleft_coordinate(y, chunk_s);
 
-    ChunkArena *arena = world->chunk_arenas;
-    ChunkDescriptor *start, *end, *cd;
-    start = CHUNK_DESCRIPTORS;
-    end = start + world->chunk_max;
+    unsigned long key = chunk_ht_hash(x, y, chunk_s);
+    int64_t re = ht_lookup(CHUNK_HASHTABLE, key);
 
-    for (cd = start; cd < end; cd++) {
-        if (cd->tl_x == x && cd->tl_y == y) return cd->ptr;
-    }
-
-    return NULL;
+    return re == -1 ? NULL : (Chunk*) re;
 }
 
 // Find chunk closest to position (x,y)
@@ -328,25 +327,30 @@ Chunk *chunk_nearest(World *world, int x, int y) {
     x = topleft_coordinate(x, chunk_s);
     y = topleft_coordinate(y, chunk_s);
 
-    ChunkDescriptor *nearest = CHUNK_DESCRIPTORS;
+    HashTableEntry *start, *end, *e;
+    start = CHUNK_HASHTABLE->entries;
+    end = start + CHUNK_HASHTABLE->max;
+
+    while (start < end && start->key == -1) start++;
+    if (start == end) return NULL;
+
+    Chunk *nearest = (Chunk*) start->value;
     int dist = man_dist(nearest->tl_x, nearest->tl_y, x, y);
 
-    ChunkDescriptor *start, *end, *cd;
-    start = CHUNK_DESCRIPTORS + 1;
-    end = CHUNK_DESCRIPTORS + world->chunk_max;
+    for (e = start; e < end; e++) {
+        if (e->key == -1) continue;
 
-    for (cd = start; cd < end; cd++) {
-        if (!cd->ptr) continue;
+        Chunk *ptr = (Chunk*) e->value;
 
-        int tmp = man_dist(cd->tl_x, cd->tl_y, x, y);
+        int tmp = man_dist(ptr->tl_x, ptr->tl_y, x, y);
 
         if (tmp < dist && 0 < tmp) {
             dist = tmp;
-            nearest = cd;
+            nearest = ptr;
         }
     }
 
-    return nearest->ptr;
+    return nearest;
 }
 
 Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
@@ -444,7 +448,7 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
 
     size_t chunk_mem_stride = sizeof(Chunk) + chunk_s * chunk_s;
     int chunk_max = chunk_mem_max / chunk_mem_stride;
-    CHUNK_DESCRIPTORS = calloc(chunk_max, sizeof(ChunkDescriptor));
+    CHUNK_HASHTABLE = ht_init(chunk_max);
 
     MAXID = maxid;
     new_world->chunk_s = chunk_s;

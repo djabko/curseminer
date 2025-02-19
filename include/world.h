@@ -33,17 +33,10 @@ typedef struct Chunk {
     struct Chunk *top, *bottom, *left, *right;
 } Chunk;
 
-typedef struct ChunkDescriptor {
-    int tl_x, tl_y;
-    Chunk *ptr;
-} ChunkDescriptor;
-
 typedef struct ChunkArena {
     int count, max;
     Chunk *start, *free, *end;
     struct ChunkArena* next;
-
-    ChunkDescriptor *descriptors;
 } ChunkArena;
 
 typedef struct World {
