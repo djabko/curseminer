@@ -31,11 +31,13 @@ int is_arena_full(ChunkArena *arena) {
     return arena->free == arena->end;
 }
 
-// TODO: Standardize, this expensive function is often called three times successively 
+// All chunk_ functions that deal with coordinates only work when given
+// top-left values. This function is responsible for constraining any coordinate
+// to it's specific chunk's tl_x or tl_y value.
 int topleft_coordinate(int coordinate, int chunk_s) {
     if (0 <= coordinate) return chunk_s * (coordinate / chunk_s);
     else return chunk_s * ((coordinate + 1) / chunk_s) - chunk_s;
-}
+} inline int topleft_coordinate(int, int);
 
 ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 
@@ -309,10 +311,6 @@ Chunk *chunk_create(World *world, int x, int y) {
 Chunk *chunk_lookup(World *world, int x, int y) {
     int chunk_s = world->chunk_s;
 
-    // Make sure (x,y) points to top-left corner of their chunk
-    x = topleft_coordinate(x, chunk_s);
-    y = topleft_coordinate(y, chunk_s);
-
     unsigned long key = chunk_ht_hash(x, y, chunk_s);
     int64_t re = ht_lookup(CHUNK_HASHTABLE, key);
 
@@ -322,10 +320,6 @@ Chunk *chunk_lookup(World *world, int x, int y) {
 // Find chunk closest to position (x,y)
 Chunk *chunk_nearest(World *world, int x, int y) {
     if (GLOBAL_CHUNK_COUNT < 1) return NULL;
-
-    int chunk_s = world->chunk_s;
-    x = topleft_coordinate(x, chunk_s);
-    y = topleft_coordinate(y, chunk_s);
 
     HashTableEntry *start, *end, *e;
     start = CHUNK_HASHTABLE->entries;
@@ -471,12 +465,15 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
 
 unsigned char world_getxy(World* world, int x, int y) {
     int chunk_s = world->chunk_s;
-    Chunk *chunk = chunk_lookup(world, x, y);
+    int tl_x = topleft_coordinate(x, chunk_s);
+    int tl_y = topleft_coordinate(y, chunk_s);
+    x = fabs(x % chunk_s);
+    y = fabs(y % chunk_s);
 
-    // Algorithm: keep inserting chunk to the nearest neighbour until a new chunk is present at (x,y)
+    Chunk *chunk = chunk_lookup(world, tl_x, tl_y);
+
+    // Algorithm: keep inserting chunk to the nearest neighbour until a new chunk is present at (tl_x, tl_y)
     if (!chunk) {
-        int tl_x = topleft_coordinate(x, chunk_s);
-        int tl_y = topleft_coordinate(y, chunk_s);
 
         Chunk *nearest = chunk_nearest(world, tl_x, tl_y);
         if (!nearest) log_debug("ERROR: unable to find chunk closes to position (%d,%d); GLOBAL_CHUNK_COUNT: %d", tl_x, tl_y, GLOBAL_CHUNK_COUNT);
@@ -524,9 +521,6 @@ unsigned char world_getxy(World* world, int x, int y) {
         chunk = nearest;
     }
 
-    // Convert coordinates to chunk-local
-    x = fabs(x % chunk_s);
-    y = fabs(y % chunk_s);
     int ret = chunk->data[x * chunk_s + y];
 
     if (ret < 0 || ge_end <= ret) {
