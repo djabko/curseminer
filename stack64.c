@@ -213,8 +213,8 @@ int ht_insert(HashTable* ht, unsigned long key, int64_t value) {
     return 1;
 }
 
-int64_t ht_lookup(HashTable* ht, unsigned long key) {
-    if (ht == NULL) return -1;
+struct HashTableEntry* ht_entry(HashTable* ht, unsigned long key) {
+    if (ht == NULL) return NULL;
 
     int i = key % ht->max;
 
@@ -226,9 +226,29 @@ int64_t ht_lookup(HashTable* ht, unsigned long key) {
         j++;
 
         if (ht->max < j)
-            return -1;
+            return NULL;
     }
 
-    return e->value;
+    return e;
 }
+
+int64_t ht_lookup(HashTable *ht, unsigned long key) {
+    HashTableEntry *e = ht_entry(ht, key);
+
+    if (!e) return -1;
+    
+    return e->value;
+
+} inline int64_t ht_lookup(HashTable*, unsigned long);
+
+int ht_clear(HashTable *ht, unsigned long key) {
+    HashTableEntry *e = ht_entry(ht, key);
+
+    if (!e) return -1;
+    
+    e->key = -1;
+
+    return 1;
+
+} inline int ht_clear(HashTable*, unsigned long);
 

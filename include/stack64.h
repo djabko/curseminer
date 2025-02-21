@@ -69,5 +69,6 @@ typedef struct HashTable {
 HashTable *ht_init(int size);
 int ht_insert(HashTable*, unsigned long, int64_t);
 int64_t ht_lookup(HashTable*, unsigned long);
+int ht_clear(HashTable*, unsigned long);
 
 #endif

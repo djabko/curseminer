@@ -21,9 +21,9 @@ int MAXID = 0;
 
 /* Internal Helper Functions */
 
-#define CHUNK_HASH_PRIME 51203
+// Cantor's pairing
 unsigned long chunk_ht_hash(int x, int y, int chunk_s) {
-    return CHUNK_HASH_PRIME * (x / chunk_s) + (y / chunk_s);
+    return (x + y) * (x + y + 1) / 2 + x;
 
 } inline unsigned long chunk_ht_hash(int, int, int);
 
@@ -73,6 +73,31 @@ Chunk *chunk_arena_next(World* world, ChunkArena *arena, Chunk *chunk) {
     return (Chunk*) ptr;
 }
 
+void recycle_oldest_arena(World *world) {
+    ChunkArena *oldest = world->chunk_arenas;
+
+    for (Chunk *c = oldest->start; c < oldest->end; c = chunk_arena_next(world, oldest, c)) {
+        unsigned long key = chunk_ht_hash(c->tl_x, c->tl_y, world->chunk_s);
+        ht_clear(CHUNK_HASHTABLE, key);
+        
+        if (c->top)     c->top->bottom = NULL;
+        if (c->bottom)  c->bottom->top = NULL;
+        if (c->left)    c->left->right = NULL;
+        if (c->right)   c->right->left = NULL;
+    }
+
+    ChunkArena *newest = world->chunk_arenas;
+    while (newest->next) newest = newest->next;
+
+    world->chunk_arenas = oldest->next ? oldest->next : oldest;
+    newest->next = oldest;
+    oldest->next = NULL;
+
+    GLOBAL_CHUNK_COUNT -= oldest->count;
+    oldest->count = 0;
+    oldest->free = oldest->start;
+}
+
 // Returns a free area of memory for chunk allocation
 Chunk *chunk_get_free(World *world) {
     ChunkArena *prev = NULL;
@@ -91,7 +116,7 @@ Chunk *chunk_get_free(World *world) {
 
         // Allocate new arena
         if (minmem <= world->chunk_mem_max) {
-            // TODO: this check should be done in chunk_init_arena()
+
             size_t mem = world->chunk_mem_max - world->chunk_mem_used;
             mem = mem <= DEFAULT_CHUNK_ARENA_SIZE ? mem : DEFAULT_CHUNK_ARENA_SIZE;
             arena = chunk_init_arena(mem, world->chunk_s);
@@ -104,15 +129,8 @@ Chunk *chunk_get_free(World *world) {
         // Cannot allocate new arena without violating memory constraints, in this case reuse oldest arena
         } else {
             arena = world->chunk_arenas;
-            world->chunk_arenas = world->chunk_arenas->next;
-            prev->next = arena;
-            arena->next = NULL;
-            
-            GLOBAL_CHUNK_COUNT -= arena->count;
-            arena->count = 0;
-            arena->free = arena->start;
 
-            // TODO: remove chunks from hashtable
+            recycle_oldest_arena(world);
         }
     } 
     
@@ -299,7 +317,8 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
     chunk_populate(world, chunk);
 
     unsigned long key = chunk_ht_hash(chunk->tl_x, chunk->tl_y, world->chunk_s);
-    ht_insert(CHUNK_HASHTABLE, key, (int64_t) chunk);
+    int re = ht_insert(CHUNK_HASHTABLE, key, (int64_t) chunk);
+    if (re == -1) log_debug("FAILED TO INSERT CHUNK INTO HASHTABLE");
 
     return chunk;
 }
