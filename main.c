@@ -14,14 +14,6 @@
 
 struct Globals GLOBALS = {
     .keyboard = {{{-1, {0}, -1, -1}}},
-    .window = {
-        .width=2<<6, 
-        .height=2<<5, 
-        .title="My game",
-        .w = NULL,
-        .monitor = NULL,
-        .share = NULL
-    },
     .player = NULL
 };
 
@@ -52,6 +44,7 @@ int exit_state() {
     log_debug("Exiting...");
 
     UI_exit();
+    game_free();
     scheduler_free();
 
     return 0;
@@ -66,8 +59,8 @@ int jobUI (Task* task, Stack64* stack) {
         last_screen_refresh = TIMER_NOW;
         tsinit = 1;
 
-        int sec = TIMER_NOW.tv_sec;
-        int msec = TIMER_NOW.tv_usec / 1000;
+        miliseconds_t sec = TIMER_NOW.tv_sec;
+        miliseconds_t msec = TIMER_NOW.tv_usec / 1000;
         UI_update_time(sec * 1000 + msec);
 
         int quit = UI_loop();
@@ -78,11 +71,24 @@ int jobUI (Task* task, Stack64* stack) {
     return 0;
 }
 
+int tsinit2 = 0;
+TimeStamp last_widget_toggle;
 int jobInput (Task* task, Stack64* stack) {
+    if (!tsinit2) {
+        last_widget_toggle = TIMER_NOW;
+        tsinit2 = 1;
+    }
 
     keyboard_poll();
+
     if (kb_down(KB_Q))
         tk_kill(task);
+
+    else if (kb_down(KB_G) && 350 < timer_diff_milisec(&TIMER_NOW, &last_widget_toggle))
+        {
+        UI_toggle_widgetwin();
+        last_widget_toggle = TIMER_NOW;
+        }
 
     return 0;
 }

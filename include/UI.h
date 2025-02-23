@@ -4,6 +4,8 @@
 int UI_init();
 int UI_loop();
 int UI_exit();
-void UI_update_time(int);
+void UI_update_time(miliseconds_t);
+
+void UI_toggle_widgetwin();
 
 #endif

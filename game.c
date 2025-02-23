@@ -95,18 +95,29 @@ int game_init() {
 
     init_skins();
     init_entity_types();
-    GAME->world = world_init(256, 256, GAME->skins_c - 1);
+    GAME->world = world_init(20, GAME->skins_c - 1, PAGE_SIZE * 64);
     
-    int e_x = rand() % (GAME->world_view_x + 20);
-    int e_y = rand() % (GAME->world_view_y + 20);
-    Entity* player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
+    int e_x, e_y;
+    Entity *player, *entity;
+
+    player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
     entity_set_keyboard_controller(player);
     GLOBALS.player = player;
 
-    e_x = rand() % (GAME->world_view_x + 20);
-    e_y = rand() % (GAME->world_view_y + 20);
-    Entity* entity = entity_spawn(GAME->world, GAME->entity_types + ge_chaser_mob, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
-    entity->speed = 100;
+    e_x = rand() % GLOBALS.view_port_maxx;
+    e_y = rand() % GLOBALS.view_port_maxy;
+    entity = entity_spawn(GAME->world, GAME->entity_types + ge_chaser_mob, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    entity->speed = 50;
+
+    e_x = rand() % GLOBALS.view_port_maxx;
+    e_y = rand() % GLOBALS.view_port_maxy;
+    entity = entity_spawn(GAME->world, GAME->entity_types + ge_diamond, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    entity->speed = 80;
+
+    e_x = rand() % GLOBALS.view_port_maxx;
+    e_y = rand() % GLOBALS.view_port_maxy;
+    entity = entity_spawn(GAME->world, GAME->entity_types + ge_redore, e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+    entity->speed = 150;
 
     GAME_RUNQUEUE = scheduler_new_rq();
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
@@ -117,8 +128,7 @@ int game_init() {
 }
 
 void game_free() {
-    world_free();
-    free(GAME->world);
+    world_free(GAME->world);
     free(GAME->entity_types);
     free(GAME->skins);
     free(GAME);
@@ -134,9 +144,9 @@ EntityType* game_world_getxy(int x, int y) {
     y += GAME->world_view_y;
 
     /* world_view updating should take place in a separate task */
-    if (GLOBALS.player->x < GAME->world_view_x+1) GAME->world_view_x--;
+    if (GLOBALS.player->x < GAME->world_view_x) GAME->world_view_x--;
     if (GLOBALS.player->x > GAME->world_view_x + GLOBALS.view_port_maxx) GAME->world_view_x++;
-    if (GLOBALS.player->y < GAME->world_view_y+1) GAME->world_view_y--;
+    if (GLOBALS.player->y < GAME->world_view_y) GAME->world_view_y--;
     if (GLOBALS.player->y > GAME->world_view_y + GLOBALS.view_port_maxy) GAME->world_view_y++;
 
     Queue64* entity_qu = GAME->world->entities;
@@ -145,14 +155,16 @@ EntityType* game_world_getxy(int x, int y) {
         if (e->x == x && e->y == y) return e->type;
     }
 
-    int id = world_getxy(x + GAME->world_view_x, y + GAME->world_view_y);
+    int id = world_getxy(GAME->world, x, y);
+
+    if (id < ge_air || ge_end <= id) 
+        log_debug("ERROR: attempting to access invalid id %d at position (%d,%d)", id, x, y);
+
     return GAME->entity_types + id;
 }
 
 int game_world_setxy(int x, int y, EntityTypeID tid) {
-    x += GAME->world_view_x;
-    y += GAME->world_view_y;
-    world_setxy(x, y, tid);
+    world_setxy(GAME->world, x, y, tid);
     return 0;
 }
 

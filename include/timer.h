@@ -6,8 +6,11 @@
 #include <unistd.h>
 
 //typedef struct timespec TimeStamp;
+typedef unsigned int utime_t;
+
 typedef struct timeval TimeStamp;
 typedef suseconds_t microseconds_t;
+typedef suseconds_t miliseconds_t;
 typedef time_t seconds_t;
 
 // TODO: move to globals

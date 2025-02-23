@@ -21,6 +21,7 @@ void keyboard_init() {
     KEYMAP[ 'a' ]       = KB_A;
     KEYMAP[ 'd' ]       = KB_D;
     KEYMAP[ 'c' ]       = KB_C;
+    KEYMAP[ 'g' ]       = KB_G;
     KEYMAP[ 'q' ]       = KB_Q;
     KEYMAP[ ASCII_ESC ] = KB_ESC;
 
@@ -48,6 +49,7 @@ const char* KEYID_STR_MAP[] = {
     "A_key",
     "D_key",
     "C_key",
+    "G_key",
     "Q_key",
     "esc_key",
     "$"

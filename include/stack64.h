@@ -50,22 +50,25 @@ int qu_full(Queue64*);
 void qu_print(Queue64*);
 
 #define qu_foreach(qu, type, e)         \
-    int __ITERATOR_1804289383 = 0;      \
+    int __ITERATOR_1804289383 = 1;      \
     int __ERROR_CODE_846930886 = -1;    \
     for(type e = (type) qu->mempool[qu->head]; e; e = (type) qu_get(qu, __ITERATOR_1804289383++, &__ERROR_CODE_846930886))
 
 
 /* 8 Byte Hashtable */
-struct HashTableEntry {
+typedef struct HashTableEntry {
     unsigned long key;
-    int value;
-};
+    int64_t value;
+} HashTableEntry;
+
 typedef struct HashTable {
     int count, max;
     struct HashTableEntry* entries;
 } HashTable;
 
-int ht_init(int size);
-int cache_lookup(HashTable* ht, char* str);
+HashTable *ht_init(int size);
+int ht_insert(HashTable*, unsigned long, int64_t);
+int64_t ht_lookup(HashTable*, unsigned long);
+int ht_clear(HashTable*, unsigned long);
 
 #endif

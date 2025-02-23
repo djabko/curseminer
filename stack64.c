@@ -162,6 +162,9 @@ void qu_print(Queue64* qu) {
 
 /*
  * === HASH TABLE ===
+ * Key == -1 is used to denote an empty hashtable entry.
+ * Checks must be done before calling ht_insert() or cache_lookup().
+ * Alternatively a hash function can be used which never returns -1
  */
 
 unsigned long ht_hash(char* str) {
@@ -173,25 +176,46 @@ unsigned long ht_hash(char* str) {
 
     return hash;
 
-} inline unsigned long ht_hash(char*);
+}
 
-int ht_init(int size) {
-    HashTable* ht = malloc(size * sizeof(HashTable));
+HashTable *ht_init(int size) {
+    HashTable* ht = calloc(sizeof(HashTable) + size * sizeof(HashTableEntry), 1);
     ht->max = size;
     ht->count = 0;
+    ht->entries = (HashTableEntry*) (ht+1);
 
     for (int i=0; i<size; i++) {
-        ht->entries[i].key = 0;
+        ht->entries[i].key = -1;
         ht->entries[i].value = -1;
     }
 
-    return ht != NULL;
+    return ht;
 }
 
-int cache_lookup(HashTable* ht, char* str) {
+int ht_insert(HashTable* ht, unsigned long key, int64_t value) {
     if (ht == NULL) return -1;
 
-    unsigned long key = ht_hash(str);
+    int i = key % ht->max;
+    struct HashTableEntry* e = ht->entries + i;
+
+    int j = 0;
+    while (e->key != -1) {
+        e = ht->entries + (i++ % ht->max);
+        j++;
+
+        if (ht->max < j)
+            return -1;
+    }
+
+    e->key = key;
+    e->value = value;
+
+    return 1;
+}
+
+struct HashTableEntry* ht_entry(HashTable* ht, unsigned long key) {
+    if (ht == NULL) return NULL;
+
     int i = key % ht->max;
 
     struct HashTableEntry* e = ht->entries + i;
@@ -201,10 +225,30 @@ int cache_lookup(HashTable* ht, char* str) {
         e = ht->entries + (i++ % ht->max);
         j++;
 
-        if (e->value < 0 || ht->max < j)
-            return -1;
+        if (ht->max < j)
+            return NULL;
     }
 
-    return e->value;
+    return e;
 }
+
+int64_t ht_lookup(HashTable *ht, unsigned long key) {
+    HashTableEntry *e = ht_entry(ht, key);
+
+    if (!e) return -1;
+    
+    return e->value;
+
+} inline int64_t ht_lookup(HashTable*, unsigned long);
+
+int ht_clear(HashTable *ht, unsigned long key) {
+    HashTableEntry *e = ht_entry(ht, key);
+
+    if (!e) return -1;
+    
+    e->key = -1;
+
+    return 1;
+
+} inline int ht_clear(HashTable*, unsigned long);
 
