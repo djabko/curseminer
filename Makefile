@@ -3,9 +3,10 @@ CF_DEBUG=-Wall -g -DDEBUG
 CF_OPTIM=-Ofast
 CF_LIBS=-lncurses -lm -ldl -lpthread
 
-SRCDIR=.
+SRCDIR=./src
 INCDIR=./include
 OBJDIR=./obj
+LOGSDIR=./logs
 OPT_OBJDIR=./obj_opt
 
 SRCS=$(wildcard $(SRCDIR)/*.c)
@@ -39,5 +40,5 @@ $(OPT_OBJDIR):
 	mkdir -p $(OPT_OBJDIR)
 
 clean:
-	rm -f $(TARGET) $(OPT_TARGET) $(OBJS) vgcore.* error.dump
+	rm -f $(TARGET) $(OPT_TARGET) $(OBJS) $(LOGSDIR)/* vgcore.* error.dump
 	rm -rf $(OBJDIR) $(OPT_OBJDIR)
