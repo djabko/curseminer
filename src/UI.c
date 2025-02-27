@@ -187,8 +187,8 @@ void draw_gamewin_nogui(window_t *gamewin) {
 void draw_gamewin(window_t *gamewin) {
     EntityType* entity;
 
-    for (int x=0; x <= gamewin->w; x++) {
-        for (int y=0; y <= gamewin->h; y++) {
+    for (int x=0; x < gamewin->w; x++) {
+        for (int y=0; y < gamewin->h; y++) {
 
             entity = game_world_getxy(x, y);
             wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
@@ -429,8 +429,8 @@ int UI_init(int nogui_mode) {
     window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
     window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
 
-    GLOBALS.view_port_maxx = gww - 1;
-    GLOBALS.view_port_maxy = gwh - 1;
+    GLOBALS.view_port_maxx = gww;
+    GLOBALS.view_port_maxy = gwh;
 
     int status = game_init();
     if (status != 0) {

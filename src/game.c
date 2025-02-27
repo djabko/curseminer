@@ -9,8 +9,32 @@
 #include <scheduler.h>
 
 
-GameContext* GAME;
-RunQueue* GAME_RUNQUEUE;
+GameContext *GAME;
+RunQueue *GAME_RUNQUEUE;
+int *WORLD_ENTITY_CACHE;
+int *GAME_ENTITY_CACHE;
+
+/* Helper Functions */
+void game_cache_set(int *cache, int x, int y, int tid) {
+    cache[y * GLOBALS.view_port_maxx + x] = tid;
+
+} inline void game_cache_set(int*, int, int, int);
+
+int game_cache_get(int *cache, int x, int y) {
+    return cache[y * GLOBALS.view_port_maxx + x];
+
+} inline int game_cache_get(int*, int, int);
+
+void refresh_game_entity_cache(int *cache) {
+    for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
+        for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
+
+            int tid = world_getxy(GAME->world, x + GAME->world_view_x, y + GAME->world_view_y);
+
+            game_cache_set(cache, x, y, tid);
+        }
+    }
+}
 
 void create_skin(int id, char c, color_t bg_r, color_t bg_g, color_t bg_b, color_t fg_r, color_t fg_g, color_t fg_b) {
     if (GAME->skins_c == GAME->skins_maxc) {
@@ -83,6 +107,9 @@ int update_game_world(Task* task, Stack64* stack) {
 int game_init() {
     int status = 0;
 
+    GAME_ENTITY_CACHE = calloc(GLOBALS.view_port_maxx * GLOBALS.view_port_maxy, sizeof(int));
+    WORLD_ENTITY_CACHE = calloc(GLOBALS.view_port_maxx * GLOBALS.view_port_maxy, sizeof(int));
+
     GAME = calloc(sizeof(GameContext), 1);
     GAME->skins_c = 0;
     GAME->entity_types_c = 0;
@@ -100,6 +127,7 @@ int game_init() {
     int e_x, e_y;
     Entity *player, *entity;
 
+    // Spawn some moving entities
     player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
     entity_set_keyboard_controller(player);
     GLOBALS.player = player;
@@ -124,6 +152,8 @@ int game_init() {
 
     GLOBALS.game = GAME;
 
+    refresh_game_entity_cache(WORLD_ENTITY_CACHE);
+
     return status;
 }
 
@@ -138,10 +168,9 @@ GameContext* game_get_context() {
     return GAME;
 }
 
-// TODO: Use a hashtable instead
 EntityType* game_world_getxy(int x, int y) {
-    x += GAME->world_view_x;
-    y += GAME->world_view_y;
+    int _x = x + GAME->world_view_x;
+    int _y = y + GAME->world_view_y;
 
     /* world_view updating should take place in a separate task */
     if (GLOBALS.player->x < GAME->world_view_x) GAME->world_view_x--;
@@ -155,7 +184,7 @@ EntityType* game_world_getxy(int x, int y) {
         if (e->x == x && e->y == y) return e->type;
     }
 
-    int id = world_getxy(GAME->world, x, y);
+    int id = game_cache_get(WORLD_ENTITY_CACHE, x, y);
 
     if (id < ge_air || ge_end <= id) 
         log_debug("ERROR: attempting to access invalid id %d at position (%d,%d)", id, x, y);
@@ -165,6 +194,14 @@ EntityType* game_world_getxy(int x, int y) {
 
 int game_world_setxy(int x, int y, EntityTypeID tid) {
     world_setxy(GAME->world, x, y, tid);
+    
+
+    x += GAME->world_view_x;
+    y += GAME->world_view_y;
+
+    if (0 < x && 0 < y && x < GLOBALS.view_port_maxx && y < GLOBALS.view_port_maxy)
+        game_cache_set(WORLD_ENTITY_CACHE, x, y, tid);
+    
     return 0;
 }
 
