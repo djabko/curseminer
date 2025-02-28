@@ -25,14 +25,24 @@ int game_cache_get(int *cache, int x, int y) {
 
 } inline int game_cache_get(int*, int, int);
 
-void refresh_game_entity_cache(int *cache) {
+void flush_world_entity_cache() {
     for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
         for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
 
             int tid = world_getxy(GAME->world, x + GAME->world_view_x, y + GAME->world_view_y);
 
-            game_cache_set(cache, x, y, tid);
+            game_cache_set(WORLD_ENTITY_CACHE, x, y, tid);
         }
+    }
+}
+
+void flush_game_entity_cache() {
+    for (int x = 0; x < GLOBALS.view_port_maxx; x++)
+        for (int y = 0; y < GLOBALS.view_port_maxy; y++)
+            game_cache_set(GAME_ENTITY_CACHE, x, y, 0);
+
+    qu_foreach(GAME->world->entities, Entity*, e) {
+        game_cache_set(GAME_ENTITY_CACHE, e->x - GAME->world_view_x, e->y - GAME->world_view_y, e->type->id);
     }
 }
 
@@ -152,7 +162,7 @@ int game_init() {
 
     GLOBALS.game = GAME;
 
-    refresh_game_entity_cache(WORLD_ENTITY_CACHE);
+    flush_world_entity_cache();
 
     return status;
 }
@@ -173,18 +183,29 @@ EntityType* game_world_getxy(int x, int y) {
     int _y = y + GAME->world_view_y;
 
     /* world_view updating should take place in a separate task */
-    if (GLOBALS.player->x < GAME->world_view_x) GAME->world_view_x--;
-    if (GLOBALS.player->x > GAME->world_view_x + GLOBALS.view_port_maxx) GAME->world_view_x++;
-    if (GLOBALS.player->y < GAME->world_view_y) GAME->world_view_y--;
-    if (GLOBALS.player->y > GAME->world_view_y + GLOBALS.view_port_maxy) GAME->world_view_y++;
-
-    Queue64* entity_qu = GAME->world->entities;
-
-    qu_foreach(entity_qu, Entity*, e) {
-        if (e->x == x && e->y == y) return e->type;
+    if (GLOBALS.player->x < GAME->world_view_x) {
+        GAME->world_view_x--;
+        flush_world_entity_cache();
+        flush_game_entity_cache();
+    }
+    if (GLOBALS.player->x >= GAME->world_view_x + GLOBALS.view_port_maxx) {
+        GAME->world_view_x++;
+        flush_world_entity_cache();
+        flush_game_entity_cache();
+    }
+    if (GLOBALS.player->y < GAME->world_view_y) {
+        GAME->world_view_y--;
+        flush_world_entity_cache();
+        flush_game_entity_cache();
+    }
+    if (GLOBALS.player->y >= GAME->world_view_y + GLOBALS.view_port_maxy) {
+        GAME->world_view_y++;
+        flush_world_entity_cache();
+        flush_game_entity_cache();
     }
 
-    int id = game_cache_get(WORLD_ENTITY_CACHE, x, y);
+    int id = game_cache_get(GAME_ENTITY_CACHE, x, y);
+    id = id > 0 ? id : game_cache_get(WORLD_ENTITY_CACHE, x, y);
 
     if (id < ge_air || ge_end <= id) 
         log_debug("ERROR: attempting to access invalid id %d at position (%d,%d)", id, x, y);
@@ -195,9 +216,8 @@ EntityType* game_world_getxy(int x, int y) {
 int game_world_setxy(int x, int y, EntityTypeID tid) {
     world_setxy(GAME->world, x, y, tid);
     
-
-    x += GAME->world_view_x;
-    y += GAME->world_view_y;
+    x -= GAME->world_view_x;
+    y -= GAME->world_view_y;
 
     if (0 < x && 0 < y && x < GLOBALS.view_port_maxx && y < GLOBALS.view_port_maxy)
         game_cache_set(WORLD_ENTITY_CACHE, x, y, tid);

@@ -4,6 +4,12 @@
 #include <stack64.h>
 #include <world.h>
 
+
+extern int *WORLD_ENTITY_CACHE;
+extern int *GAME_ENTITY_CACHE;
+void game_cache_set(int*, int, int, int);
+int game_cache_get(int*, int, int);
+
 typedef unsigned char color_t;
 
 typedef enum {

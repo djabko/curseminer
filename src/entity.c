@@ -25,9 +25,13 @@ void tick_entity_behaviour(Entity* e) {
             int interval = e->speed * 10;
 
             if (interval < timer_diff_milisec(&TIMER_NOW, &e->last_moved)) {
+                game_cache_set(GAME_ENTITY_CACHE, e->x - GLOBALS.game->world_view_x, e->y - GLOBALS.game->world_view_y, 0);
+
                 e->x += e->vx;
                 e->y += e->vy;
                 e->last_moved = TIMER_NOW;
+
+                game_cache_set(GAME_ENTITY_CACHE, e->x - GLOBALS.game->world_view_x, e->y - GLOBALS.game->world_view_y, e->type->id);
         }
     }
 }
@@ -46,7 +50,8 @@ void default_tick(Entity* e) {
 static inline void set_entity_facing(Entity* e, int x, int y, int vx, int vy, EntityFacing direction) {
     e->facing = direction;
 
-    int id = game_world_getxy(x, y)->id;
+    // TODO: expand WORLD_ENTITY_CACHE to check tiles at view_port boundaries
+    int id = 0; //game_world_getxy(x, y)->id;
 
     if (id == 0) {
         e->vx = vx;
@@ -216,6 +221,8 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
     new_entity->controller = DEFAULT_CONTROLLER;
 
     qu_enqueue(world->entities, (uint64_t) new_entity);
+
+    game_cache_set(GAME_ENTITY_CACHE, new_entity->x, new_entity->y, new_entity->type->id);
 
     return new_entity;
 }
