@@ -190,9 +190,11 @@ void draw_gamewin(window_t *gamewin) {
     for (int x=0; x < gamewin->w; x++) {
         for (int y=0; y < gamewin->h; y++) {
 
-            entity = game_world_getxy(x, y);
-            wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
-            mvwaddch(gamewin->win, y, x, entity->skin->character);
+            if (game_world_dirty(x, y)) {
+                entity = game_world_getxy(x, y);
+                wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
+                mvwaddch(gamewin->win, y, x, entity->skin->character);
+            }
         }
     }
 

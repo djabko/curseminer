@@ -5,10 +5,13 @@
 #include <world.h>
 
 
-extern int *WORLD_ENTITY_CACHE;
-extern int *GAME_ENTITY_CACHE;
-void game_cache_set(int*, int, int, int);
-int game_cache_get(int*, int, int);
+extern unsigned char *WORLD_ENTITY_CACHE;
+extern unsigned char *GAME_ENTITY_CACHE;
+extern unsigned char *GAME_DIRTY_ARRAY;
+
+void game_cache_set(unsigned char*, int, int, unsigned char);
+unsigned char game_cache_get(unsigned char*, int, int);
+int game_world_dirty(int x, int y);
 
 typedef unsigned char color_t;
 
@@ -69,7 +72,8 @@ typedef struct EntityType {
 typedef struct World World;
 typedef struct GameContext {
     World* world;
-    int world_view_x, world_view_y, skins_c, skins_maxc, entity_types_c, entity_types_maxc;
+    int world_view_x, world_view_y, skins_c, skins_maxc, entity_types_c,
+        entity_types_maxc, scroll_threshold;
     EntityType* entity_types;
     Skin* skins;
 } GameContext;

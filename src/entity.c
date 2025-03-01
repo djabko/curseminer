@@ -50,8 +50,7 @@ void default_tick(Entity* e) {
 static inline void set_entity_facing(Entity* e, int x, int y, int vx, int vy, EntityFacing direction) {
     e->facing = direction;
 
-    // TODO: expand WORLD_ENTITY_CACHE to check tiles at view_port boundaries
-    int id = 0; //game_world_getxy(x, y)->id;
+    int id = game_world_getxy(x, y)->id;
 
     if (id == 0) {
         e->vx = vx;

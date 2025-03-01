@@ -11,19 +11,20 @@
 
 GameContext *GAME;
 RunQueue *GAME_RUNQUEUE;
-int *WORLD_ENTITY_CACHE;
-int *GAME_ENTITY_CACHE;
+unsigned char *WORLD_ENTITY_CACHE;
+unsigned char *GAME_ENTITY_CACHE;
+unsigned char *GAME_DIRTY_ARRAY;
 
 /* Helper Functions */
-void game_cache_set(int *cache, int x, int y, int tid) {
+void game_cache_set(unsigned char *cache, int x, int y, unsigned char tid) {
     cache[y * GLOBALS.view_port_maxx + x] = tid;
 
-} inline void game_cache_set(int*, int, int, int);
+} inline void game_cache_set(unsigned char*, int, int, unsigned char);
 
-int game_cache_get(int *cache, int x, int y) {
+unsigned char game_cache_get(unsigned char *cache, int x, int y) {
     return cache[y * GLOBALS.view_port_maxx + x];
 
-} inline int game_cache_get(int*, int, int);
+} inline unsigned char game_cache_get(unsigned char*, int, int);
 
 void flush_world_entity_cache() {
     for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
@@ -32,6 +33,7 @@ void flush_world_entity_cache() {
             int tid = world_getxy(GAME->world, x + GAME->world_view_x, y + GAME->world_view_y);
 
             game_cache_set(WORLD_ENTITY_CACHE, x, y, tid);
+            game_cache_set(GAME_DIRTY_ARRAY, x, y, 1);
         }
     }
 }
@@ -43,8 +45,16 @@ void flush_game_entity_cache() {
 
     qu_foreach(GAME->world->entities, Entity*, e) {
         game_cache_set(GAME_ENTITY_CACHE, e->x - GAME->world_view_x, e->y - GAME->world_view_y, e->type->id);
+        game_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
     }
 }
+
+int game_world_dirty(int x, int y) {
+    unsigned int v = game_cache_get(GAME_DIRTY_ARRAY, x, y);
+    game_cache_set(GAME_DIRTY_ARRAY, x, y, 0);
+    return v;
+
+} inline int game_world_dirty(int, int);
 
 void create_skin(int id, char c, color_t bg_r, color_t bg_g, color_t bg_b, color_t fg_r, color_t fg_g, color_t fg_b) {
     if (GAME->skins_c == GAME->skins_maxc) {
@@ -110,6 +120,21 @@ int update_game_world(Task* task, Stack64* stack) {
 
     } while (e != end && 0 < i);
 
+    unsigned char leftb = GLOBALS.player->x < GAME->world_view_x + GAME->scroll_threshold;
+    unsigned char topb = GLOBALS.player->y < GAME->world_view_y + GAME->scroll_threshold;
+    unsigned char rightb = GLOBALS.player->x >= GAME->world_view_x + GLOBALS.view_port_maxx - GAME->scroll_threshold;
+    unsigned char bottomb = GLOBALS.player->y >= GAME->world_view_y + GLOBALS.view_port_maxy - GAME->scroll_threshold;
+
+    if (leftb || topb || rightb || bottomb) {
+        if      (leftb)      GAME->world_view_x--;
+        else if (rightb)     GAME->world_view_x++;
+        if      (topb)       GAME->world_view_y--;
+        else if (bottomb)    GAME->world_view_y++;
+
+        flush_world_entity_cache();
+        flush_game_entity_cache();
+    }
+
     tk_sleep(task, 100);
     return 0;
 }
@@ -117,8 +142,11 @@ int update_game_world(Task* task, Stack64* stack) {
 int game_init() {
     int status = 0;
 
-    GAME_ENTITY_CACHE = calloc(GLOBALS.view_port_maxx * GLOBALS.view_port_maxy, sizeof(int));
-    WORLD_ENTITY_CACHE = calloc(GLOBALS.view_port_maxx * GLOBALS.view_port_maxy, sizeof(int));
+    size_t stride = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy * sizeof(unsigned char);
+    unsigned char *tmp  = calloc(stride, 3);
+    GAME_ENTITY_CACHE   = tmp + stride * 0;
+    WORLD_ENTITY_CACHE  = tmp + stride * 1;
+    GAME_DIRTY_ARRAY    = tmp + stride * 2;
 
     GAME = calloc(sizeof(GameContext), 1);
     GAME->skins_c = 0;
@@ -129,6 +157,7 @@ int game_init() {
     GAME->entity_types = calloc(GAME->entity_types_maxc, sizeof(EntityType));
     GAME->world_view_x = 0;
     GAME->world_view_y = 0;
+    GAME->scroll_threshold = 5;
 
     init_skins();
     init_entity_types();
@@ -181,28 +210,6 @@ GameContext* game_get_context() {
 EntityType* game_world_getxy(int x, int y) {
     int _x = x + GAME->world_view_x;
     int _y = y + GAME->world_view_y;
-
-    /* world_view updating should take place in a separate task */
-    if (GLOBALS.player->x < GAME->world_view_x) {
-        GAME->world_view_x--;
-        flush_world_entity_cache();
-        flush_game_entity_cache();
-    }
-    if (GLOBALS.player->x >= GAME->world_view_x + GLOBALS.view_port_maxx) {
-        GAME->world_view_x++;
-        flush_world_entity_cache();
-        flush_game_entity_cache();
-    }
-    if (GLOBALS.player->y < GAME->world_view_y) {
-        GAME->world_view_y--;
-        flush_world_entity_cache();
-        flush_game_entity_cache();
-    }
-    if (GLOBALS.player->y >= GAME->world_view_y + GLOBALS.view_port_maxy) {
-        GAME->world_view_y++;
-        flush_world_entity_cache();
-        flush_game_entity_cache();
-    }
 
     int id = game_cache_get(GAME_ENTITY_CACHE, x, y);
     id = id > 0 ? id : game_cache_get(WORLD_ENTITY_CACHE, x, y);

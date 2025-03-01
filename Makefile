@@ -40,5 +40,5 @@ $(OPT_OBJDIR):
 	mkdir -p $(OPT_OBJDIR)
 
 clean:
-	rm -f $(TARGET) $(OPT_TARGET) $(OBJS) $(LOGSDIR)/* vgcore.* error.dump gmon.out
+	rm -f $(TARGET) $(OPT_TARGET) $(OBJS) $(LOGSDIR)/error.dump vgcore.* error.dump gmon.out
 	rm -rf $(OBJDIR) $(OPT_OBJDIR)

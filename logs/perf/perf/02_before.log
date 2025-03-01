@@ -1,21 +1,21 @@
  Performance counter stats for './curseminer':
 
-          7,244.91 msec task-clock                       #    0.120 CPUs utilized
-             7,062      context-switches                 #  974.754 /sec
-                 6      cpu-migrations                   #    0.828 /sec
-               545      page-faults                      #   75.225 /sec
-    23,691,616,325      instructions                     #    2.28  insn per cycle
-    10,392,011,586      cycles                           #    1.434 GHz
-     4,506,507,562      branches                         #  622.024 M/sec
-        10,796,006      branch-misses                    #    0.24% of all branches
-                        TopdownL1                 #     24.5 %  tma_backend_bound
-                                                  #     23.2 %  tma_bad_speculation
-                                                  #     11.6 %  tma_frontend_bound
-                                                  #     40.7 %  tma_retiring
+          5,498.06 msec task-clock                       #    0.091 CPUs utilized
+             7,064      context-switches                 #    1.285 K/sec
+                12      cpu-migrations                   #    2.183 /sec
+               546      page-faults                      #   99.308 /sec
+    16,824,790,934      instructions                     #    2.22  insn per cycle
+     7,567,066,425      cycles                           #    1.376 GHz
+     3,167,555,181      branches                         #  576.122 M/sec
+        10,015,969      branch-misses                    #    0.32% of all branches
+                        TopdownL1                 #     21.8 %  tma_backend_bound
+                                                  #     35.9 %  tma_bad_speculation
+                                                  #     10.3 %  tma_frontend_bound
+                                                  #     32.0 %  tma_retiring
 
-      60.221288757 seconds time elapsed
+      60.310425237 seconds time elapsed
 
-       6.813856000 seconds user
-       0.345338000 seconds sys
+       5.107937000 seconds user
+       0.322918000 seconds sys
 
 
