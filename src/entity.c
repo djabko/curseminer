@@ -25,13 +25,19 @@ void tick_entity_behaviour(Entity* e) {
             int interval = e->speed * 10;
 
             if (interval < timer_diff_milisec(&TIMER_NOW, &e->last_moved)) {
-                game_cache_set(GAME_ENTITY_CACHE, e->x - GLOBALS.game->world_view_x, e->y - GLOBALS.game->world_view_y, 0);
+                if (game_on_screen(e->x, e->y)) {
+                    gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
+                    gamew_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
+                }
 
                 e->x += e->vx;
                 e->y += e->vy;
                 e->last_moved = TIMER_NOW;
 
-                game_cache_set(GAME_ENTITY_CACHE, e->x - GLOBALS.game->world_view_x, e->y - GLOBALS.game->world_view_y, e->type->id);
+                if (game_on_screen(e->x, e->y)) {
+                    gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+                    gamew_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
+                }
         }
     }
 }
@@ -50,7 +56,7 @@ void default_tick(Entity* e) {
 static inline void set_entity_facing(Entity* e, int x, int y, int vx, int vy, EntityFacing direction) {
     e->facing = direction;
 
-    int id = game_world_getxy(x, y)->id;
+    int id = world_getxy(GLOBALS.game->world, x, y);
 
     if (id == 0) {
         e->vx = vx;
@@ -221,7 +227,7 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
 
     qu_enqueue(world->entities, (uint64_t) new_entity);
 
-    game_cache_set(GAME_ENTITY_CACHE, new_entity->x, new_entity->y, new_entity->type->id);
+    gamew_cache_set(GAME_ENTITY_CACHE, new_entity->x, new_entity->y, new_entity->type->id);
 
     return new_entity;
 }

@@ -9,9 +9,12 @@ extern unsigned char *WORLD_ENTITY_CACHE;
 extern unsigned char *GAME_ENTITY_CACHE;
 extern unsigned char *GAME_DIRTY_ARRAY;
 
+int game_on_screen(int, int);
 void game_cache_set(unsigned char*, int, int, unsigned char);
+void gamew_cache_set(unsigned char*, int, int, unsigned char);
 unsigned char game_cache_get(unsigned char*, int, int);
-int game_world_dirty(int x, int y);
+unsigned char gamew_cache_get(unsigned char*, int, int);
+unsigned char game_world_dirty(int x, int y);
 
 typedef unsigned char color_t;
 

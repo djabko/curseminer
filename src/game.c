@@ -16,15 +16,36 @@ unsigned char *GAME_ENTITY_CACHE;
 unsigned char *GAME_DIRTY_ARRAY;
 
 /* Helper Functions */
+int game_on_screen(int x, int y) {
+    int minx = GAME->world_view_x;
+    int miny = GAME->world_view_y;
+    int maxx = minx + GLOBALS.view_port_maxx;
+    int maxy = miny + GLOBALS.view_port_maxy;
+
+    return minx <= x && miny <= y && x < maxx && y < maxy;
+}
+
 void game_cache_set(unsigned char *cache, int x, int y, unsigned char tid) {
     cache[y * GLOBALS.view_port_maxx + x] = tid;
-
-} inline void game_cache_set(unsigned char*, int, int, unsigned char);
+}
 
 unsigned char game_cache_get(unsigned char *cache, int x, int y) {
     return cache[y * GLOBALS.view_port_maxx + x];
+}
 
-} inline unsigned char game_cache_get(unsigned char*, int, int);
+void gamew_cache_set(unsigned char *cache, int x, int y, unsigned char tid) {
+    x -= GAME->world_view_x;
+    y -= GAME->world_view_y;
+
+    cache[y * GLOBALS.view_port_maxx + x] = tid;
+}
+
+unsigned char gamew_cache_get(unsigned char *cache, int x, int y) {
+    x -= GAME->world_view_x;
+    y -= GAME->world_view_y;
+
+    return cache[y * GLOBALS.view_port_maxx + x];
+}
 
 void flush_world_entity_cache() {
     for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
@@ -44,17 +65,16 @@ void flush_game_entity_cache() {
             game_cache_set(GAME_ENTITY_CACHE, x, y, 0);
 
     qu_foreach(GAME->world->entities, Entity*, e) {
-        game_cache_set(GAME_ENTITY_CACHE, e->x - GAME->world_view_x, e->y - GAME->world_view_y, e->type->id);
-        game_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
+        if (!game_on_screen(e->x, e->y)) continue;
+
+        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+        gamew_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
     }
 }
 
-int game_world_dirty(int x, int y) {
-    unsigned int v = game_cache_get(GAME_DIRTY_ARRAY, x, y);
-    game_cache_set(GAME_DIRTY_ARRAY, x, y, 0);
-    return v;
-
-} inline int game_world_dirty(int, int);
+unsigned char game_world_dirty(int x, int y) {
+    return game_cache_get(GAME_DIRTY_ARRAY, x, y);
+}
 
 void create_skin(int id, char c, color_t bg_r, color_t bg_g, color_t bg_b, color_t fg_r, color_t fg_g, color_t fg_b) {
     if (GAME->skins_c == GAME->skins_maxc) {

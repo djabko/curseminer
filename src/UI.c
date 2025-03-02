@@ -184,13 +184,18 @@ void draw_gamewin_nogui(window_t *gamewin) {
     }
 }
 
+//int SKIPPED_UPDATES = 0;
 void draw_gamewin(window_t *gamewin) {
     EntityType* entity;
+    int update = 0;
 
     for (int x=0; x < gamewin->w; x++) {
         for (int y=0; y < gamewin->h; y++) {
 
             if (game_world_dirty(x, y)) {
+                update++;
+                game_cache_set(GAME_DIRTY_ARRAY, x, y, 0);
+
                 entity = game_world_getxy(x, y);
                 wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
                 mvwaddch(gamewin->win, y, x, entity->skin->character);
@@ -198,7 +203,11 @@ void draw_gamewin(window_t *gamewin) {
         }
     }
 
-    wnoutrefresh(gamewin->win);
+    if (update) {
+        wnoutrefresh(gamewin->win);
+        //log_debug("Skipped %d iterations, this iteration made %d screen updates", SKIPPED_UPDATES, update);
+        //SKIPPED_UPDATES = 0;
+    } //else  SKIPPED_UPDATES++;
 }
 
 void draw_uiwin_nogui(window_t *uiwin) {
