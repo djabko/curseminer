@@ -11,9 +11,9 @@
 
 GameContext *GAME;
 RunQueue *GAME_RUNQUEUE;
-unsigned char *WORLD_ENTITY_CACHE;
-unsigned char *GAME_ENTITY_CACHE;
-unsigned char *GAME_DIRTY_ARRAY;
+byte *WORLD_ENTITY_CACHE;
+byte *GAME_ENTITY_CACHE;
+DirtyFlags *GAME_DIRTY_FLAGS;
 
 /* Helper Functions */
 int game_on_screen(int x, int y) {
@@ -25,22 +25,22 @@ int game_on_screen(int x, int y) {
     return minx <= x && miny <= y && x < maxx && y < maxy;
 }
 
-void game_cache_set(unsigned char *cache, int x, int y, unsigned char tid) {
+void game_cache_set(byte *cache, int x, int y, byte tid) {
     cache[y * GLOBALS.view_port_maxx + x] = tid;
 }
 
-unsigned char game_cache_get(unsigned char *cache, int x, int y) {
+byte game_cache_get(byte *cache, int x, int y) {
     return cache[y * GLOBALS.view_port_maxx + x];
 }
 
-void gamew_cache_set(unsigned char *cache, int x, int y, unsigned char tid) {
+void gamew_cache_set(byte *cache, int x, int y, byte tid) {
     x -= GAME->world_view_x;
     y -= GAME->world_view_y;
 
     cache[y * GLOBALS.view_port_maxx + x] = tid;
 }
 
-unsigned char gamew_cache_get(unsigned char *cache, int x, int y) {
+byte gamew_cache_get(byte *cache, int x, int y) {
     x -= GAME->world_view_x;
     y -= GAME->world_view_y;
 
@@ -54,7 +54,6 @@ void flush_world_entity_cache() {
             int tid = world_getxy(GAME->world, x + GAME->world_view_x, y + GAME->world_view_y);
 
             game_cache_set(WORLD_ENTITY_CACHE, x, y, tid);
-            game_cache_set(GAME_DIRTY_ARRAY, x, y, 1);
         }
     }
 }
@@ -68,12 +67,62 @@ void flush_game_entity_cache() {
         if (!game_on_screen(e->x, e->y)) continue;
 
         gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
-        gamew_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
     }
 }
 
-unsigned char game_world_dirty(int x, int y) {
-    return game_cache_get(GAME_DIRTY_ARRAY, x, y);
+void game_init_dirty_flags() {
+    DirtyFlags *df = GAME_DIRTY_FLAGS;
+    byte *ptr = (byte*) df;
+    size_t s = 64;
+    size_t tiles_on_screen = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy;
+
+    if (tiles_on_screen > s*s)
+        log_debug("ERROR: screen too big for cache of %lu tiles", s*s);
+
+    df->groups = (byte*) (ptr + s * 1);
+    df->flags = (byte*) (ptr + s * 2);
+    df->stride = s;
+    df->groups_used = (tiles_on_screen + s - 1) / s;
+    df->command = 0;
+
+    log_debug("DF at %p[%d]\ngr at %p", GAME_DIRTY_FLAGS, sizeof(DirtyFlags), df->groups);
+    for (int i=0; i<s; i++) {
+        log_debug("\tGroup %d: %d", i, df->groups[i]);
+        df->groups[i] = 10;
+    }
+}
+
+void game_set_dirty(int x, int y, int v) {
+    int maxx = GLOBALS.view_port_maxx;
+
+    DirtyFlags *df = GAME_DIRTY_FLAGS;
+    byte* groups = (byte*) df->groups;
+    byte* flags = (byte*) df->flags;
+
+    size_t offset = y * maxx + x;
+
+    byte *farr = flags + offset;
+
+    groups[offset / 64] = v;
+    farr[offset % 64] = v;
+    df->command = 1;
+}
+
+void game_flush_dirty() {
+    DirtyFlags *df = GAME_DIRTY_FLAGS;
+    byte* groups = df->groups;
+    size_t s = df->stride;
+    size_t gu = df->groups_used;
+
+    for (int i = 0; i < gu; i++) {
+        groups[i] = 0;
+
+        for (int j = 0; j < s; j++) {
+            (groups + i * s) [j] = 0;
+        }
+    }
+
+    df->command = -1;
 }
 
 void create_skin(int id, char c, color_t bg_r, color_t bg_g, color_t bg_b, color_t fg_r, color_t fg_g, color_t fg_b) {
@@ -140,10 +189,10 @@ int update_game_world(Task* task, Stack64* stack) {
 
     } while (e != end && 0 < i);
 
-    unsigned char leftb = GLOBALS.player->x < GAME->world_view_x + GAME->scroll_threshold;
-    unsigned char topb = GLOBALS.player->y < GAME->world_view_y + GAME->scroll_threshold;
-    unsigned char rightb = GLOBALS.player->x >= GAME->world_view_x + GLOBALS.view_port_maxx - GAME->scroll_threshold;
-    unsigned char bottomb = GLOBALS.player->y >= GAME->world_view_y + GLOBALS.view_port_maxy - GAME->scroll_threshold;
+    byte leftb = GLOBALS.player->x < GAME->world_view_x + GAME->scroll_threshold;
+    byte topb = GLOBALS.player->y < GAME->world_view_y + GAME->scroll_threshold;
+    byte rightb = GLOBALS.player->x >= GAME->world_view_x + GLOBALS.view_port_maxx - GAME->scroll_threshold;
+    byte bottomb = GLOBALS.player->y >= GAME->world_view_y + GLOBALS.view_port_maxy - GAME->scroll_threshold;
 
     if (leftb || topb || rightb || bottomb) {
         if      (leftb)      GAME->world_view_x--;
@@ -162,11 +211,11 @@ int update_game_world(Task* task, Stack64* stack) {
 int game_init() {
     int status = 0;
 
-    size_t stride = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy * sizeof(unsigned char);
-    unsigned char *tmp  = calloc(stride, 3);
+    size_t stride = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy * sizeof(byte);
+    byte *tmp  = calloc(stride * 3 + sizeof(DirtyFlags) * 64, 1);
     GAME_ENTITY_CACHE   = tmp + stride * 0;
     WORLD_ENTITY_CACHE  = tmp + stride * 1;
-    GAME_DIRTY_ARRAY    = tmp + stride * 2;
+    GAME_DIRTY_FLAGS    = (DirtyFlags*) (tmp + stride * 2);
 
     GAME = calloc(sizeof(GameContext), 1);
     GAME->skins_c = 0;
@@ -211,7 +260,9 @@ int game_init() {
 
     GLOBALS.game = GAME;
 
+    game_init_dirty_flags();
     flush_world_entity_cache();
+    game_flush_dirty();
 
     return status;
 }
@@ -223,19 +274,26 @@ void game_free() {
     free(GAME);
 }
 
-GameContext* game_get_context() {
+GameContext *game_get_context() {
     return GAME;
 }
 
-EntityType* game_world_getxy(int x, int y) {
-    int _x = x + GAME->world_view_x;
-    int _y = y + GAME->world_view_y;
-
+EntityType *game_world_getxy(int x, int y) {
     int id = game_cache_get(GAME_ENTITY_CACHE, x, y);
     id = id > 0 ? id : game_cache_get(WORLD_ENTITY_CACHE, x, y);
 
     if (id < ge_air || ge_end <= id) 
         log_debug("ERROR: attempting to access invalid id %d at position (%d,%d)", id, x, y);
+
+    return GAME->entity_types + id;
+}
+
+EntityType *_game_world_getxy(int index) {
+    int id = GAME_ENTITY_CACHE[index];
+    id = id > 0 ? id : WORLD_ENTITY_CACHE[index];
+
+    if (id < ge_air || ge_end <= id) 
+        log_debug("ERROR: attempting to access invalid id %d at index %d", id, index);
 
     return GAME->entity_types + id;
 }

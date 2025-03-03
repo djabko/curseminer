@@ -3,6 +3,8 @@
 
 #include <unistd.h>
 
+typedef unsigned char byte;
+
 #include "keyboard.h"
 #include "game.h"
 

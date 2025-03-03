@@ -187,27 +187,54 @@ void draw_gamewin_nogui(window_t *gamewin) {
 //int SKIPPED_UPDATES = 0;
 void draw_gamewin(window_t *gamewin) {
     EntityType* entity;
-    int update = 0;
 
-    for (int x=0; x < gamewin->w; x++) {
-        for (int y=0; y < gamewin->h; y++) {
+    DirtyFlags *df = GAME_DIRTY_FLAGS;
 
-            if (game_world_dirty(x, y)) {
-                update++;
-                game_cache_set(GAME_DIRTY_ARRAY, x, y, 0);
+    // No tiles to draw
+    if (df->command == 0) {
+        return;
+
+    // Draw only dirty tiles
+    } else if (df->command == 1) {
+
+        size_t s = df->stride;
+        int maxx = GLOBALS.view_port_maxx;
+
+        for (int i = 0; i < s; i++) {
+            if (df->groups[i]) {
+
+                for (int j = 0; j < s; j++) {
+                    if ((df->flags + i * s) [j]) {
+
+                        int index = i * s + j;
+                        int x = index % maxx;
+                        int y = index / maxx;
+
+                        entity = game_world_getxy(x, y);
+                        wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
+                        mvwaddch(gamewin->win, y, x, entity->skin->character);
+                        game_set_dirty(x, y, 0);
+                    }
+                }
+            }
+        }
+
+    // Update all tiles
+    } else if (df->command == -1) {
+        for (int x=0; x < gamewin->w; x++) {
+            for (int y=0; y < gamewin->h; y++) {
 
                 entity = game_world_getxy(x, y);
                 wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
                 mvwaddch(gamewin->win, y, x, entity->skin->character);
+                game_set_dirty(x, y, 0);
             }
         }
     }
 
-    if (update) {
-        wnoutrefresh(gamewin->win);
-        //log_debug("Skipped %d iterations, this iteration made %d screen updates", SKIPPED_UPDATES, update);
-        //SKIPPED_UPDATES = 0;
-    } //else  SKIPPED_UPDATES++;
+    df->command = 0;
+
+    wnoutrefresh(gamewin->win);
 }
 
 void draw_uiwin_nogui(window_t *uiwin) {

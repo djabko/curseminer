@@ -27,7 +27,7 @@ void tick_entity_behaviour(Entity* e) {
             if (interval < timer_diff_milisec(&TIMER_NOW, &e->last_moved)) {
                 if (game_on_screen(e->x, e->y)) {
                     gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
-                    gamew_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
+                    game_set_dirty(e->x, e->y, 1);
                 }
 
                 e->x += e->vx;
@@ -36,7 +36,7 @@ void tick_entity_behaviour(Entity* e) {
 
                 if (game_on_screen(e->x, e->y)) {
                     gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
-                    gamew_cache_set(GAME_DIRTY_ARRAY, e->x, e->y, 1);
+                    game_set_dirty(e->x, e->y, 1);
                 }
         }
     }
