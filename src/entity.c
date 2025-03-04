@@ -25,19 +25,15 @@ void tick_entity_behaviour(Entity* e) {
             int interval = e->speed * 10;
 
             if (interval < timer_diff_milisec(&TIMER_NOW, &e->last_moved)) {
-                if (game_on_screen(e->x, e->y)) {
+                if (game_on_screen(e->x, e->y))
                     gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
-                    game_set_dirty(e->x, e->y, 1);
-                }
 
                 e->x += e->vx;
                 e->y += e->vy;
                 e->last_moved = TIMER_NOW;
 
-                if (game_on_screen(e->x, e->y)) {
+                if (game_on_screen(e->x, e->y))
                     gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
-                    game_set_dirty(e->x, e->y, 1);
-                }
         }
     }
 }
@@ -57,6 +53,7 @@ static inline void set_entity_facing(Entity* e, int x, int y, int vx, int vy, En
     e->facing = direction;
 
     int id = world_getxy(GLOBALS.game->world, x, y);
+    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, x, y);
 
     if (id == 0) {
         e->vx = vx;

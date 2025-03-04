@@ -26,6 +26,7 @@ int game_on_screen(int x, int y) {
 }
 
 void game_cache_set(byte *cache, int x, int y, byte tid) {
+    game_set_dirty(x, y, 1);
     cache[y * GLOBALS.view_port_maxx + x] = tid;
 }
 
@@ -37,14 +38,14 @@ void gamew_cache_set(byte *cache, int x, int y, byte tid) {
     x -= GAME->world_view_x;
     y -= GAME->world_view_y;
 
-    cache[y * GLOBALS.view_port_maxx + x] = tid;
+    game_cache_set(cache, x, y, tid);
 }
 
 byte gamew_cache_get(byte *cache, int x, int y) {
     x -= GAME->world_view_x;
     y -= GAME->world_view_y;
 
-    return cache[y * GLOBALS.view_port_maxx + x];
+    return game_cache_get(cache, x, y);
 }
 
 void flush_world_entity_cache() {
@@ -52,8 +53,7 @@ void flush_world_entity_cache() {
         for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
 
             int tid = world_getxy(GAME->world, x + GAME->world_view_x, y + GAME->world_view_y);
-
-            game_cache_set(WORLD_ENTITY_CACHE, x, y, tid);
+            WORLD_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = tid;
         }
     }
 }
@@ -61,12 +61,15 @@ void flush_world_entity_cache() {
 void flush_game_entity_cache() {
     for (int x = 0; x < GLOBALS.view_port_maxx; x++)
         for (int y = 0; y < GLOBALS.view_port_maxy; y++)
-            game_cache_set(GAME_ENTITY_CACHE, x, y, 0);
+            GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = 0;
 
     qu_foreach(GAME->world->entities, Entity*, e) {
         if (!game_on_screen(e->x, e->y)) continue;
 
-        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+        int x = e->x - GAME->world_view_x;
+        int y = e->y - GAME->world_view_y;
+
+        GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = e->type->id;
     }
 }
 
@@ -84,27 +87,22 @@ void game_init_dirty_flags() {
     df->stride = s;
     df->groups_used = (tiles_on_screen + s - 1) / s;
     df->command = 0;
-
-    log_debug("DF at %p[%d]\ngr at %p", GAME_DIRTY_FLAGS, sizeof(DirtyFlags), df->groups);
-    for (int i=0; i<s; i++) {
-        log_debug("\tGroup %d: %d", i, df->groups[i]);
-        df->groups[i] = 10;
-    }
 }
 
 void game_set_dirty(int x, int y, int v) {
-    int maxx = GLOBALS.view_port_maxx;
-
     DirtyFlags *df = GAME_DIRTY_FLAGS;
-    byte* groups = (byte*) df->groups;
-    byte* flags = (byte*) df->flags;
 
+    if (df->command == -1) return;
+
+    int maxx = GLOBALS.view_port_maxx;
     size_t offset = y * maxx + x;
+    size_t s = df->stride;
 
-    byte *farr = flags + offset;
+    byte* groups = df->groups;
+    byte* flags = df->flags;
 
-    groups[offset / 64] = v;
-    farr[offset % 64] = v;
+    groups[offset / s] = v;
+    df->flags[offset] = v;
     df->command = 1;
 }
 
@@ -202,6 +200,7 @@ int update_game_world(Task* task, Stack64* stack) {
 
         flush_world_entity_cache();
         flush_game_entity_cache();
+        game_flush_dirty();
     }
 
     tk_sleep(task, 100);
@@ -231,7 +230,11 @@ int game_init() {
     init_skins();
     init_entity_types();
     GAME->world = world_init(20, GAME->skins_c - 1, PAGE_SIZE * 64);
-    
+    game_init_dirty_flags();
+
+    flush_world_entity_cache();
+    game_flush_dirty();
+
     int e_x, e_y;
     Entity *player, *entity;
 
@@ -259,10 +262,6 @@ int game_init() {
     schedule(GAME_RUNQUEUE, 0, 0, update_game_world, NULL);
 
     GLOBALS.game = GAME;
-
-    game_init_dirty_flags();
-    flush_world_entity_cache();
-    game_flush_dirty();
 
     return status;
 }

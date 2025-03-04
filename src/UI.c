@@ -204,9 +204,12 @@ void draw_gamewin(window_t *gamewin) {
             if (df->groups[i]) {
 
                 for (int j = 0; j < s; j++) {
-                    if ((df->flags + i * s) [j]) {
 
-                        int index = i * s + j;
+                    int index = i * s + j;
+                    byte flag = df->flags[index];
+
+                    if (flag == 1) {
+
                         int x = index % maxx;
                         int y = index / maxx;
 
@@ -227,9 +230,10 @@ void draw_gamewin(window_t *gamewin) {
                 entity = game_world_getxy(x, y);
                 wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
                 mvwaddch(gamewin->win, y, x, entity->skin->character);
-                game_set_dirty(x, y, 0);
             }
         }
+
+        game_flush_dirty();
     }
 
     df->command = 0;
@@ -469,6 +473,7 @@ int UI_init(int nogui_mode) {
 
     GLOBALS.view_port_maxx = gww;
     GLOBALS.view_port_maxy = gwh;
+    log_debug("maxx = %d", GLOBALS.view_port_maxx);
 
     int status = game_init();
     if (status != 0) {
