@@ -49,8 +49,8 @@ byte gamew_cache_get(byte *cache, int x, int y) {
 }
 
 void flush_world_entity_cache() {
-    for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
-        for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
+    for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
+        for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
 
             int tid = world_getxy(GAME->world, x + GAME->world_view_x, y + GAME->world_view_y);
             WORLD_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = tid;
@@ -59,8 +59,8 @@ void flush_world_entity_cache() {
 }
 
 void flush_game_entity_cache() {
-    for (int x = 0; x < GLOBALS.view_port_maxx; x++)
-        for (int y = 0; y < GLOBALS.view_port_maxy; y++)
+    for (int y = 0; y < GLOBALS.view_port_maxy; y++)
+        for (int x = 0; x < GLOBALS.view_port_maxx; x++)
             GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = 0;
 
     qu_foreach(GAME->world->entities, Entity*, e) {
@@ -211,7 +211,7 @@ int game_init() {
     int status = 0;
 
     size_t stride = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy * sizeof(byte);
-    byte *tmp  = calloc(stride * 3 + sizeof(DirtyFlags) * 64, 1);
+    byte *tmp  = calloc(stride * 2 + sizeof(DirtyFlags) * 64, 1);
     GAME_ENTITY_CACHE   = tmp + stride * 0;
     WORLD_ENTITY_CACHE  = tmp + stride * 1;
     GAME_DIRTY_FLAGS    = (DirtyFlags*) (tmp + stride * 2);

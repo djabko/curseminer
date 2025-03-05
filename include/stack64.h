@@ -5,15 +5,22 @@
 #include "stdint.h"
 
 
-/* Double Linked List */
-typedef struct Node {
-    struct Node *prev, *next;
-} Node;
+/* Priority List */
+typedef struct PriNode {
+    void *ptr;
+    uint64_t weight;
+    struct PriNode *next;
+} PriNode;
 
-// TODO: implement utility functions for linked lists
 typedef struct {
-    Node *head, *tail;
-} LLHead;
+    PriNode *mempool, *head, *tail;
+    int count, capacity;
+} PriList;
+
+PriList* pl_init(int);
+int pl_insert(PriList*, void*, uint64_t);
+void pl_remove(PriList*, void*, uint64_t);
+void pl_free(PriList*);
 
 
 /* 8 Byte Stack */

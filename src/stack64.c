@@ -1,7 +1,84 @@
 #include "stack64.h"
 #include "globals.h"
 
+#include <string.h>
 #include <stdio.h>
+
+
+/* PRIORITY LIST */
+
+PriList* pl_init(int pages) {
+    PriList* pl = calloc(PAGE_SIZE, pages);
+    pl->mempool = (PriNode*) (pl + 1);
+    pl->head = NULL;
+    pl->tail = NULL;
+    pl->count = 0;
+    pl->capacity = (PAGE_SIZE * pages - sizeof(PriList)) / sizeof(PriNode);
+}
+
+PriNode* pl_get_free(PriList *pl) {
+    if (pl->count >= pl->capacity) return NULL;
+
+    PriNode *start, *mid, *end, *n;
+
+    start = pl->mempool;
+    end = start + pl->capacity;
+    n = pl->mempool + pl->count;
+    mid = n;
+
+    while (n->ptr && n < end) n++;
+    if (n->ptr) n = start;
+
+    while (n->ptr && n < mid) n++;
+    if (n->ptr) return NULL;
+
+    return n;
+}
+
+PriNode* pl_search(PriList *pl, uint64_t weight) {
+    // TODO: binary search
+
+    PriNode *n = pl->head;
+
+    while (n->next && n->weight < weight) n = n->next;
+
+    return n;
+}
+
+int pl_insert(PriList* pl, void* ptr, uint64_t weight) {
+    if (pl->count >= pl->capacity) return -1;
+    else  if (pl->count == 0) {
+        PriNode *new = pl_get_free(pl);
+        pl->head = new;
+        pl->tail = new;
+        return 0;
+    }
+
+    PriNode *prev = pl_search(pl, weight);;
+    PriNode *new = pl_get_free(pl);
+
+    if (!prev->next) pl->tail=new;
+
+    new->ptr = ptr;
+    new->weight = weight;
+    new->next = prev->next;
+    prev->next = new;
+
+    return 0;
+}
+
+void pl_remove(PriList* pl, void* ptr, uint64_t weight) {
+    PriNode *n = pl_search(pl, weight);
+
+    if (!n) return;
+
+    memset(n, 0, sizeof(PriNode));
+    pl->count--;
+}
+
+void pl_free(PriList* pl) {
+    free(pl);
+}
 
 
 /* STACK FUNCTIONS */

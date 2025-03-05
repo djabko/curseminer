@@ -224,8 +224,8 @@ void draw_gamewin(window_t *gamewin) {
 
     // Update all tiles
     } else if (df->command == -1) {
-        for (int x=0; x < gamewin->w; x++) {
-            for (int y=0; y < gamewin->h; y++) {
+        for (int y=0; y < gamewin->h; y++) {
+            for (int x=0; x < gamewin->w; x++) {
 
                 entity = game_world_getxy(x, y);
                 wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
