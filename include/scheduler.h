@@ -19,7 +19,7 @@ extern unsigned int GLOBAL_TASK_COUNT;
 
 // TODO: typedef ll_head as rqll_head for clarity
 
-// TODO: move to utils.h
+// TODO: move to stack64.h
 typedef struct ll_node {
     struct ll_node *next;
     void* data; 
@@ -38,9 +38,6 @@ int ll_count(ll_head*);
 int ll_empty(ll_head*);
 int ll_full(ll_head*);
 void ll_free(ll_head*);
-
-
-
 
 
 /* Task */

@@ -31,6 +31,18 @@ void timer_never(TimeStamp* ts) {
     memcpy(ts, &never, sizeof(TimeStamp));
 }
 
+void timer_add_ms(TimeStamp *ts, utime_t ms) {
+    seconds_t sec = ts->tv_sec;
+    microseconds_t usec = ts->tv_usec;
+
+    sec += ms / 1000;
+    usec += ms * 1000;
+
+    int carry = usec < ts->tv_usec;
+    ts->tv_sec = sec + carry;
+    ts->tv_usec = usec;
+}
+
 TimeStamp timer_diff(TimeStamp* a, TimeStamp* b) {
     TimeStamp time_diff;
 

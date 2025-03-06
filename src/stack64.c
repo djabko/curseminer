@@ -9,11 +9,14 @@
 
 PriList* pl_init(int pages) {
     PriList* pl = calloc(PAGE_SIZE, pages);
+
     pl->mempool = (PriNode*) (pl + 1);
     pl->head = NULL;
     pl->tail = NULL;
     pl->count = 0;
     pl->capacity = (PAGE_SIZE * pages - sizeof(PriList)) / sizeof(PriNode);
+
+    return pl;
 }
 
 PriNode* pl_get_free(PriList *pl) {

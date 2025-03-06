@@ -98,10 +98,7 @@ void game_set_dirty(int x, int y, int v) {
     size_t offset = y * maxx + x;
     size_t s = df->stride;
 
-    byte* groups = df->groups;
-    byte* flags = df->flags;
-
-    groups[offset / s] = v;
+    df->groups[offset / s] = v;
     df->flags[offset] = v;
     df->command = 1;
 }
@@ -203,7 +200,6 @@ int update_game_world(Task* task, Stack64* stack) {
         game_flush_dirty();
     }
 
-    tk_sleep(task, 100);
     return 0;
 }
 

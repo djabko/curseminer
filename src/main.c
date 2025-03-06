@@ -54,19 +54,19 @@ int tsinit = 0;
 TimeStamp last_screen_refresh;
 int jobUI (Task* task, Stack64* stack) {
     
-    static int interval = 1000 / SCREEN_REFRESH_RATE;
-    if (!tsinit || interval <= timer_diff_milisec(&TIMER_NOW, &last_screen_refresh)) {
-        last_screen_refresh = TIMER_NOW;
-        tsinit = 1;
+    last_screen_refresh = TIMER_NOW;
+    tsinit = 1;
 
-        miliseconds_t sec = TIMER_NOW.tv_sec;
-        miliseconds_t msec = TIMER_NOW.tv_usec / 1000;
-        UI_update_time(sec * 1000 + msec);
+    miliseconds_t sec = TIMER_NOW.tv_sec;
+    miliseconds_t msec = TIMER_NOW.tv_usec / 1000;
+    UI_update_time(sec * 1000 + msec);
 
-        int quit = UI_loop();
-        if (quit)
-            tk_kill(task);
-    }
+    int quit = UI_loop();
+
+    if (quit)
+        tk_kill(task);
+
+    tk_sleep(task, 1000 / SCREEN_REFRESH_RATE);
 
     return 0;
 }

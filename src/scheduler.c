@@ -27,6 +27,8 @@ Task* create_task(Task* task, int delay, int runtime, int (*func)(Task*, Stack64
     task->stack = stack;
     task->callback = callback;
     task->next = (Task*) task;
+    task->next_run.tv_sec = 0;
+    task->next_run.tv_usec = 0;
 
     if (runtime < 1) timer_never(&(task->kill_time));
     else {
@@ -95,9 +97,10 @@ Task* rq_add(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*),
         rq->tail = t;
     }
 
-    t->flags |= FLAG_RQ_NEW;
+    /*t->flags |= FLAG_RQ_NEW;
     if (rq->count == 0)
         t->flags |= FLAG_RQ_BIT;
+        */
 
     rq->count++;
     return t;
@@ -157,11 +160,9 @@ void tk_sleep(Task* task, unsigned int milliseconds) {
 
     TimeStamp* ts = &(task->next_run);
     gettimeofday(ts, NULL);
-    ts->tv_sec += milliseconds / 1000;
-    ts->tv_usec += 1000 * (milliseconds % 100); 
+    timer_add_ms(ts, milliseconds);
 
     task->flags |= FLAG_RQ_SLEEPING;
-
     ll_insert(g_sleeping_tasks, task);
 }
 
@@ -237,20 +238,21 @@ RunQueue* scheduler_new_rq() {
 int wake_tasks() {
     ll_node* stk = g_sleeping_tasks->node;
     int i = 0;
-    while (stk != NULL) {
-        Task* tk = stk->data;
-        if (timer_ready(&(tk->next_run))) {
-            tk->flags &= !FLAG_RQ_SLEEPING;
-            ll_node* next = stk->next;
-            ll_rm(g_sleeping_tasks, tk);
-            stk = next;
 
-        } else {
-            stk = stk->next;
+    while (stk) {
+
+        Task* tk = stk->data;
+
+        if (tk != NULL && timer_ready(&(tk->next_run))) {
+            tk->flags &= ~FLAG_RQ_SLEEPING;
+            ll_rm(g_sleeping_tasks, tk);
         }
+
+        stk = stk->next;
 
         i++;
     }
+
     return i;
 }
 
@@ -261,7 +263,6 @@ int rq_kill_all_tasks(RunQueue* rq) {
     int count = 0;
 
     for (int i=0; i<rq->count; i++) {
-        
         if ( !(task->flags & FLAG_RQ_KILLED)) {
             tk_kill(task);
             count++;
@@ -280,10 +281,10 @@ int rqll_kill_all_tasks(ll_head* rqll) {
 
     int count = 0;
     ll_node* node = rqll->node;
-    RunQueue* rq = (RunQueue*) node->data;
 
     // Iterate all RunQueues on list
     for (int i=0; i<rqll->count; i++) {
+        RunQueue* rq = (RunQueue*) node->data;
 
         if (rq->lock) continue;
 
@@ -291,7 +292,7 @@ int rqll_kill_all_tasks(ll_head* rqll) {
         count += rq_kill_all_tasks(rq);
         rq->lock = 0;
 
-        rq = rq->next;
+        node = node->next;
     }
 
     return count;
@@ -351,6 +352,7 @@ void schedule_run(ll_head* rqll) {
             node = node->next;
         }
 
+
         timer_synchronize();
     }
 }
@@ -372,7 +374,6 @@ ll_head* ll_init(int n) {
 int ll_insert(ll_head* head, void* ptr) {
     if (ll_full(head) != 0 || ptr == NULL) return -1;
 
-
     // Find place for new_node in mempool
     ll_node* new_node = head->mempool;
     for (int i=0; i<(head->max); i++) {
@@ -391,6 +392,7 @@ int ll_insert(ll_head* head, void* ptr) {
     // Case 2: append to tail
     } else {
         head->tail->next = new_node;
+        head->tail = new_node;
     }
 
     return 0;
@@ -402,20 +404,29 @@ int ll_rm(ll_head* head, void* ptr) {
     ll_node* prev = NULL;
     ll_node* node = head->node;
     
-    while (node != ptr && node->next != NULL) {
+    // Search for node with ptr
+    while (node->data != ptr && node->next != NULL) {
         prev = node;
         node = node->next;
     }
 
+    // Case: Not found
     if (node == NULL || node->data != ptr) return 0;
+    else {
 
-    // Deallocate node
-    node->data = NULL;
+        // Remove from list
+        if (node == head->node) head->node = node->next;
+        else if (node == head->tail) {
+            prev->next = NULL;
+            head->tail = prev;
+        }
+        else  prev->next = node->next;
 
-    // Remove from list
-    if (prev == NULL) head->node = node->next;
-    else prev->next = node->next;
-    head->count--;
+        // Deallocate node
+        node->data = NULL;
+        node->next = NULL;
+        head->count--;
+    }
 
     return 1;
 }

@@ -27,6 +27,7 @@ void timer_now(TimeStamp*); // Calls gettimeofday() to retrieve current time
 int timer_ready(TimeStamp*);
 int timer_nready(TimeStamp*);
 int timer_sleep(TimeStamp*);
+void timer_add_ms(TimeStamp*, utime_t);
 TimeStamp timer_diff(TimeStamp*, TimeStamp*);
 unsigned long timer_diff_milisec(TimeStamp*, TimeStamp*);
 
