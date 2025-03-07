@@ -109,7 +109,25 @@ void cb_exit(Task* task) {
 }
 
 
+#define ITS 10
 int main(int argc, const char** argv) {
+
+    PriList *pl = pl_init(1);
+
+    for (int i = 0; i < ITS; i++) {
+        uint64_t v = abs(i - ITS/2);
+        pl_insert(pl, (void*) v, v);
+        log_debug("Inserted %lu : %lu", v, pl->head->weight);
+    }
+
+    
+    log_debug_nl();
+    for (int i = pl->count; 0 < i; i--)
+        log_debug("Popped: %d", pl_pop(pl));
+
+    return 0;
+
+
     if (argc < MIN_ARGS+1) return -1;
 
     const char *nogui_string = "-nogui";

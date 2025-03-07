@@ -5,85 +5,6 @@
 #include <stdio.h>
 
 
-/* PRIORITY LIST */
-
-PriList* pl_init(int pages) {
-    PriList* pl = calloc(PAGE_SIZE, pages);
-
-    pl->mempool = (PriNode*) (pl + 1);
-    pl->head = NULL;
-    pl->tail = NULL;
-    pl->count = 0;
-    pl->capacity = (PAGE_SIZE * pages - sizeof(PriList)) / sizeof(PriNode);
-
-    return pl;
-}
-
-PriNode* pl_get_free(PriList *pl) {
-    if (pl->count >= pl->capacity) return NULL;
-
-    PriNode *start, *mid, *end, *n;
-
-    start = pl->mempool;
-    end = start + pl->capacity;
-    n = pl->mempool + pl->count;
-    mid = n;
-
-    while (n->ptr && n < end) n++;
-    if (n->ptr) n = start;
-
-    while (n->ptr && n < mid) n++;
-    if (n->ptr) return NULL;
-
-    return n;
-}
-
-PriNode* pl_search(PriList *pl, uint64_t weight) {
-    // TODO: binary search
-
-    PriNode *n = pl->head;
-
-    while (n->next && n->weight < weight) n = n->next;
-
-    return n;
-}
-
-int pl_insert(PriList* pl, void* ptr, uint64_t weight) {
-    if (pl->count >= pl->capacity) return -1;
-    else  if (pl->count == 0) {
-        PriNode *new = pl_get_free(pl);
-        pl->head = new;
-        pl->tail = new;
-        return 0;
-    }
-
-    PriNode *prev = pl_search(pl, weight);;
-    PriNode *new = pl_get_free(pl);
-
-    if (!prev->next) pl->tail=new;
-
-    new->ptr = ptr;
-    new->weight = weight;
-    new->next = prev->next;
-    prev->next = new;
-
-    return 0;
-}
-
-void pl_remove(PriList* pl, void* ptr, uint64_t weight) {
-    PriNode *n = pl_search(pl, weight);
-
-    if (!n) return;
-
-    memset(n, 0, sizeof(PriNode));
-    pl->count--;
-}
-
-void pl_free(PriList* pl) {
-    free(pl);
-}
-
-
 /* STACK FUNCTIONS */
 
 Stack64* st_init(int capacity) {
@@ -151,6 +72,124 @@ void st_print(Stack64* st) {
     log_debug(" ]");
 }
 
+
+/* PRIORITY LIST */
+
+PriList* pl_init(int pages) {
+    PriList* pl = calloc(PAGE_SIZE, pages);
+
+    pl->mempool = (PriNode*) (pl + 1);
+    pl->head = NULL;
+    pl->tail = NULL;
+    pl->count = 0;
+    pl->capacity = (PAGE_SIZE * pages - sizeof(PriList)) / sizeof(PriNode);
+    pl->free = st_init(pl->capacity);
+
+    for (int i = 0; i < pl->capacity; i++)
+        st_push(pl->free, (uint64_t) (pl->mempool + i));
+
+    return pl;
+}
+
+PriNode* pl_get_free(PriList *pl) {
+    return (PriNode*) st_pop(pl->free);
+}
+
+PriNode* _pl_search(PriList *pl, uint64_t weight, int rprev) {
+    PriNode *prev = NULL;
+    PriNode *node = pl->head;
+
+    while (node->next && node->weight < weight) {
+        prev = node;
+        node = node->next;
+    }
+
+    return rprev ? prev : node;
+}
+
+PriNode* pl_search(PriList *pl, uint64_t weight) {
+    return _pl_search(pl, weight, 0);
+}
+
+PriNode* pl_search_prev(PriList *pl, uint64_t weight) {
+    return _pl_search(pl, weight, 1);
+}
+
+int pl_insert(PriList* pl, void* ptr, uint64_t weight) {
+    if (pl->count >= pl->capacity) return -1;
+
+    PriNode *new = pl_get_free(pl);
+
+    // New head
+    if (pl->count == 0) {
+        pl->head = new;
+        pl->tail = new;
+        new->next = NULL;
+
+    } else {
+        PriNode *prev, *next;
+        prev = pl_search_prev(pl, weight);;
+
+        // Insert after head
+        if (prev) {
+            next = prev->next;
+            prev->next = new;
+
+        // Insert at head
+        } else {
+            next = pl->head;
+            pl->head = new;
+        }
+        
+        if (!next) pl->tail = new;
+        
+        new->next = next;
+    }
+
+    new->ptr = ptr;
+    new->weight = weight;
+
+    pl->count++;
+    return 0;
+}
+
+void pl_remove(PriList* pl, void* ptr, uint64_t weight) {
+    PriNode *prev = NULL;
+    PriNode *node = pl->head;
+
+    while (node && node->ptr != ptr) {
+        prev = node;
+        node = node->next;
+    }
+
+    if (!node) return;
+
+    if (prev) prev->next = node->next;
+
+    memset(node, 0, sizeof(PriNode));
+    pl->count--;
+    st_push(pl->free, (uint64_t) node);
+}
+
+void *pl_peek(PriList *pl) {
+    return pl->head->ptr;
+}
+
+void *pl_pop(PriList *pl) {
+    PriNode *old = pl->head;
+    pl->head = old->next;
+
+    void *ptr = old->ptr;
+    memset(old, 0, sizeof(PriNode));
+    pl->count--;
+    st_push(pl->free, (uint64_t) old);
+
+    return ptr;
+}
+
+void pl_free(PriList* pl) {
+    free(pl);
+}
 
 
 /* QUEUE FUNCTIONS */

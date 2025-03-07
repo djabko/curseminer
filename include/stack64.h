@@ -5,24 +5,6 @@
 #include "stdint.h"
 
 
-/* Priority List */
-typedef struct PriNode {
-    void *ptr;
-    uint64_t weight;
-    struct PriNode *next;
-} PriNode;
-
-typedef struct {
-    PriNode *mempool, *head, *tail;
-    int count, capacity;
-} PriList;
-
-PriList* pl_init(int);
-int pl_insert(PriList*, void*, uint64_t);
-void pl_remove(PriList*, void*, uint64_t);
-void pl_free(PriList*);
-
-
 /* 8 Byte Stack */
 typedef struct {
     uint64_t *top;
@@ -37,6 +19,27 @@ int st_empty(Stack64*);
 int st_full(Stack64*);
 void st_free(Stack64*);
 void st_print(Stack64*);
+
+
+/* Priority List */
+typedef struct PriNode {
+    void *ptr;
+    uint64_t weight;
+    struct PriNode *next;
+} PriNode;
+
+typedef struct {
+    PriNode *mempool, *head, *tail;
+    Stack64 *free;
+    int count, capacity;
+} PriList;
+
+PriList* pl_init(int);
+int pl_insert(PriList*, void*, uint64_t);
+void pl_remove(PriList*, void*, uint64_t);
+void *pl_pop(PriList*);
+void *pl_peek(PriList*);
+void pl_free(PriList*);
 
 
 /* 8 Byte Queue */
