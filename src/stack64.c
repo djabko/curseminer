@@ -75,29 +75,29 @@ void st_print(Stack64* st) {
 
 /* PRIORITY LIST */
 
-PriList* pl_init(int pages) {
-    PriList* pl = calloc(PAGE_SIZE, pages);
+PQueue64* pq_init(int pages) {
+    PQueue64* pq = calloc(PAGE_SIZE, pages);
 
-    pl->mempool = (PriNode*) (pl + 1);
-    pl->head = NULL;
-    pl->tail = NULL;
-    pl->count = 0;
-    pl->capacity = (PAGE_SIZE * pages - sizeof(PriList)) / sizeof(PriNode);
-    pl->free = st_init(pl->capacity);
+    pq->mempool = (PriNode*) (pq + 1);
+    pq->head = NULL;
+    pq->tail = NULL;
+    pq->count = 0;
+    pq->capacity = (PAGE_SIZE * pages - sizeof(PQueue64)) / sizeof(PriNode);
+    pq->free = st_init(pq->capacity);
 
-    for (int i = 0; i < pl->capacity; i++)
-        st_push(pl->free, (uint64_t) (pl->mempool + i));
+    for (int i = 0; i < pq->capacity; i++)
+        st_push(pq->free, (uint64_t) (pq->mempool + i));
 
-    return pl;
+    return pq;
 }
 
-PriNode* pl_get_free(PriList *pl) {
-    return (PriNode*) st_pop(pl->free);
+PriNode* pq_get_free(PQueue64 *pq) {
+    return (PriNode*) st_pop(pq->free);
 }
 
-PriNode* _pl_search(PriList *pl, uint64_t weight, int rprev) {
+PriNode* _pq_search(PQueue64 *pq, uint64_t weight, int rprev) {
     PriNode *prev = NULL;
-    PriNode *node = pl->head;
+    PriNode *node = pq->head;
 
     while (node->next && node->weight < weight) {
         prev = node;
@@ -107,28 +107,28 @@ PriNode* _pl_search(PriList *pl, uint64_t weight, int rprev) {
     return rprev ? prev : node;
 }
 
-PriNode* pl_search(PriList *pl, uint64_t weight) {
-    return _pl_search(pl, weight, 0);
+PriNode* pq_search(PQueue64 *pq, uint64_t weight) {
+    return _pq_search(pq, weight, 0);
 }
 
-PriNode* pl_search_prev(PriList *pl, uint64_t weight) {
-    return _pl_search(pl, weight, 1);
+PriNode* pq_search_prev(PQueue64 *pq, uint64_t weight) {
+    return _pq_search(pq, weight, 1);
 }
 
-int pl_insert(PriList* pl, void* ptr, uint64_t weight) {
-    if (pl->count >= pl->capacity) return -1;
+int pq_insert(PQueue64* pq, void* ptr, uint64_t weight) {
+    if (pq->count >= pq->capacity) return -1;
 
-    PriNode *new = pl_get_free(pl);
+    PriNode *new = pq_get_free(pq);
 
     // New head
-    if (pl->count == 0) {
-        pl->head = new;
-        pl->tail = new;
+    if (pq->count == 0) {
+        pq->head = new;
+        pq->tail = new;
         new->next = NULL;
 
     } else {
         PriNode *prev, *next;
-        prev = pl_search_prev(pl, weight);;
+        prev = pq_search_prev(pq, weight);;
 
         // Insert after head
         if (prev) {
@@ -137,11 +137,11 @@ int pl_insert(PriList* pl, void* ptr, uint64_t weight) {
 
         // Insert at head
         } else {
-            next = pl->head;
-            pl->head = new;
+            next = pq->head;
+            pq->head = new;
         }
         
-        if (!next) pl->tail = new;
+        if (!next) pq->tail = new;
         
         new->next = next;
     }
@@ -149,13 +149,13 @@ int pl_insert(PriList* pl, void* ptr, uint64_t weight) {
     new->ptr = ptr;
     new->weight = weight;
 
-    pl->count++;
+    pq->count++;
     return 0;
 }
 
-void pl_remove(PriList* pl, void* ptr, uint64_t weight) {
+void pq_remove(PQueue64* pq, void* ptr, uint64_t weight) {
     PriNode *prev = NULL;
-    PriNode *node = pl->head;
+    PriNode *node = pq->head;
 
     while (node && node->ptr != ptr) {
         prev = node;
@@ -167,28 +167,28 @@ void pl_remove(PriList* pl, void* ptr, uint64_t weight) {
     if (prev) prev->next = node->next;
 
     memset(node, 0, sizeof(PriNode));
-    pl->count--;
-    st_push(pl->free, (uint64_t) node);
+    pq->count--;
+    st_push(pq->free, (uint64_t) node);
 }
 
-void *pl_peek(PriList *pl) {
-    return pl->head->ptr;
+void *pq_peek(PQueue64 *pq) {
+    return pq->head ? pq->head->ptr : NULL;
 }
 
-void *pl_pop(PriList *pl) {
-    PriNode *old = pl->head;
-    pl->head = old->next;
+void *pq_pop(PQueue64 *pq) {
+    PriNode *old = pq->head;
+    pq->head = old->next;
 
     void *ptr = old->ptr;
     memset(old, 0, sizeof(PriNode));
-    pl->count--;
-    st_push(pl->free, (uint64_t) old);
+    pq->count--;
+    st_push(pq->free, (uint64_t) old);
 
     return ptr;
 }
 
-void pl_free(PriList* pl) {
-    free(pl);
+void pq_free(PQueue64* pq) {
+    free(pq);
 }
 
 

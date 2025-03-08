@@ -41,12 +41,16 @@ void ll_free(ll_head*);
 
 
 /* Task */
+struct RunQueue;
 typedef struct Task {
     unsigned char flags, occupied, byte2, byte3;
     int (*func) (struct Task*, Stack64*);
     void (*callback) (struct Task*);
+
+    struct RunQueue *runqueue;
     Stack64 *stack;
-    TimeStamp next_run, kill_time;
+    miliseconds_t next_run, kill_time;
+
     struct Task* next;
 } Task;
 
@@ -57,15 +61,11 @@ typedef struct RunQueue {
     Task *mempool, *head, *tail;
     struct RunQueue *next;
 
-    unsigned int count, max;
+    unsigned int count, max, running;
     int lock;
 } RunQueue;
 
-
 RunQueue* rq_init();
-Task* rq_add(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*, void (*callback)(Task*));
-int rq_pop(RunQueue*);
-int rq_run(RunQueue*);
 int rq_kill_all_tasks(RunQueue*);
 
 

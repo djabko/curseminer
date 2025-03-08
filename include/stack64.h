@@ -21,7 +21,7 @@ void st_free(Stack64*);
 void st_print(Stack64*);
 
 
-/* Priority List */
+/* Priority Queue */
 typedef struct PriNode {
     void *ptr;
     uint64_t weight;
@@ -32,14 +32,14 @@ typedef struct {
     PriNode *mempool, *head, *tail;
     Stack64 *free;
     int count, capacity;
-} PriList;
+} PQueue64;
 
-PriList* pl_init(int);
-int pl_insert(PriList*, void*, uint64_t);
-void pl_remove(PriList*, void*, uint64_t);
-void *pl_pop(PriList*);
-void *pl_peek(PriList*);
-void pl_free(PriList*);
+PQueue64* pq_init(int);
+int pq_insert(PQueue64*, void*, uint64_t);
+void pq_remove(PQueue64*, void*, uint64_t);
+void *pq_pop(PQueue64*);
+void *pq_peek(PQueue64*);
+void pq_free(PQueue64*);
 
 
 /* 8 Byte Queue */

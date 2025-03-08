@@ -8,6 +8,7 @@
 #include <stack64.h>
 #include <scheduler.h>
 
+#define GAME_REFRESH_RATE 120
 
 GameContext *GAME;
 RunQueue *GAME_RUNQUEUE;
@@ -199,6 +200,8 @@ int update_game_world(Task* task, Stack64* stack) {
         flush_game_entity_cache();
         game_flush_dirty();
     }
+
+    tk_sleep(task, 1000 / GAME_REFRESH_RATE);
 
     return 0;
 }

@@ -7,8 +7,11 @@
 
 TimeStamp INIT_TIME;
 TimeStamp TIMER_NOW;
-TimeStamp last_sync, refresh_rate;
 TimeStamp TIMER_NEVER = {0, 0};
+miliseconds_t TIMER_NOW_MS;
+miliseconds_t TIMER_NEVER_MS = -1;
+
+TimeStamp last_sync, refresh_rate;
 
 void timer_init(int ips) {
     refresh_rate.tv_sec = ips / 1000000;
@@ -17,6 +20,8 @@ void timer_init(int ips) {
     timer_now(&INIT_TIME);
     timer_now(&TIMER_NOW);
     timer_now(&last_sync);
+
+    TIMER_NOW_MS = timer_to_ms(&TIMER_NOW);
 }
 
 void timer_now(TimeStamp* ts) {
@@ -93,6 +98,10 @@ int timer_sleep(TimeStamp* t) {
     return usleep(6000000 * t->tv_sec + t->tv_nsec);
 }
 
+miliseconds_t timer_to_ms(TimeStamp *ts) {
+    return ts->tv_sec * 1000 + ts->tv_usec / 1000;
+}
+
 void timer_print(TimeStamp* t) {
     static long unsigned int hours, minutes, seconds, useconds;
     hours = t->tv_sec / (60*60) % (24);
@@ -109,6 +118,7 @@ void timer_print_now() {
 void timer_synchronize() {
     static TimeStamp delta, sleepts;
     timer_now(&TIMER_NOW);
+    TIMER_NOW_MS = timer_to_ms(&TIMER_NOW);
 
     delta = timer_diff(&TIMER_NOW, &last_sync);
     sleepts = timer_diff(&refresh_rate, &delta);

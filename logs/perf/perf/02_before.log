@@ -1,21 +1,21 @@
- Performance counter stats for './curseminer':
+  Performance counter stats for './curseminer':
 
-          1,148.32 msec task-clock                       #    0.019 CPUs utilized
-             7,053      context-switches                 #    6.142 K/sec
-                29      cpu-migrations                   #   25.254 /sec
-               540      page-faults                      #  470.251 /sec
-     1,124,997,034      instructions                     #    0.87  insn per cycle
-     1,285,765,027      cycles                           #    1.120 GHz
-       250,632,007      branches                         #  218.259 M/sec
-         7,003,871      branch-misses                    #    2.79% of all branches
-                        TopdownL1                 #     13.2 %  tma_backend_bound
-                                                  #     56.3 %  tma_bad_speculation
-                                                  #     25.0 %  tma_frontend_bound
-                                                  #      5.5 %  tma_retiring
+          1,136.89 msec task-clock                       #    0.019 CPUs utilized
+             7,051      context-switches                 #    6.202 K/sec
+                28      cpu-migrations                   #   24.629 /sec
+               541      page-faults                      #  475.860 /sec
+     1,129,544,932      instructions                     #    0.90  insn per cycle
+     1,259,775,166      cycles                           #    1.108 GHz
+       252,722,655      branches                         #  222.293 M/sec
+         6,996,612      branch-misses                    #    2.77% of all branches
+                        TopdownL1                 #     11.8 %  tma_backend_bound
+                                                  #     56.5 %  tma_bad_speculation
+                                                  #     25.6 %  tma_frontend_bound
+                                                  #      6.0 %  tma_retiring
 
-      60.281575163 seconds time elapsed
+      60.267111726 seconds time elapsed
 
-       0.758951000 seconds user
-       0.378520000 seconds sys
+       0.745195000 seconds user
+       0.379373000 seconds sys
 
 

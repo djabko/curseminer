@@ -53,7 +53,6 @@ int exit_state() {
 int tsinit = 0;
 TimeStamp last_screen_refresh;
 int jobUI (Task* task, Stack64* stack) {
-    
     last_screen_refresh = TIMER_NOW;
     tsinit = 1;
 
@@ -99,7 +98,10 @@ int jobIO (Task* task, Stack64* stack) {
 
 int jobMain (Task* task, Stack64* stack) {
     if (GLOBAL_TASK_COUNT < 2) tk_kill(task);
+
     wake_tasks();
+    //TODO: put to sleep until next task needs to be woken
+
     return 0;
 }
 
@@ -111,23 +113,6 @@ void cb_exit(Task* task) {
 
 #define ITS 10
 int main(int argc, const char** argv) {
-
-    PriList *pl = pl_init(1);
-
-    for (int i = 0; i < ITS; i++) {
-        uint64_t v = abs(i - ITS/2);
-        pl_insert(pl, (void*) v, v);
-        log_debug("Inserted %lu : %lu", v, pl->head->weight);
-    }
-
-    
-    log_debug_nl();
-    for (int i = pl->count; 0 < i; i--)
-        log_debug("Popped: %d", pl_pop(pl));
-
-    return 0;
-
-
     if (argc < MIN_ARGS+1) return -1;
 
     const char *nogui_string = "-nogui";
