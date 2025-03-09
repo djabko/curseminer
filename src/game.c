@@ -64,13 +64,19 @@ void flush_game_entity_cache() {
         for (int x = 0; x < GLOBALS.view_port_maxx; x++)
             GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = 0;
 
-    qu_foreach(GAME->world->entities, Entity*, e) {
+    PriNode* n = GAME->world->entities->head;
+
+    while (n) {
+        Entity *e = (Entity*) n->ptr;
+
         if (!game_on_screen(e->x, e->y)) continue;
 
         int x = e->x - GAME->world_view_x;
         int y = e->y - GAME->world_view_y;
 
         GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = e->type->id;
+
+        n = n->next;
     }
 }
 
@@ -171,19 +177,19 @@ void init_entity_types() {
 }
 
 int update_game_world(Task* task, Stack64* stack) {
-    Queue64* entity_qu = GAME->world->entities;
+    PQueue64* entity_pq = GAME->world->entities;
 
-    Entity* end = (Entity*) qu_peek(entity_qu);;
-    Entity* e = (Entity*) qu_next(entity_qu);
+    if (entity_pq->count && entity_pq->head->weight <= TIMER_NOW_MS) {
 
-    int i = entity_qu->count;
+        while (entity_pq->head->weight <= TIMER_NOW_MS) {
+            Entity *e = (Entity*) pq_dequeue(entity_pq);
 
-    do {
-        e->controller->tick(e);
-        e = (Entity*) qu_next(entity_qu);
-        i--;
+            e->controller->tick(e);
+            e->next_tick = TIMER_NOW_MS + e->speed * 10;
 
-    } while (e != end && 0 < i);
+            pq_enqueue(entity_pq, e, e->next_tick);
+        }
+    }
 
     byte leftb = GLOBALS.player->x < GAME->world_view_x + GAME->scroll_threshold;
     byte topb = GLOBALS.player->y < GAME->world_view_y + GAME->scroll_threshold;
@@ -239,7 +245,9 @@ int game_init() {
 
     // Spawn some moving entities
     player = entity_spawn(GAME->world, GAME->entity_types + ge_player, 20, 20, ENTITY_FACING_RIGHT, 1, 0);
+    player->speed = 1;
     entity_set_keyboard_controller(player);
+
     GLOBALS.player = player;
 
     e_x = rand() % GLOBALS.view_port_maxx;

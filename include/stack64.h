@@ -35,9 +35,9 @@ typedef struct {
 } PQueue64;
 
 PQueue64* pq_init(int);
-int pq_insert(PQueue64*, void*, uint64_t);
+int pq_enqueue(PQueue64*, void*, uint64_t);
 void pq_remove(PQueue64*, void*, uint64_t);
-void *pq_pop(PQueue64*);
+void *pq_dequeue(PQueue64*);
 void *pq_peek(PQueue64*);
 void pq_free(PQueue64*);
 

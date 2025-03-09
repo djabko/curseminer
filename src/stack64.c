@@ -99,7 +99,7 @@ PriNode* _pq_search(PQueue64 *pq, uint64_t weight, int rprev) {
     PriNode *prev = NULL;
     PriNode *node = pq->head;
 
-    while (node->next && node->weight < weight) {
+    while (node && node->weight < weight) {
         prev = node;
         node = node->next;
     }
@@ -115,7 +115,7 @@ PriNode* pq_search_prev(PQueue64 *pq, uint64_t weight) {
     return _pq_search(pq, weight, 1);
 }
 
-int pq_insert(PQueue64* pq, void* ptr, uint64_t weight) {
+int pq_enqueue(PQueue64* pq, void* ptr, uint64_t weight) {
     if (pq->count >= pq->capacity) return -1;
 
     PriNode *new = pq_get_free(pq);
@@ -175,7 +175,7 @@ void *pq_peek(PQueue64 *pq) {
     return pq->head ? pq->head->ptr : NULL;
 }
 
-void *pq_pop(PQueue64 *pq) {
+void *pq_dequeue(PQueue64 *pq) {
     PriNode *old = pq->head;
     pq->head = old->next;
 

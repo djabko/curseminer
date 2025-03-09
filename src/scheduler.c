@@ -173,7 +173,7 @@ void tk_sleep(Task* task, unsigned int miliseconds) {
     task->next_run = TIMER_NOW_MS + miliseconds;
 
     task->flags |= FLAG_RQ_SLEEPING;
-    pq_insert(g_sleep_queue, task, task->next_run);
+    pq_enqueue(g_sleep_queue, task, task->next_run);
 
     // Unlink task from runqueue
 }
@@ -252,7 +252,7 @@ int wake_tasks() {
 
     int i = 0;
     while (g_sleep_queue->count && stk->next_run <= TIMER_NOW_MS) {
-        stk = pq_pop(g_sleep_queue);
+        stk = pq_dequeue(g_sleep_queue);
         stk->flags &= ~FLAG_RQ_SLEEPING;
         rq_add(stk->runqueue, stk);
         i++;
@@ -309,7 +309,7 @@ int kill_all_tasks() {
     // Force wake all tasks and kill them
     Task *stk = (Task*) pq_peek(g_sleep_queue);
     while (g_sleep_queue->count) {
-        stk = pq_pop(g_sleep_queue);
+        stk = pq_dequeue(g_sleep_queue);
 
         stk->flags &= FLAG_RQ_KILLED;
 

@@ -468,7 +468,7 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     new_world->chunk_arenas = NULL;
     new_world->entity_c = 0;
     new_world->entity_maxc = 32;
-    new_world->entities = qu_init( new_world->entity_maxc );
+    new_world->entities = pq_init( (new_world->entity_maxc * sizeof(Entity) + PAGE_SIZE) / PAGE_SIZE );
     new_world->chunk_max = chunk_max;
     new_world->chunk_mem_used = 0;
     new_world->chunk_mem_max = chunk_mem_max;
@@ -574,7 +574,7 @@ void world_setxy(World *world, int x, int y, int tid) {
 void world_free(World *world) {
     chunk_free_all(world);
     noise_free(LATTICE_2D);
-    free(world->entities);
+    pq_free(world->entities);
     free(world);
 }
 
