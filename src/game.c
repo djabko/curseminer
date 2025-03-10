@@ -69,12 +69,13 @@ void flush_game_entity_cache() {
     while (n) {
         Entity *e = (Entity*) n->ptr;
 
-        if (!game_on_screen(e->x, e->y)) continue;
+        if (game_on_screen(e->x, e->y)) {
 
-        int x = e->x - GAME->world_view_x;
-        int y = e->y - GAME->world_view_y;
+            int x = e->x - GAME->world_view_x;
+            int y = e->y - GAME->world_view_y;
 
-        GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = e->type->id;
+            GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = e->type->id;
+        }
 
         n = n->next;
     }

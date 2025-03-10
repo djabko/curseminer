@@ -62,6 +62,7 @@ RunQueue* rq_init() {
         (rq->mempool+i)->occupied = 0;
 
     rq->count = 0;
+    rq->running = 0;
     rq->lock = 0;
     rq->head = NULL;
     rq->tail = NULL;
@@ -365,7 +366,7 @@ void schedule_run(ll_head* rqll) {
             RunQueue* rq = (RunQueue*) node->data;
 
             for (int i = rq->running; 0 < i; i--)
-                rq_run(rq) == 0;
+                rq_run(rq);
 
             tasks_running += rq->count;
             node = node->next;
