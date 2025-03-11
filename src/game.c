@@ -64,10 +64,11 @@ void flush_game_entity_cache() {
         for (int x = 0; x < GLOBALS.view_port_maxx; x++)
             GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = 0;
 
-    PriNode* n = GAME->world->entities->head;
+    Heap *h = &GAME->world->entities->heap;
 
-    while (n) {
-        Entity *e = (Entity*) n->ptr;
+    int i = 0;
+    while (i < h->count) {
+        Entity *e = (Entity*) h->mempool[i].data;
 
         if (game_on_screen(e->x, e->y)) {
 
@@ -77,7 +78,7 @@ void flush_game_entity_cache() {
             GAME_ENTITY_CACHE[y * GLOBALS.view_port_maxx + x] = e->type->id;
         }
 
-        n = n->next;
+        i++;
     }
 }
 
@@ -180,9 +181,9 @@ void init_entity_types() {
 int update_game_world(Task* task, Stack64* stack) {
     PQueue64* entity_pq = GAME->world->entities;
 
-    if (entity_pq->count && entity_pq->head->weight <= TIMER_NOW_MS) {
+    if (!pq_empty(entity_pq) && _pq_peek(entity_pq, 0) <= TIMER_NOW_MS) {
 
-        while (entity_pq->head->weight <= TIMER_NOW_MS) {
+        while (_pq_peek(entity_pq, 0) <= TIMER_NOW_MS) {
             Entity *e = (Entity*) pq_dequeue(entity_pq);
 
             e->controller->tick(e);

@@ -21,24 +21,39 @@ void st_free(Stack64*);
 void st_print(Stack64*);
 
 
-/* Priority Queue */
-typedef struct PriNode {
-    void *ptr;
-    uint64_t weight;
-    struct PriNode *next;
-} PriNode;
+/* Min Heap */
+typedef struct HeapNode {
+    uint64_t weight, data;
+} HeapNode;
 
-typedef struct {
-    PriNode *mempool, *head, *tail;
-    Stack64 *free;
+typedef struct Heap {
+    HeapNode *mempool;
     int count, capacity;
+} Heap;
+
+Heap *minh_init(int pages);
+void minh_print(Heap*, char);
+int minh_insert(Heap*, uint64_t, uint64_t);
+uint64_t minh_get(Heap*, int);
+uint64_t *minh_delete(Heap*, int);
+uint64_t minh_pop(Heap*);
+
+
+/* Priority Queue */
+typedef struct PQueue64 {
+    Heap heap;
+    int (*heap_insert)(Heap*, uint64_t, uint64_t);
+    uint64_t (*heap_pop)(Heap*);
 } PQueue64;
 
 PQueue64* pq_init(int);
 int pq_enqueue(PQueue64*, void*, uint64_t);
 void pq_remove(PQueue64*, void*, uint64_t);
 void *pq_dequeue(PQueue64*);
+void *_pq_peek(PQueue64*, char);
 void *pq_peek(PQueue64*);
+int pq_empty(PQueue64*);
+int pq_full(PQueue64*);
 void pq_free(PQueue64*);
 
 

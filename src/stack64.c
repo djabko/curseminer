@@ -73,121 +73,143 @@ void st_print(Stack64* st) {
 }
 
 
+/* Min Heap Functions */
+Heap *minh_init(int pages) {
+    size_t size = (PAGE_SIZE * size) - sizeof(Heap);
+    Heap *h = calloc(size, PAGE_SIZE);
+
+    h->mempool = (HeapNode*) (h + 1);
+    h->count = 0;
+    h->capacity = size / sizeof(HeapNode);
+
+    return h;
+}
+
+void minh_print(Heap *h, char dw) {
+    _log_debug("{");
+    for (int i=0; i<h->count; i++) {
+        HeapNode *node = h->mempool + i;
+        _log_debug("%lu, ", dw ? node->data : node->weight);
+    }
+    log_debug("}");
+}
+
+int minh_insert(Heap *h, uint64_t data, uint64_t weight) {
+    if (h->count >= h->capacity) return -1;
+
+    int i = h->count++;
+    int pi = (i - 1) / 2;
+
+    HeapNode *node = h->mempool + i; 
+    node->weight = weight;
+    node->data = data;
+
+    HeapNode *parent = h->mempool + pi;
+
+    while (0 < i && weight < parent->weight) {
+        swap(node, parent);
+
+        i = pi;
+        pi = (i - 1) / 2;
+        node = parent;
+        parent = h->mempool + pi;
+    }
+
+    return 1;
+}
+
+uint64_t minh_get(Heap *h, int i) {
+    if (0 <= i && i <= h->count)
+        return h->mempool[i].data;
+
+    return 0;
+}
+
+uint64_t minh_pop(Heap *h) {
+    if (h->count <= 0) return 0;
+
+    uint64_t data = h->mempool[0].data;
+
+    swap(h->mempool, (h->mempool + h->count - 1));
+
+    h->count--;
+
+    uint64_t w = h->mempool[0].weight;
+    HeapNode *node, *child_r, *child_l, *target;
+
+    for (int i = 0; i < h->count;) {
+        int i_target, i_child_l, i_child_r;
+        i_child_l = (i * 2) + 1;
+        i_child_r = (i * 2) + 2;
+
+        node = h->mempool + i;
+        child_l = h->mempool + i_child_l;
+        child_r = h->mempool + i_child_r;
+
+        if (i_child_l >= h->count) break;
+        else if (i_child_r >= h->count) i_target = i_child_l;
+        else i_target = child_l->weight < child_r->weight ? i_child_l : i_child_r;
+
+        target = h->mempool + i_target;
+
+        if (target->weight < w) swap(node, target);
+
+        i = i_target;
+    }
+
+    return data;
+}
+
+
 /* PRIORITY LIST */
 
 PQueue64* pq_init(int pages) {
-    PQueue64* pq = calloc(PAGE_SIZE, pages);
+    size_t size = (PAGE_SIZE * pages) - sizeof(PQueue64);
+    PQueue64 *pq = calloc(pages, PAGE_SIZE);
 
-    pq->mempool = (PriNode*) (pq + 1);
-    pq->head = NULL;
-    pq->tail = NULL;
-    pq->count = 0;
-    pq->capacity = (PAGE_SIZE * pages - sizeof(PQueue64)) / sizeof(PriNode);
-    pq->free = st_init(pq->capacity);
+    pq->heap.mempool = (HeapNode*) (pq + 1);
+    pq->heap.count = 0;
+    pq->heap.capacity = size / sizeof(HeapNode);
 
-    for (int i = 0; i < pq->capacity; i++)
-        st_push(pq->free, (uint64_t) (pq->mempool + i));
+    // TODO: Max Heap
+    pq->heap_insert = minh_insert;
+    pq->heap_pop = minh_pop;
 
     return pq;
 }
 
-PriNode* pq_get_free(PQueue64 *pq) {
-    return (PriNode*) st_pop(pq->free);
-}
-
-PriNode* _pq_search(PQueue64 *pq, uint64_t weight, int rprev) {
-    PriNode *prev = NULL;
-    PriNode *node = pq->head;
-
-    while (node && node->weight < weight) {
-        prev = node;
-        node = node->next;
-    }
-
-    return rprev ? prev : node;
-}
-
-PriNode* pq_search(PQueue64 *pq, uint64_t weight) {
-    return _pq_search(pq, weight, 0);
-}
-
-PriNode* pq_search_prev(PQueue64 *pq, uint64_t weight) {
-    return _pq_search(pq, weight, 1);
-}
-
 int pq_enqueue(PQueue64* pq, void* ptr, uint64_t weight) {
-    if (pq->count >= pq->capacity) return -1;
-
-    PriNode *new = pq_get_free(pq);
-
-    // New head
-    if (pq->count == 0) {
-        pq->head = new;
-        pq->tail = new;
-        new->next = NULL;
-
-    } else {
-        PriNode *prev, *next;
-        prev = pq_search_prev(pq, weight);;
-
-        // Insert after head
-        if (prev) {
-            next = prev->next;
-            prev->next = new;
-
-        // Insert at head
-        } else {
-            next = pq->head;
-            pq->head = new;
-        }
-        
-        if (!next) pq->tail = new;
-        
-        new->next = next;
-    }
-
-    new->ptr = ptr;
-    new->weight = weight;
-
-    pq->count++;
-    return 0;
+    return pq->heap_insert(&pq->heap, (uint64_t) ptr, weight);
 }
 
 void pq_remove(PQueue64* pq, void* ptr, uint64_t weight) {
-    PriNode *prev = NULL;
-    PriNode *node = pq->head;
-
-    while (node && node->ptr != ptr) {
-        prev = node;
-        node = node->next;
-    }
-
-    if (!node) return;
-
-    if (prev) prev->next = node->next;
-
-    memset(node, 0, sizeof(PriNode));
-    pq->count--;
-    st_push(pq->free, (uint64_t) node);
+    // TODO: search for ptr and remove from heap
 }
 
-void *pq_peek(PQueue64 *pq) {
-    return pq->head ? pq->head->ptr : NULL;
+void *_pq_peek(PQueue64* pq, char dw) {
+    if (dw)
+        return (void*) pq->heap.mempool[0].data;
+
+    return (void*) pq->heap.mempool[0].weight;
+}
+
+void *pq_peek(PQueue64* pq) {
+    return _pq_peek(pq, 1);
+}
+
+int pq_empty(PQueue64* pq) {
+    return pq->heap.count == 0;
+}
+
+int pq_full(PQueue64* pq) {
+    return pq->heap.count < pq->heap.capacity;
 }
 
 void *pq_dequeue(PQueue64 *pq) {
-    PriNode *old = pq->head;
-    pq->head = old->next;
-
-    void *ptr = old->ptr;
-    memset(old, 0, sizeof(PriNode));
-    pq->count--;
-    st_push(pq->free, (uint64_t) old);
-
-    return ptr;
+    return (void*) pq->heap_pop(&pq->heap);
 }
 
-void pq_free(PQueue64* pq) {
+void pq_free(PQueue64 *pq) {
     free(pq);
 }
 

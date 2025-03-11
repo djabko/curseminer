@@ -252,7 +252,7 @@ int wake_tasks() {
     Task *stk = (Task*) pq_peek(g_sleep_queue);
 
     int i = 0;
-    while (g_sleep_queue->count && stk->next_run <= TIMER_NOW_MS) {
+    while (!pq_empty(g_sleep_queue) && stk->next_run <= TIMER_NOW_MS) {
         stk = pq_dequeue(g_sleep_queue);
         stk->flags &= ~FLAG_RQ_SLEEPING;
         rq_add(stk->runqueue, stk);
@@ -309,7 +309,7 @@ int kill_all_tasks() {
 
     // Force wake all tasks and kill them
     Task *stk = (Task*) pq_peek(g_sleep_queue);
-    while (g_sleep_queue->count) {
+    while (!pq_empty(g_sleep_queue)) {
         stk = pq_dequeue(g_sleep_queue);
 
         stk->flags &= FLAG_RQ_KILLED;
