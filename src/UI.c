@@ -43,7 +43,7 @@ Stack64* MENU_STACK = NULL;
 int LINES = 0;
 int COLS = 0;
 
-miliseconds_t TIME_MSEC = 0;
+milliseconds_t TIME_MSEC = 0;
 
 static inline char sign_of_int(int x) {
     if      (x == 0) return ' ';
@@ -424,7 +424,7 @@ void window_mgr_free() {
 
 
 /* Public functions used by other components */
-void UI_update_time(miliseconds_t msec) {
+void UI_update_time(milliseconds_t msec) {
     TIME_MSEC = msec;
 }
 

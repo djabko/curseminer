@@ -22,8 +22,6 @@ void tick_entity_behaviour(Entity* e) {
             game_world_setxy(e->x, e->y, ge_stone);
 
         case be_move:
-            int interval = e->speed * 10;
-
             if (game_on_screen(e->x, e->y))
                 gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
 

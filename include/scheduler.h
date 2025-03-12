@@ -49,7 +49,7 @@ typedef struct Task {
 
     struct RunQueue *runqueue;
     Stack64 *stack;
-    miliseconds_t next_run, kill_time;
+    milliseconds_t next_run, kill_time;
 
     struct Task* next;
 } Task;

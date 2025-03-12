@@ -50,7 +50,7 @@ PQueue64* pq_init(int);
 int pq_enqueue(PQueue64*, void*, uint64_t);
 void pq_remove(PQueue64*, void*, uint64_t);
 void *pq_dequeue(PQueue64*);
-void *_pq_peek(PQueue64*, char);
+uint64_t _pq_peek(PQueue64*, char);
 void *pq_peek(PQueue64*);
 int pq_empty(PQueue64*);
 int pq_full(PQueue64*);

@@ -186,15 +186,15 @@ void pq_remove(PQueue64* pq, void* ptr, uint64_t weight) {
     // TODO: search for ptr and remove from heap
 }
 
-void *_pq_peek(PQueue64* pq, char dw) {
+uint64_t _pq_peek(PQueue64* pq, char dw) {
     if (dw)
-        return (void*) pq->heap.mempool[0].data;
+        return pq->heap.mempool[0].data;
 
-    return (void*) pq->heap.mempool[0].weight;
+    return pq->heap.mempool[0].weight;
 }
 
 void *pq_peek(PQueue64* pq) {
-    return _pq_peek(pq, 1);
+    return (void*) _pq_peek(pq, 1);
 }
 
 int pq_empty(PQueue64* pq) {

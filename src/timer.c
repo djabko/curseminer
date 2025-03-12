@@ -8,8 +8,8 @@
 TimeStamp INIT_TIME;
 TimeStamp TIMER_NOW;
 TimeStamp TIMER_NEVER = {0, 0};
-miliseconds_t TIMER_NOW_MS;
-miliseconds_t TIMER_NEVER_MS = -1;
+milliseconds_t TIMER_NOW_MS;
+milliseconds_t TIMER_NEVER_MS = -1;
 
 TimeStamp last_sync, refresh_rate;
 
@@ -62,7 +62,7 @@ TimeStamp timer_diff(TimeStamp* a, TimeStamp* b) {
     return time_diff;
 }
 
-unsigned long timer_diff_milisec(TimeStamp* a, TimeStamp* b) {
+unsigned long timer_diff_millisec(TimeStamp* a, TimeStamp* b) {
     unsigned long diff = 0;
 
     seconds_t asec = a->tv_sec;
@@ -98,7 +98,7 @@ int timer_sleep(TimeStamp* t) {
     return usleep(6000000 * t->tv_sec + t->tv_nsec);
 }
 
-miliseconds_t timer_to_ms(TimeStamp *ts) {
+milliseconds_t timer_to_ms(TimeStamp *ts) {
     return ts->tv_sec * 1000 + ts->tv_usec / 1000;
 }
 

@@ -3,6 +3,7 @@
 
 #include <stack64.h>
 #include <world.h>
+#include <scheduler.h>
 
 
 typedef struct DirtyFlags {
@@ -91,6 +92,7 @@ typedef struct GameContext {
 
 int game_init();
 void game_free();
+int game_update(Task* task, Stack64* stack);
 EntityType* game_world_getxy(int, int);
 EntityType* _game_world_getxy(int);
 int game_world_setxy(int, int, EntityTypeID);

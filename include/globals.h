@@ -31,8 +31,9 @@ typedef unsigned char byte;
 #define assert(condition) \
     if (!(condition)) {exit(-1);}
 
-#define log_assert(condition, ...)          \
+#define assert_log(condition, ...)          \
     if (!(condition)) {                     \
+        _log_debug("ERROR: ");              \
         log_debug(__VA_ARGS__);             \
         exit(-1);                           \
     }
@@ -43,7 +44,7 @@ typedef unsigned char byte;
 #define _log_debug(...)
 #define log_debug(...)
 #define assert(condition)
-#define log_assert(condition, ...)
+#define assert_log(condition, ...)
 #endif
 
 

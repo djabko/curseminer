@@ -11,7 +11,7 @@ typedef struct EntityController EntityController;
 typedef struct Entity {
     EntityType* type;
     EntityController* controller;
-    miliseconds_t next_tick;
+    milliseconds_t next_tick;
     int id, x, y, vx, vy, speed, health, facing;
 } Entity;
 

@@ -9,7 +9,7 @@
 
 #define MIN_ARGS 0
 #define UPDATE_RATE 120 // times per second
-#define SCREEN_REFRESH_RATE 120 // times per second
+#define SCREEN_REFRESH_RATE 20 // times per second
 #define KEYBOARD_EMPTY_RATE 1000000 / 2
 
 struct Globals GLOBALS = {
@@ -17,22 +17,18 @@ struct Globals GLOBALS = {
     .player = NULL
 };
 
-ll_head* RQLL = NULL;
-RunQueue* RUN_QUEUE = NULL;
+ll_head* g_runqueue_list = NULL;
+RunQueue* g_runqueue = NULL;
 
-TimeStamp quit_time;
-
-void checkifNULL(void* ptr, const char* str) {
-    if (ptr == NULL) log_debug("%s is a null pointer.\n", str);
-}
 
 void init(int nogui_mode) {
     timer_init(UPDATE_RATE);
 
-    RQLL = scheduler_init();
-    checkifNULL((void*)(
-                RUN_QUEUE = scheduler_new_rq(RQLL)), "RQ_UI");
-    
+    g_runqueue_list = scheduler_init();
+    g_runqueue = scheduler_new_rq(g_runqueue_list);
+
+    assert_log(g_runqueue_list && g_runqueue,
+            "failed to initialize main RunQueue");
 
     UI_init(nogui_mode);
     keyboard_init();
@@ -50,14 +46,10 @@ int exit_state() {
     return 0;
 }
 
-int tsinit = 0;
-TimeStamp last_screen_refresh;
-int jobUI (Task* task, Stack64* stack) {
-    last_screen_refresh = TIMER_NOW;
-    tsinit = 1;
+int job_ui (Task* task, Stack64* stack) {
+    milliseconds_t sec = TIMER_NOW.tv_sec;
+    milliseconds_t msec = TIMER_NOW.tv_usec / 1000;
 
-    miliseconds_t sec = TIMER_NOW.tv_sec;
-    miliseconds_t msec = TIMER_NOW.tv_usec / 1000;
     UI_update_time(sec * 1000 + msec);
 
     int quit = UI_loop();
@@ -70,70 +62,43 @@ int jobUI (Task* task, Stack64* stack) {
     return 0;
 }
 
-int tsinit2 = 0;
-TimeStamp last_widget_toggle;
-int jobInput (Task* task, Stack64* stack) {
-    if (!tsinit2) {
-        last_widget_toggle = TIMER_NOW;
-        tsinit2 = 1;
-    }
-
+milliseconds_t last_widget_toggle = 0;
+int job_input (Task* task, Stack64* stack) {
     keyboard_poll();
 
     if (kb_down(KB_Q))
         tk_kill(task);
 
-    else if (kb_down(KB_G) && 350 < timer_diff_milisec(&TIMER_NOW, &last_widget_toggle))
-        {
+    else if (kb_down(KB_G) && TIMER_NOW_MS <= last_widget_toggle + 350) {
         UI_toggle_widgetwin();
-        last_widget_toggle = TIMER_NOW;
-        }
+        last_widget_toggle = TIMER_NOW_MS;
+    }
 
     return 0;
 }
-
-int jobIO (Task* task, Stack64* stack) {
-    return 0;
-}
-
-int jobMain (Task* task, Stack64* stack) {
-    if (GLOBAL_TASK_COUNT < 2) tk_kill(task);
-
-    wake_tasks();
-    //TODO: put to sleep until next task needs to be woken
-
-    return 0;
-}
-
 
 void cb_exit(Task* task) {
     kill_all_tasks();
 }
 
 
-#define ITS 10
 int main(int argc, const char** argv) {
     if (argc < MIN_ARGS+1) return -1;
 
     const char *nogui_string = "-nogui";
     int nogui_mode = 0;
-    for (int i=1; i<argc; i++) if (1 < argc && 0 == strncmp(argv[i], nogui_string, 7)) nogui_mode = 1;
+
+    for (int i=1; i<argc; i++)
+        if (1 < argc)
+            if (0 == strncmp(argv[i], nogui_string, 7)) nogui_mode = 1;
 
     init(nogui_mode);
 
-    Stack64* stackUI = st_init(16);
-    Stack64* stackIn = st_init(16);
-    Stack64* stackIO = st_init(16);
+    schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
+    schedule_cb(g_runqueue, 0, 0, job_input, NULL, cb_exit);
+    schedule_cb(g_runqueue, 0, 0, game_update, NULL, cb_exit);
 
-    gettimeofday(&quit_time, NULL);
-    quit_time.tv_sec += 1;
-
-    schedule(RUN_QUEUE, 0, 0, jobMain, NULL);
-    schedule_cb(RUN_QUEUE, 0, 0, jobUI, stackUI, cb_exit);
-    schedule_cb(RUN_QUEUE, 0, 0, jobInput, stackIn, cb_exit);
-    schedule(RUN_QUEUE, 0, 1, jobIO, stackIO);
-
-    schedule_run(RQLL);
+    schedule_run(g_runqueue_list);
 
     return exit_state();
 }

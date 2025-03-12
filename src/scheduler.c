@@ -15,12 +15,14 @@ const unsigned char FLAG_RQ_NEW         = 0b01000000;
 const unsigned char FLAG_RQ_CUSTOM2     = 0b10000000;
 
 unsigned int GLOBAL_TASK_COUNT = 0;
-ll_head* DEFAULT_RQLL = NULL;
+ll_head* g_default_rqll = NULL;
 ll_head* g_dying_tasks = NULL;
 PQueue64* g_sleep_queue = NULL;
 
 
-Task* create_task(Task* task, RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
+Task* create_task(Task* task, RunQueue* rq, int delay, int runtime,
+        int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
+
     task->flags = '\0';
     task->occupied = 1;
     task->func = func;
@@ -93,7 +95,8 @@ void rq_add(RunQueue* rq, Task *tk) {
     rq->running++;
 }
 
-Task* rq_create(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
+Task* rq_create(RunQueue* rq, int delay, int runtime, int
+        (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
 
     // TODO: Allocate more memory
     if (rq == NULL || rq_full(rq)) return NULL;
@@ -192,7 +195,7 @@ ll_head* scheduler_init() {
         g_dying_tasks = ll_init(1);
     }
 
-    DEFAULT_RQLL = rqll;
+    g_default_rqll = rqll;
     return rqll;
 }
 
@@ -225,10 +228,11 @@ void scheduler_free_rqll(ll_head* rqll) {
 }
 
 
-
-// TODO: Rewrite tasks & runqueues to use ll_head
-//
-// This is a mess because rqll is ll_head and RunQueue is a separate linked list implementation; first the RunQueue is added to rqll list, then it must be added to the RunQueue list
+/* TODO: Rewrite tasks & runqueues to use ll_head
+ *  This is a mess because rqll is ll_head and RunQueue is a separate linked
+ *  list implementation; first the RunQueue is added to rqll list, then it must
+ *  be added to the RunQueue list
+ */
 RunQueue* scheduler_new_rq_(ll_head* rqll) {
 
     // 1. Insert into rqll (type ll_head)
@@ -245,7 +249,7 @@ RunQueue* scheduler_new_rq_(ll_head* rqll) {
 }
 
 RunQueue* scheduler_new_rq() {
-    return scheduler_new_rq_(DEFAULT_RQLL);
+    return scheduler_new_rq_(g_default_rqll);
 }
 
 int wake_tasks() {
@@ -282,7 +286,9 @@ int rq_kill_all_tasks(RunQueue* rq) {
     return count;
 }
 
-// TODO: Currently doesn't iterate RunQueueLists (rqll) because they are not tracked in any way other than DEFAULT_RQLL and g_sleeping_tasks
+/* TODO: Currently doesn't iterate RunQueueLists (rqll) because they are not
+ * tracked in any way other than g_default_rqll and g_sleeping_tasks
+ */
 int rqll_kill_all_tasks(ll_head* rqll) {
     if (ll_empty(rqll)) return -1;
 
@@ -290,7 +296,7 @@ int rqll_kill_all_tasks(ll_head* rqll) {
     ll_node* node = rqll->node;
 
     // Iterate all RunQueues on list
-    for (int i=0; i<rqll->count; i++) {
+    for (int i = 0; i < rqll->count; i++) {
         RunQueue* rq = (RunQueue*) node->data;
 
         if (rq->lock) continue;
@@ -317,7 +323,7 @@ int kill_all_tasks() {
         rq_add(stk->runqueue, stk);
     }
 
-    int count = rqll_kill_all_tasks(DEFAULT_RQLL);
+    int count = rqll_kill_all_tasks(g_default_rqll);
     
     return count;
 }
@@ -343,11 +349,15 @@ int kill_dying_tasks() {
 }
 
 
-int schedule(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack) {
+int schedule(RunQueue* rq, int delay, int runtime,
+        int (*func)(Task*, Stack64*), Stack64* stack) {
+
     return schedule_cb(rq, delay, runtime, func, stack, NULL);
 }
 
-int schedule_cb(RunQueue* rq, int delay, int runtime, int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
+int schedule_cb(RunQueue* rq, int delay, int runtime,
+        int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
+
     Task* t = rq_create(rq, delay, runtime, func, stack, callback);
 
     return (t != NULL) - 1;
@@ -359,6 +369,8 @@ void schedule_run(ll_head* rqll) {
 
     while (tasks_running) {
         tasks_running = 0;
+
+        wake_tasks();
 
         ll_node* node = rqll->node;
         while (node != NULL) {
