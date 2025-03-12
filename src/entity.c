@@ -22,13 +22,14 @@ void tick_entity_behaviour(Entity* e) {
             game_world_setxy(e->x, e->y, ge_stone);
 
         case be_move:
-            int interval = e->speed * 10;
+            if (game_on_screen(e->x, e->y))
+                gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
 
-            if (interval < timer_diff_milisec(&TIMER_NOW, &e->last_moved)) {
-                e->x += e->vx;
-                e->y += e->vy;
-                e->last_moved = TIMER_NOW;
-        }
+            e->x += e->vx;
+            e->y += e->vy;
+
+            if (game_on_screen(e->x, e->y))
+                gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
     }
 }
 
@@ -46,7 +47,8 @@ void default_tick(Entity* e) {
 static inline void set_entity_facing(Entity* e, int x, int y, int vx, int vy, EntityFacing direction) {
     e->facing = direction;
 
-    int id = game_world_getxy(x, y)->id;
+    int id = world_getxy(GLOBALS.game->world, x, y);
+    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, x, y);
 
     if (id == 0) {
         e->vx = vx;
@@ -176,7 +178,7 @@ void player_tick(Entity* player) {
 
 int create_default_entity_controller() {
     DEFAULT_CONTROLLER = calloc(2, sizeof(EntityController));
-    DEFAULT_CONTROLLER->behaviour_queue = qu_init(8);
+    DEFAULT_CONTROLLER->behaviour_queue = qu_init(1);
     DEFAULT_CONTROLLER->tick = default_tick;
     DEFAULT_CONTROLLER->find_path = default_find_path;
 
@@ -210,12 +212,14 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
     new_entity->speed = 20;
     new_entity->health = 10;
     new_entity->facing = face;
-    new_entity->last_moved = TIMER_NEVER;
+    new_entity->next_tick = TIMER_NOW_MS;
 
     create_default_entity_controller();
     new_entity->controller = DEFAULT_CONTROLLER;
 
-    qu_enqueue(world->entities, (uint64_t) new_entity);
+    pq_enqueue(world->entities, new_entity, TIMER_NOW_MS);
+
+    gamew_cache_set(GAME_ENTITY_CACHE, new_entity->x, new_entity->y, new_entity->type->id);
 
     return new_entity;
 }

@@ -1,6 +1,7 @@
 #include "stack64.h"
 #include "globals.h"
 
+#include <string.h>
 #include <stdio.h>
 
 
@@ -71,6 +72,146 @@ void st_print(Stack64* st) {
     log_debug(" ]");
 }
 
+
+/* Min Heap Functions */
+Heap *minh_init(int pages) {
+    size_t size = (PAGE_SIZE * size) - sizeof(Heap);
+    Heap *h = calloc(size, PAGE_SIZE);
+
+    h->mempool = (HeapNode*) (h + 1);
+    h->count = 0;
+    h->capacity = size / sizeof(HeapNode);
+
+    return h;
+}
+
+void minh_print(Heap *h, char dw) {
+    _log_debug("{");
+    for (int i=0; i<h->count; i++) {
+        HeapNode *node = h->mempool + i;
+        _log_debug("%lu, ", dw ? node->data : node->weight);
+    }
+    log_debug("}");
+}
+
+int minh_insert(Heap *h, uint64_t data, uint64_t weight) {
+    if (h->count >= h->capacity) return -1;
+
+    int i = h->count++;
+    int pi = (i - 1) / 2;
+
+    HeapNode *node = h->mempool + i; 
+    node->weight = weight;
+    node->data = data;
+
+    HeapNode *parent = h->mempool + pi;
+
+    while (0 < i && weight < parent->weight) {
+        swap(node, parent);
+
+        i = pi;
+        pi = (i - 1) / 2;
+        node = parent;
+        parent = h->mempool + pi;
+    }
+
+    return 1;
+}
+
+uint64_t minh_get(Heap *h, int i) {
+    if (0 <= i && i <= h->count)
+        return h->mempool[i].data;
+
+    return 0;
+}
+
+uint64_t minh_pop(Heap *h) {
+    if (h->count <= 0) return 0;
+
+    uint64_t data = h->mempool[0].data;
+
+    swap(h->mempool, (h->mempool + h->count - 1));
+
+    h->count--;
+
+    uint64_t w = h->mempool[0].weight;
+    HeapNode *node, *child_r, *child_l, *target;
+
+    for (int i = 0; i < h->count;) {
+        int i_target, i_child_l, i_child_r;
+        i_child_l = (i * 2) + 1;
+        i_child_r = (i * 2) + 2;
+
+        node = h->mempool + i;
+        child_l = h->mempool + i_child_l;
+        child_r = h->mempool + i_child_r;
+
+        if (i_child_l >= h->count) break;
+        else if (i_child_r >= h->count) i_target = i_child_l;
+        else i_target = child_l->weight < child_r->weight ? i_child_l : i_child_r;
+
+        target = h->mempool + i_target;
+
+        if (target->weight < w) swap(node, target);
+
+        i = i_target;
+    }
+
+    return data;
+}
+
+
+/* PRIORITY LIST */
+
+PQueue64* pq_init(int pages) {
+    size_t size = (PAGE_SIZE * pages) - sizeof(PQueue64);
+    PQueue64 *pq = calloc(pages, PAGE_SIZE);
+
+    pq->heap.mempool = (HeapNode*) (pq + 1);
+    pq->heap.count = 0;
+    pq->heap.capacity = size / sizeof(HeapNode);
+
+    // TODO: Max Heap
+    pq->heap_insert = minh_insert;
+    pq->heap_pop = minh_pop;
+
+    return pq;
+}
+
+int pq_enqueue(PQueue64* pq, void* ptr, uint64_t weight) {
+    return pq->heap_insert(&pq->heap, (uint64_t) ptr, weight);
+}
+
+void pq_remove(PQueue64* pq, void* ptr, uint64_t weight) {
+    // TODO: search for ptr and remove from heap
+}
+
+uint64_t _pq_peek(PQueue64* pq, char dw) {
+    if (dw)
+        return pq->heap.mempool[0].data;
+
+    return pq->heap.mempool[0].weight;
+}
+
+void *pq_peek(PQueue64* pq) {
+    return (void*) _pq_peek(pq, 1);
+}
+
+int pq_empty(PQueue64* pq) {
+    return pq->heap.count == 0;
+}
+
+int pq_full(PQueue64* pq) {
+    return pq->heap.count < pq->heap.capacity;
+}
+
+void *pq_dequeue(PQueue64 *pq) {
+    return (void*) pq->heap_pop(&pq->heap);
+}
+
+void pq_free(PQueue64 *pq) {
+    free(pq);
+}
 
 
 /* QUEUE FUNCTIONS */

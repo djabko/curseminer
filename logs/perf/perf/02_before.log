@@ -1,0 +1,21 @@
+ Performance counter stats for './curseminer':
+
+          1,003.25 msec task-clock                       #    0.017 CPUs utilized
+             7,048      context-switches                 #    7.025 K/sec
+                 5      cpu-migrations                   #    4.984 /sec
+               508      page-faults                      #  506.354 /sec
+     1,040,485,352      instructions                     #    0.93  insn per cycle
+     1,122,599,336      cycles                           #    1.119 GHz
+       226,894,853      branches                         #  226.160 M/sec
+         6,657,093      branch-misses                    #    2.93% of all branches
+                        TopdownL1                 #     16.1 %  tma_backend_bound
+                                                  #     53.0 %  tma_bad_speculation
+                                                  #     22.8 %  tma_frontend_bound
+                                                  #      8.1 %  tma_retiring
+
+      60.279439867 seconds time elapsed
+
+       0.648824000 seconds user
+       0.335892000 seconds sys
+
+

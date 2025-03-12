@@ -19,7 +19,7 @@ extern unsigned int GLOBAL_TASK_COUNT;
 
 // TODO: typedef ll_head as rqll_head for clarity
 
-// TODO: move to utils.h
+// TODO: move to stack64.h
 typedef struct ll_node {
     struct ll_node *next;
     void* data; 
@@ -40,16 +40,17 @@ int ll_full(ll_head*);
 void ll_free(ll_head*);
 
 
-
-
-
 /* Task */
+struct RunQueue;
 typedef struct Task {
     unsigned char flags, occupied, byte2, byte3;
     int (*func) (struct Task*, Stack64*);
     void (*callback) (struct Task*);
+
+    struct RunQueue *runqueue;
     Stack64 *stack;
-    TimeStamp next_run, kill_time;
+    milliseconds_t next_run, kill_time;
+
     struct Task* next;
 } Task;
 
@@ -60,15 +61,11 @@ typedef struct RunQueue {
     Task *mempool, *head, *tail;
     struct RunQueue *next;
 
-    unsigned int count, max;
+    unsigned int count, max, running;
     int lock;
 } RunQueue;
 
-
 RunQueue* rq_init();
-Task* rq_add(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*, void (*callback)(Task*));
-int rq_pop(RunQueue*);
-int rq_run(RunQueue*);
 int rq_kill_all_tasks(RunQueue*);
 
 

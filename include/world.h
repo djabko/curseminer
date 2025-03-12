@@ -11,7 +11,7 @@ typedef struct EntityController EntityController;
 typedef struct Entity {
     EntityType* type;
     EntityController* controller;
-    TimeStamp last_moved;
+    milliseconds_t next_tick;
     int id, x, y, vx, vy, speed, health, facing;
 } Entity;
 
@@ -41,7 +41,7 @@ typedef struct ChunkArena {
 
 typedef struct World {
     ChunkArena *chunk_arenas;
-    Queue64 *entities; // TODO: should be a linked list
+    PQueue64 *entities;
                        
     int chunk_s, entity_c, entity_maxc, chunk_max;
     size_t chunk_mem_used, chunk_mem_stride, chunk_mem_max;

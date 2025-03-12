@@ -3,6 +3,8 @@
 
 #include <unistd.h>
 
+typedef unsigned char byte;
+
 #include "keyboard.h"
 #include "game.h"
 
@@ -11,6 +13,7 @@
 
 #define min(a, b) a <= b ? a : b
 #define max(a, b) a >= b ? a : b
+#define swap(a, b) do {typeof(*a) tmp = *a; *a = *b; *b = tmp;} while (0);
 #define foreach(ptr, e) for (typeof(ptr->mempool) e=ptr->mempool; e < ptr->mempool + ptr->count; e++)
 #define foreachn(ptr, n, e) for (typeof(ptr) e=ptr; e < ptr + n; e++)
 
@@ -25,18 +28,24 @@
     log_debug_nl();                         \
     } while (0)                                       
 
+#define assert(condition) \
+    if (!(condition)) {exit(-1);}
+
+#define assert_log(condition, ...)          \
+    if (!(condition)) {                     \
+        _log_debug("ERROR: ");              \
+        log_debug(__VA_ARGS__);             \
+        exit(-1);                           \
+    }
+
 #else
 
 #define log_debug_nl()
 #define _log_debug(...)
 #define log_debug(...)
+#define assert(condition)
+#define assert_log(condition, ...)
 #endif
-
-#define assert(condition, ...)              \
-    if (!(condition)) {                     \
-        log_debug(__VA_ARGS__);             \
-        exit(-1);                           \
-    }
 
 
 struct Globals{

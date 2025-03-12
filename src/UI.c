@@ -43,7 +43,7 @@ Stack64* MENU_STACK = NULL;
 int LINES = 0;
 int COLS = 0;
 
-miliseconds_t TIME_MSEC = 0;
+milliseconds_t TIME_MSEC = 0;
 
 static inline char sign_of_int(int x) {
     if      (x == 0) return ' ';
@@ -184,17 +184,59 @@ void draw_gamewin_nogui(window_t *gamewin) {
     }
 }
 
+//int SKIPPED_UPDATES = 0;
 void draw_gamewin(window_t *gamewin) {
     EntityType* entity;
 
-    for (int x=0; x <= gamewin->w; x++) {
-        for (int y=0; y <= gamewin->h; y++) {
+    DirtyFlags *df = GAME_DIRTY_FLAGS;
 
-            entity = game_world_getxy(x, y);
-            wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
-            mvwaddch(gamewin->win, y, x, entity->skin->character);
+    // No tiles to draw
+    if (df->command == 0) {
+        return;
+
+    // Draw only dirty tiles
+    } else if (df->command == 1) {
+
+        size_t s = df->stride;
+        int maxx = GLOBALS.view_port_maxx;
+
+        for (int i = 0; i < s; i++) {
+            if (df->groups[i]) {
+
+                for (int j = 0; j < s; j++) {
+
+                    int index = i * s + j;
+                    byte flag = df->flags[index];
+
+                    if (flag == 1) {
+
+                        int x = index % maxx;
+                        int y = index / maxx;
+
+                        entity = game_world_getxy(x, y);
+                        wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
+                        mvwaddch(gamewin->win, y, x, entity->skin->character);
+                        game_set_dirty(x, y, 0);
+                    }
+                }
+            }
         }
+
+    // Update all tiles
+    } else if (df->command == -1) {
+        for (int y=0; y < gamewin->h; y++) {
+            for (int x=0; x < gamewin->w; x++) {
+
+                entity = game_world_getxy(x, y);
+                wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
+                mvwaddch(gamewin->win, y, x, entity->skin->character);
+            }
+        }
+
+        game_flush_dirty();
     }
+
+    df->command = 0;
 
     wnoutrefresh(gamewin->win);
 }
@@ -382,7 +424,7 @@ void window_mgr_free() {
 
 
 /* Public functions used by other components */
-void UI_update_time(miliseconds_t msec) {
+void UI_update_time(milliseconds_t msec) {
     TIME_MSEC = msec;
 }
 
@@ -429,8 +471,9 @@ int UI_init(int nogui_mode) {
     window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
     window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
 
-    GLOBALS.view_port_maxx = gww - 1;
-    GLOBALS.view_port_maxy = gwh - 1;
+    GLOBALS.view_port_maxx = gww;
+    GLOBALS.view_port_maxy = gwh;
+    log_debug("maxx = %d", GLOBALS.view_port_maxx);
 
     int status = game_init();
     if (status != 0) {

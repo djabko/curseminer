@@ -5,17 +5,6 @@
 #include "stdint.h"
 
 
-/* Double Linked List */
-typedef struct Node {
-    struct Node *prev, *next;
-} Node;
-
-// TODO: implement utility functions for linked lists
-typedef struct {
-    Node *head, *tail;
-} LLHead;
-
-
 /* 8 Byte Stack */
 typedef struct {
     uint64_t *top;
@@ -30,6 +19,42 @@ int st_empty(Stack64*);
 int st_full(Stack64*);
 void st_free(Stack64*);
 void st_print(Stack64*);
+
+
+/* Min Heap */
+typedef struct HeapNode {
+    uint64_t weight, data;
+} HeapNode;
+
+typedef struct Heap {
+    HeapNode *mempool;
+    int count, capacity;
+} Heap;
+
+Heap *minh_init(int pages);
+void minh_print(Heap*, char);
+int minh_insert(Heap*, uint64_t, uint64_t);
+uint64_t minh_get(Heap*, int);
+uint64_t *minh_delete(Heap*, int);
+uint64_t minh_pop(Heap*);
+
+
+/* Priority Queue */
+typedef struct PQueue64 {
+    Heap heap;
+    int (*heap_insert)(Heap*, uint64_t, uint64_t);
+    uint64_t (*heap_pop)(Heap*);
+} PQueue64;
+
+PQueue64* pq_init(int);
+int pq_enqueue(PQueue64*, void*, uint64_t);
+void pq_remove(PQueue64*, void*, uint64_t);
+void *pq_dequeue(PQueue64*);
+uint64_t _pq_peek(PQueue64*, char);
+void *pq_peek(PQueue64*);
+int pq_empty(PQueue64*);
+int pq_full(PQueue64*);
+void pq_free(PQueue64*);
 
 
 /* 8 Byte Queue */

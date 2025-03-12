@@ -3,8 +3,29 @@
 
 #include <stack64.h>
 #include <world.h>
+#include <scheduler.h>
 
-typedef unsigned char color_t;
+
+typedef struct DirtyFlags {
+    byte *groups, *flags;
+    size_t stride, groups_used;
+    int64_t command, extra, extra2, extra3;
+} DirtyFlags;
+
+extern byte *WORLD_ENTITY_CACHE;
+extern byte *GAME_ENTITY_CACHE;
+extern DirtyFlags *GAME_DIRTY_FLAGS;
+
+int game_on_screen(int, int);
+void game_cache_set(byte*, int, int, byte);
+void gamew_cache_set(byte*, int, int, byte);
+byte game_cache_get(byte*, int, int);
+byte gamew_cache_get(byte*, int, int);
+byte game_world_dirty(int x, int y);
+void game_set_dirty(int, int, int);
+void game_flush_dirty();
+
+typedef byte color_t;
 
 typedef enum {
     DIRECTION_NULL,
@@ -63,14 +84,17 @@ typedef struct EntityType {
 typedef struct World World;
 typedef struct GameContext {
     World* world;
-    int world_view_x, world_view_y, skins_c, skins_maxc, entity_types_c, entity_types_maxc;
+    int world_view_x, world_view_y, skins_c, skins_maxc, entity_types_c,
+        entity_types_maxc, scroll_threshold;
     EntityType* entity_types;
     Skin* skins;
 } GameContext;
 
 int game_init();
 void game_free();
+int game_update(Task* task, Stack64* stack);
 EntityType* game_world_getxy(int, int);
+EntityType* _game_world_getxy(int);
 int game_world_setxy(int, int, EntityTypeID);
 GameContext* game_get_context();
 

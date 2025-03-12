@@ -72,7 +72,7 @@ void keyboard_poll() {
     KeyState* ptr_e = GLOBALS.keyboard.keys + KB_END;
 
     for (ks = ptr_s; ks < ptr_e; ks++) {
-        if (100 < timer_diff_milisec(&TIMER_NOW, &(ks->last_pressed))) {
+        if (100 < timer_diff_millisec(&TIMER_NOW, &(ks->last_pressed))) {
             ks->down = 0;
             ks->held = 0;
         }
