@@ -9,7 +9,7 @@
 #include "stack64.h"
 #include "UI.h"
 #include "game.h"
-#include "keyboard.h"
+#include "input.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
 #define MAX_TITLE 32
@@ -170,10 +170,7 @@ void draw_rt_clock(WINDOW* win, int x, int y, int r) {
 }
 
 void draw_keyboard_state(WINDOW* scr, int x, int y) {
-    for (KeyID i=KB_START+1; i<KB_END; i++) {
-        mvwprintw(scr, y, x, "%c%s", keyid_to_string(i)[0], GLOBALS.keyboard.keys[i].down ? "*" : ".");
-        x += 3;
-    }
+
 }
 
 void draw_gamewin_nogui(window_t *gamewin) {
@@ -277,9 +274,6 @@ void draw_widgetwin_rt_clock(window_t *widgetwin) {
 
     draw_rt_clock(widgetwin->win, widgetwin->w/2, widgetwin->h/2, WIDGET_WIN_R);
 
-    if (kb_down(KB_D)) WIDGET_WIN_R += .1;
-    if (kb_down(KB_A)) WIDGET_WIN_R -= .1;
-
     wnoutrefresh(widgetwin->win);
 }
 
@@ -317,11 +311,6 @@ void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*
             mvwaddch(widgetwin->win, y, x, '+');
         }
     }
-
-    if (kb_down(KB_D)) WIDGET_WIN_O += .1;
-    if (kb_down(KB_A)) WIDGET_WIN_O -= .1;
-    if (kb_down(KB_W)) WIDGET_WIN_C += .1;
-    if (kb_down(KB_S) && WIDGET_WIN_C > 1) WIDGET_WIN_C -= .1;
 
     wnoutrefresh(widgetwin->win);
 }

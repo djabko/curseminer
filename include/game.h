@@ -88,6 +88,8 @@ typedef struct GameContext {
         entity_types_maxc, scroll_threshold;
     EntityType* entity_types;
     Skin* skins;
+
+    InputEvent ev1, ev2, ev3;
 } GameContext;
 
 int game_init();

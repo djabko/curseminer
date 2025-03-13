@@ -5,7 +5,7 @@
 
 typedef unsigned char byte;
 
-#include "keyboard.h"
+#include "input.h"
 #include "game.h"
 
 /* Useful Macros */

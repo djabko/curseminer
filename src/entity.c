@@ -15,11 +15,14 @@ void tick_entity_behaviour(Entity* e) {
     switch (qu_dequeue(qu)) {
 
         case be_attack:
+            break;
 
         case be_interact:
+            break;
 
         case be_place:
             game_world_setxy(e->x, e->y, ge_stone);
+            break;
 
         case be_move:
             if (game_on_screen(e->x, e->y))
@@ -27,9 +30,12 @@ void tick_entity_behaviour(Entity* e) {
 
             e->x += e->vx;
             e->y += e->vy;
+            e->vx = 0;
+            e->vy = 0;
 
             if (game_on_screen(e->x, e->y))
                 gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+            break;
     }
 }
 
@@ -130,48 +136,6 @@ void default_find_path(Entity* e, int x, int y) {
 /* Defines player action for each tick */
 void player_tick(Entity* player) {
     Queue64* qu = player->controller->behaviour_queue;
-    int up = kb_down(KB_W);
-    int down = kb_down(KB_S);
-    int left = kb_down(KB_A);
-    int right = kb_down(KB_D);
-    int place_tile = kb_down(KB_C);
-
-    int x = 0;
-    int y = 0;
-    if (up || down || left || right) {
-        x = player->x;
-        y = player->y;
-
-        if (up && left)
-            player->controller->find_path(player, x-1, y-1);
-        else if (up && right)
-            player->controller->find_path(player, x+1, y-1);
-        else if (down && left)
-            player->controller->find_path(player, x-1, y+1);
-        else if (down && right)
-            player->controller->find_path(player, x+1, y+1);
-        else if (up)
-            player->controller->find_path(player, x+0, y-1);
-        else if (down)
-            player->controller->find_path(player, x+0, y+1);
-        else if (left)
-            player->controller->find_path(player, x-1, y+0);
-        else if (right)
-            player->controller->find_path(player, x+1, y+0);
-        else
-            log_debug("ERROR: unable to execute pathfinding for player");
-
-    } else {
-        player->vx = 0;
-        player->vy = 0;
-    }
-
-    if (place_tile) {
-        qu_enqueue(qu, be_place);
-    }
-
-    if (qu_empty(qu) && (up || down || right || left))
-        qu_enqueue(qu, be_move);
 
     tick_entity_behaviour(player);
 }

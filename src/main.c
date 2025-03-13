@@ -13,7 +13,6 @@
 #define KEYBOARD_EMPTY_RATE 1000000 / 2
 
 struct Globals GLOBALS = {
-    .keyboard = {{{-1, {0}, -1, -1}}},
     .player = NULL
 };
 
@@ -22,6 +21,7 @@ RunQueue* g_runqueue = NULL;
 
 
 void init(int nogui_mode) {
+    keyboard_init();
     timer_init(UPDATE_RATE);
 
     g_runqueue_list = scheduler_init();
@@ -31,7 +31,6 @@ void init(int nogui_mode) {
             "failed to initialize main RunQueue");
 
     UI_init(nogui_mode);
-    keyboard_init();
 
     log_debug("Initialized...\n");
 }
@@ -62,25 +61,13 @@ int job_ui (Task* task, Stack64* stack) {
     return 0;
 }
 
-milliseconds_t last_widget_toggle = 0;
-int job_input (Task* task, Stack64* stack) {
-    keyboard_poll();
-
-    if (kb_down(KB_Q))
-        tk_kill(task);
-
-    else if (kb_down(KB_G) && TIMER_NOW_MS <= last_widget_toggle + 350) {
-        UI_toggle_widgetwin();
-        last_widget_toggle = TIMER_NOW_MS;
-    }
-
-    return 0;
-}
-
 void cb_exit(Task* task) {
     kill_all_tasks();
 }
 
+void main_event_handler(event_t ev) {
+    if (ev == E_KB_Q) kill_all_tasks();
+}
 
 int main(int argc, const char** argv) {
     if (argc < MIN_ARGS+1) return -1;
@@ -94,8 +81,9 @@ int main(int argc, const char** argv) {
 
     init(nogui_mode);
 
+    input_register_handler(main_event_handler);
+
     schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
-    schedule_cb(g_runqueue, 0, 0, job_input, NULL, cb_exit);
     schedule_cb(g_runqueue, 0, 0, game_update, NULL, cb_exit);
 
     schedule_run(g_runqueue_list);

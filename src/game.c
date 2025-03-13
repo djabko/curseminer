@@ -234,6 +234,25 @@ int game_update(Task* task, Stack64* stack) {
     return 0;
 }
 
+void game_event_handler(event_t ev) {
+    if (ev == E_KB_W) {
+        GLOBALS.player->vy = -1;
+        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+
+    } else if (ev == E_KB_S) {
+        GLOBALS.player->vy = +1;
+        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+
+    } else if (ev == E_KB_A) {
+        GLOBALS.player->vx = -1;
+        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+
+    } else if (ev == E_KB_D) {
+        GLOBALS.player->vx = +1;
+        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+    }
+}
+
 int game_init() {
     int status = 0;
 
@@ -270,6 +289,7 @@ int game_init() {
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
     player->speed = 1;
     entity_set_keyboard_controller(player);
+    input_register_handler(game_event_handler);
 
     GLOBALS.player = player;
 
