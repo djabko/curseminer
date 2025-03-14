@@ -234,22 +234,27 @@ int game_update(Task* task, Stack64* stack) {
     return 0;
 }
 
-void game_event_handler(event_t ev) {
-    if (ev == E_KB_W) {
+void game_event_handler(InputEvent *ev) {
+    Queue64 *bq = GLOBALS.player->controller->behaviour_queue;
+
+    if (ev->id == E_KB_W) {
         GLOBALS.player->vy = -1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        qu_enqueue(bq, be_move);
 
-    } else if (ev == E_KB_S) {
+    } else if (ev->id == E_KB_S) {
         GLOBALS.player->vy = +1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        qu_enqueue(bq, be_move);
 
-    } else if (ev == E_KB_A) {
+    } else if (ev->id == E_KB_A) {
         GLOBALS.player->vx = -1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        qu_enqueue(bq, be_move);
 
-    } else if (ev == E_KB_D) {
+    } else if (ev->id == E_KB_D) {
         GLOBALS.player->vx = +1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        qu_enqueue(bq, be_move);
+
+    } else if (ev->id == E_KB_C) {
+        qu_enqueue(bq, be_place);
     }
 }
 

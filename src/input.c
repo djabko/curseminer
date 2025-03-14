@@ -11,59 +11,73 @@
 #include "UI.h"
 #include "input.h"
 
-event_t map_key_to_event(int key) {
-    event_t ev;
+event_t NCURSES_MAPPING[] = {};
+
+void ncurses_map_event(InputEvent *ev, int key) {
+    event_type_t type = E_TYPE_KB;
+    event_state_t state = ES_DOWN;
+    event_mods_t mods = 0;
+    event_t id = 0;
+
+    if ('A' <= key && key <= 'Z') {
+        mods |= E_MOD_0;
+        key += ' ';
+    }
 
     switch (key) {
         case 'w':
-            ev = E_KB_W;
+            id = E_KB_W;
             break;
         case 'a':
-            ev = E_KB_A;
+            id = E_KB_A;
             break;
         case 'd':
-            ev = E_KB_D;
+            id = E_KB_D;
             break;
         case 's':
-            ev = E_KB_S;
+            id = E_KB_S;
+            break;
+        case 'c':
+            id = E_KB_C;
             break;
         case 'g':
-            ev = E_KB_G;
+            id = E_KB_G;
             break;
         case 'q':
-            ev = E_KB_Q;
+            id = E_KB_Q;
             break;
         default:
-            return 0;
+            id = E_NULL;
     }
 
-    return ev;
+    ev->type = type;
+    ev->state = state;
+    ev->mods = mods;
+    ev->id = id;
 }
 
-void handle_event(int signo) {
+void handle_event_ncurses(int signo) {
     char key = getch();
 
-    event_t ev = map_key_to_event(key);
-    Keyboard *kb = &GLOBALS.keyboard;
+    InputEvent ev;
+    ncurses_map_event(&ev, key);
 
-    for (int i = 0; i < kb->handler_c; i++)
-        kb->handlers[i](ev);
+    InputHandler *ih = &GLOBALS.keyboard;
 
+    for (int i = 0; i < ih->handler_c; i++)
+        ih->handlers[i](&ev);
 }
 
-int input_register_handler(void (*func)(event_t)) {
-    Keyboard *kb = &GLOBALS.keyboard;
+int input_register_handler(void (*func)(InputEvent*)) {
+    InputHandler *ih = &GLOBALS.keyboard;
 
-    if (kb->handler_c >= MAX_INPUT_HANDLERS) return -1;
+    if (ih->handler_c >= MAX_INPUT_HANDLERS) return -1;
 
-    kb->handlers[ kb->handler_c++ ] = func;
+    ih->handlers[ ih->handler_c++ ] = func;
 }
 
-void keyboard_init() {
-
-    GLOBALS.keyboard.handler_c = 0;
-
-    void (*event_handler) = handle_event;
+int input_init_ncurses() {
+    void (*event_handler) = handle_event_ncurses;
 
     struct sigaction sa;
     sa.sa_handler = event_handler;
@@ -74,5 +88,20 @@ void keyboard_init() {
     int flags = fcntl(STDIN_FILENO, F_GETFL);
     fcntl(STDIN_FILENO, F_SETFL, flags | O_ASYNC);
     fcntl(STDIN_FILENO, F_SETOWN, getpid());
+}
+
+void input_init(game_frontent_t frontend) {
+
+    GLOBALS.keyboard.handler_c = 0;
+
+    switch (frontend) {
+
+        case GAME_FRONTEND_NCURSES:
+            input_init_ncurses();
+            break;
+
+        default:
+            log_debug("ERROR: invalid input frontend provided: %d", frontend);
+    }
 }
 

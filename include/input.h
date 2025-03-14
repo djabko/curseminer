@@ -6,23 +6,34 @@
 #include "timer.h"
 
 typedef enum {
+    GAME_FRONTEND_NCURSES
+} game_frontent_t;
+
+typedef enum {
+    E_TYPE_NULL,
+    E_TYPE_KB,
+    E_TYPE_MS,
+    E_TYPE_END,
+} event_type_t;
+
+typedef enum {
     ES_UP,
     ES_DOWN,
 } event_state_t;
 
 typedef enum {
-    E_MOD_0 =  0,
-    E_MOD_1 =  1,
-    E_MOD_2 =  2,
-    E_MOD_3 =  4,
-    E_MOD_4 =  8,
-    E_MOD_5 = 16,
-    E_MOD_6 = 32,
-    E_MOD_7 = 64,
-} event_mod_t;
+    E_MOD_0 =   1,
+    E_MOD_1 =   2,
+    E_MOD_2 =   4,
+    E_MOD_3 =   8,
+    E_MOD_4 =  16,
+    E_MOD_5 =  32,
+    E_MOD_6 =  64,
+    E_MOD_7 = 128,
+} event_mods_t;
 
 typedef enum {
-    E_START,
+    E_NULL,
     E_KB_UP,
     E_KB_DOWN,
     E_KB_LEFT,
@@ -42,20 +53,20 @@ typedef enum {
 } event_t;
 
 typedef struct {
-    milliseconds_t start, end;
     event_t id;
-    event_t state;
-    event_mod_t mod;
-    short repeat, extra;
+    event_type_t type;
+    event_state_t state;
+    event_mods_t mods;
 } InputEvent;
 
 #define MAX_INPUT_HANDLERS 16
 typedef struct {
-    void (*handlers[MAX_INPUT_HANDLERS])(event_t);
+    void (*handlers[MAX_INPUT_HANDLERS])(InputEvent*);
     int handler_c;
-} Keyboard;
+} InputHandler;
 
-void keyboard_init();
-int input_register_handler(void (*)(event_t));
+void input_init(game_frontent_t);
+int input_register_handler(void (*)(InputEvent*));
+void map_input(InputEvent*, void (*)()); // Replace multiple handlers with one handler and a jump table
 
 #endif

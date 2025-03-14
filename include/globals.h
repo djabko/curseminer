@@ -50,7 +50,7 @@ typedef unsigned char byte;
 
 struct Globals{
     int view_port_maxx, view_port_maxy;
-    Keyboard keyboard;
+    InputHandler keyboard;
     Entity* player;
     GameContext* game;
 };

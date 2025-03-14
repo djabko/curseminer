@@ -21,7 +21,7 @@ RunQueue* g_runqueue = NULL;
 
 
 void init(int nogui_mode) {
-    keyboard_init();
+    input_init(GAME_FRONTEND_NCURSES);
     timer_init(UPDATE_RATE);
 
     g_runqueue_list = scheduler_init();
@@ -65,8 +65,8 @@ void cb_exit(Task* task) {
     kill_all_tasks();
 }
 
-void main_event_handler(event_t ev) {
-    if (ev == E_KB_Q) kill_all_tasks();
+void main_event_handler(InputEvent *ev) {
+    if (ev->id == E_KB_Q) kill_all_tasks();
 }
 
 int main(int argc, const char** argv) {
