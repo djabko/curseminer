@@ -1,9 +1,9 @@
 #ifndef ENTITY_HEADER
 #define ENTITY_HEADER
 
-#include <stack64.h>
-#include <game.h>
-#include <world.h>
+#include "stack64.h"
+#include "game.h"
+#include "world.h"
 
 typedef enum {
     be_move,

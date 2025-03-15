@@ -206,7 +206,7 @@ void draw_gamewin(window_t *gamewin) {
                 for (int j = 0; j < s; j++) {
 
                     int index = i * s + j;
-                    byte flag = df->flags[index];
+                    byte_t flag = df->flags[index];
 
                     if (flag == 1) {
 
@@ -462,9 +462,9 @@ int UI_init(int nogui_mode) {
     window_t *gamewin, *uiwin;
 
     window_mgr_init(4);
-    gamewin    = window_mgr_add(NULL, gwx, gwy, gww, gwh, "Game", ge_player);
-    uiwin      = window_mgr_add(NULL, uwx, uwy, uww, uwh, "UI", ge_diamond);
-    g_widgetwin  = window_mgr_add(gamewin, gwx+2, gwy+2, gww, gwh, "Widget", ge_redore);
+    gamewin    = window_mgr_add(NULL, gwx, gwy, gww, gwh, "Game", ENTITY_PLAYER);
+    uiwin      = window_mgr_add(NULL, uwx, uwy, uww, uwh, "UI", ENTITY_DIAMOND);
+    g_widgetwin  = window_mgr_add(gamewin, gwx+2, gwy+2, gww, gwh, "Widget", ENTITY_REDORE);
 
     window_insert_draw_func(gamewin,        nogui_mode ? draw_gamewin_nogui     : draw_gamewin);
     window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);

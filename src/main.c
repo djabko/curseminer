@@ -78,7 +78,7 @@ int job_input (Task* task, Stack64* stack) {
 }
 
 void cb_exit(Task* task) {
-    kill_all_tasks();
+    tk_kill_all();
 }
 
 

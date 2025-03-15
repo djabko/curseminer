@@ -1,18 +1,18 @@
+#include <sys/time.h>
+#include <stdio.h>
+
+#include "globals.h"
 #include <scheduler.h>
-#include <globals.h>
-
-#include "sys/time.h"
-#include "stdio.h"
 
 
-const unsigned char FLAG_RQ_BIT         = 0b00000001;
-const unsigned char FLAG_RQ_KILLED      = 0b00000010;
-const unsigned char FLAG_RQ_SLEEPING    = 0b00000100;
-const unsigned char FLAG_RQ_RAN         = 0b00001000;
-const unsigned char FLAG_RQ_CHANGED     = 0b00010000;
-const unsigned char FLAG_RQ_PARAMS      = 0b00100000;
-const unsigned char FLAG_RQ_NEW         = 0b01000000;
-const unsigned char FLAG_RQ_CUSTOM2     = 0b10000000;
+const unsigned char RQ_FLAG_BIT         = 0b00000001;
+const unsigned char RQ_FLAG_KILLED      = 0b00000010;
+const unsigned char RQ_FLAG_SLEEPING    = 0b00000100;
+const unsigned char RQ_FLAG_RAN         = 0b00001000;
+const unsigned char RQ_FLAG_CHANGED     = 0b00010000;
+const unsigned char RQ_FLAG_PARAMS      = 0b00100000;
+const unsigned char RQ_FLAG_NEW         = 0b01000000;
+const unsigned char RQ_FLAG_CUSTOM2     = 0b10000000;
 
 unsigned int GLOBAL_TASK_COUNT = 0;
 ll_head* g_default_rqll = NULL;
@@ -50,7 +50,7 @@ void rm_task(Task* task) {
 }
 
 int tk_kill(Task* task) {
-    task->flags |= FLAG_RQ_KILLED;
+    task->flags |= RQ_FLAG_KILLED;
     return 0;
 }
 
@@ -149,7 +149,7 @@ int rq_run(RunQueue* rq) {
 
     if (!current->occupied) return -1;
 
-    if (current->flags & FLAG_RQ_KILLED) {
+    if (current->flags & RQ_FLAG_KILLED) {
 
         if (current->callback)
             current->callback(current);
@@ -161,7 +161,7 @@ int rq_run(RunQueue* rq) {
     current->func(current, current->stack);
 
     // Unlink from other tasks if sleeping
-    if (current->flags & FLAG_RQ_SLEEPING) rq_pop(rq);
+    if (current->flags & RQ_FLAG_SLEEPING) rq_pop(rq);
     else {
         rq->head = rq->head->next;
         rq->tail->next = current;
@@ -176,7 +176,7 @@ void tk_sleep(Task* task, unsigned int miliseconds) {
 
     task->next_run = TIMER_NOW_MS + miliseconds;
 
-    task->flags |= FLAG_RQ_SLEEPING;
+    task->flags |= RQ_FLAG_SLEEPING;
     pq_enqueue(g_sleep_queue, task, task->next_run);
 
     // Unlink task from runqueue
@@ -258,7 +258,7 @@ int wake_tasks() {
     int i = 0;
     while (!pq_empty(g_sleep_queue) && stk->next_run <= TIMER_NOW_MS) {
         stk = pq_dequeue(g_sleep_queue);
-        stk->flags &= ~FLAG_RQ_SLEEPING;
+        stk->flags &= ~RQ_FLAG_SLEEPING;
         rq_add(stk->runqueue, stk);
         i++;
     }
@@ -274,7 +274,7 @@ int rq_kill_all_tasks(RunQueue* rq) {
     int running = rq->running;
 
     for (int i=0; i < running; i++) {
-        if ( !(task->flags & FLAG_RQ_KILLED) ) {
+        if ( !(task->flags & RQ_FLAG_KILLED) ) {
             tk_kill(task);
             count++;
         }
@@ -289,7 +289,7 @@ int rq_kill_all_tasks(RunQueue* rq) {
 /* TODO: Currently doesn't iterate RunQueueLists (rqll) because they are not
  * tracked in any way other than g_default_rqll and g_sleeping_tasks
  */
-int rqll_kill_all_tasks(ll_head* rqll) {
+int kill_rqll(ll_head* rqll) {
     if (ll_empty(rqll)) return -1;
 
     int count = 0;
@@ -311,19 +311,19 @@ int rqll_kill_all_tasks(ll_head* rqll) {
     return count;
 }
 
-int kill_all_tasks() {
+int tk_kill_all() {
 
     // Force wake all tasks and kill them
     Task *stk = (Task*) pq_peek(g_sleep_queue);
     while (!pq_empty(g_sleep_queue)) {
         stk = pq_dequeue(g_sleep_queue);
 
-        stk->flags &= FLAG_RQ_KILLED;
+        stk->flags &= RQ_FLAG_KILLED;
 
         rq_add(stk->runqueue, stk);
     }
 
-    int count = rqll_kill_all_tasks(g_default_rqll);
+    int count = kill_rqll(g_default_rqll);
     
     return count;
 }

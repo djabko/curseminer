@@ -19,7 +19,7 @@ void tick_entity_behaviour(Entity* e) {
         case be_interact:
 
         case be_place:
-            game_world_setxy(e->x, e->y, ge_stone);
+            game_world_setxy(e->x, e->y, ENTITY_STONE);
 
         case be_move:
             if (game_on_screen(e->x, e->y))

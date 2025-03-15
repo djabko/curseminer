@@ -1,8 +1,8 @@
 #ifndef WORLD_HEADER
 #define WORLD_HEADER
 
-#include <game.h>
-#include <timer.h>
+#include "game.h"
+#include "timer.h"
 
 typedef struct EntityType EntityType;
 typedef struct EntityController EntityController;

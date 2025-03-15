@@ -143,7 +143,7 @@ Chunk *chunk_get_free(World *world) {
 }
 
 int chunk_populate_void(double noise_sample) {
-    return ge_air;
+    return ENTITY_AIR;
 }
 
 int chunk_populate_plains(double noise_sample) {
@@ -156,10 +156,10 @@ int chunk_populate_plains(double noise_sample) {
 
     int id = 0;
 
-    if (v <= p) id = ge_air;
-    else if (v <= p+e*.5) id = ge_stone;
-    else if (v <= p+e*.6) id = ge_iron;
-    else id = ge_redore;
+    if (v <= p) id = ENTITY_AIR;
+    else if (v <= p+e*.5) id = ENTITY_STONE;
+    else if (v <= p+e*.6) id = ENTITY_IRON;
+    else id = ENTITY_REDORE;
 
     return id;
 }
@@ -183,12 +183,12 @@ int chunk_populate_mountains(double noise_sample) {
 
     int id = 0;
 
-    if (v <= p) id = ge_air;
-    else if (v <= p+e*.4) id = ge_stone;
-    else if (v <= p+e*.6) id = ge_iron;
-    else if (v <= p+e*.7) id = ge_redore;
-    else if (v <= p+e*.8) id = ge_gold;
-    else if (v <= p+e*.9) id = ge_diamond;
+    if (v <= p) id = ENTITY_AIR;
+    else if (v <= p+e*.4) id = ENTITY_STONE;
+    else if (v <= p+e*.6) id = ENTITY_IRON;
+    else if (v <= p+e*.7) id = ENTITY_REDORE;
+    else if (v <= p+e*.8) id = ENTITY_GOLD;
+    else if (v <= p+e*.9) id = ENTITY_DIAMOND;
 
     return id;
 }
@@ -202,12 +202,12 @@ int chunk_populate_mine(double noise_sample) {
 
     int id = 0;
 
-    if (v <= p) id = ge_air;
-    else if (v <= p+e*.5) id = ge_stone;
-    else if (v <= p+e*.75) id = ge_iron;
-    else if (v <= p+e*.87) id = ge_redore;
-    else if (v <= p+e*.98) id = ge_gold;
-    else if (v <= p+e*.99) id = ge_diamond;
+    if (v <= p) id = ENTITY_AIR;
+    else if (v <= p+e*.5) id = ENTITY_STONE;
+    else if (v <= p+e*.75) id = ENTITY_IRON;
+    else if (v <= p+e*.87) id = ENTITY_REDORE;
+    else if (v <= p+e*.98) id = ENTITY_GOLD;
+    else if (v <= p+e*.99) id = ENTITY_DIAMOND;
 
     return id;
 }
@@ -542,7 +542,7 @@ unsigned char world_getxy(World* world, int x, int y) {
 
     int ret = chunk->data[x * chunk_s + y];
 
-    if (ret < 0 || ge_end <= ret) {
+    if (ret < 0 || ENTITY_END <= ret) {
 
         log_debug("FATAL ERROR");
     }
@@ -560,7 +560,7 @@ void world_setxy(World *world, int x, int y, int tid) {
         log_debug("ERROR: attempting to set nonexistent chunk at (%d,%d) to entity ID: %d", x, y, tid);
         return;
     }
-    else if (ge_end <= tid) {
+    else if (ENTITY_END <= tid) {
         log_debug("ERROR: attempting to set (%d,%d) to invalid entity ID: %d", x, y, tid);
         return;
     }

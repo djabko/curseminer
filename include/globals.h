@@ -3,10 +3,7 @@
 
 #include <unistd.h>
 
-typedef unsigned char byte;
-
-#include "keyboard.h"
-#include "game.h"
+typedef unsigned char byte_t;
 
 /* Useful Macros */
 #define PAGE_SIZE getpagesize()
@@ -47,6 +44,9 @@ typedef unsigned char byte;
 #define assert_log(condition, ...)
 #endif
 
+
+#include "keyboard.h"
+#include "game.h"
 
 struct Globals{
     int view_port_maxx, view_port_maxy;
