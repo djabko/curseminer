@@ -342,7 +342,7 @@ Chunk *chunk_nearest(World *world, int x, int y) {
 
     HashTableEntry *start, *end, *e;
     start = CHUNK_HASHTABLE->entries;
-    end = start + CHUNK_HASHTABLE->max;
+    end = start + CHUNK_HASHTABLE->capacity;
 
     while (start < end && start->key == -1) start++;
     if (start == end) return NULL;

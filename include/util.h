@@ -26,11 +26,11 @@ typedef struct NoiseLattice {
 } NoiseLattice;
 
 NoiseLattice *noise_init(int count, int dimensions, int length, double (*smoothing_func)(double));
+void noise_free(NoiseLattice *noise);
 double value_noise_1D(NoiseLattice *lattice, double x);
 double value_noise_2D(NoiseLattice *lattice, double x, double y);
 double perlin_noise_1D(NoiseLattice *lattice, double x);
 double perlin_noise_2D(NoiseLattice *lattice, double x, double y);
 double perlin_noise_2D_var(NoiseLattice *lattice, double x, double y);
-inline void noise_free(NoiseLattice *noise);
 
 #endif

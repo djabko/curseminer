@@ -7,6 +7,8 @@ typedef unsigned char byte_t;
 
 /* Useful Macros */
 #define PAGE_SIZE getpagesize()
+#define capacity_from_pages(pages, offset, stride) \
+    (PAGE_SIZE * pages - offset) / stride
 
 #define min(a, b) a <= b ? a : b
 #define max(a, b) a >= b ? a : b

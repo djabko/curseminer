@@ -80,7 +80,7 @@ int file_read(Task* task, Stack64* stack) {
 }
 
 int await_file_read(Task* task, Stack64* stack) {
-    struct aiocb* cb = (struct aiocb*) *(stack->top);
+    struct aiocb* cb = (struct aiocb*) *(stack->head);
 
     switch (aio_error(cb)) {
         case 0:

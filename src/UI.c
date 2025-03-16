@@ -148,9 +148,9 @@ void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, doub
 void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     seconds_t time_sec = TIME_MSEC / 1000;
 
-    utime_t sc = time_sec % 60;
-    utime_t mn = time_sec % (60*60);
-    utime_t hr = (time_sec) % (60*60*12);
+    time_t sc = time_sec % 60;
+    time_t mn = time_sec % (60*60);
+    time_t hr = (time_sec) % (60*60*12);
 
     double angleS = sc * (2*M_PI/60) - (M_PI/2);
     double angleM = mn * (2*M_PI/(60*60)) - (M_PI/2);
