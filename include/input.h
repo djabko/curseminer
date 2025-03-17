@@ -22,15 +22,16 @@ typedef enum {
 } event_state_t;
 
 typedef enum {
-    E_MOD_0 =   1,
-    E_MOD_1 =   2,
-    E_MOD_2 =   4,
-    E_MOD_3 =   8,
-    E_MOD_4 =  16,
-    E_MOD_5 =  32,
-    E_MOD_6 =  64,
-    E_MOD_7 = 128,
-} event_mods_t;
+    E_NOMOD = 0,
+    E_MOD_0,
+    E_MOD_1,
+    E_MOD_2,
+    E_MOD_3,
+    E_MOD_4,
+    E_MOD_5,
+    E_MOD_6,
+    E_MOD_7,
+} event_mod_t;
 
 typedef enum {
     E_NULL,
@@ -56,17 +57,18 @@ typedef struct {
     event_t id;
     event_type_t type;
     event_state_t state;
-    event_mods_t mods;
+    event_mod_t mods; // Bitmap
 } InputEvent;
 
 #define MAX_INPUT_HANDLERS 16
 typedef struct {
-    void (*handlers[MAX_INPUT_HANDLERS])(InputEvent*);
-    int handler_c;
+    void (*handlers[E_END])(InputEvent*);
+    int count;
 } InputHandler;
 
 void input_init(game_frontent_t);
-int input_register_handler(void (*)(InputEvent*));
+int input_register_event(event_t, event_mod_t, void (*)(InputEvent*));
 void map_input(InputEvent*, void (*)()); // Replace multiple handlers with one handler and a jump table
+void print_ncurses_mapping(const char* tag);
 
 #endif

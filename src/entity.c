@@ -28,13 +28,23 @@ void tick_entity_behaviour(Entity* e) {
             if (game_on_screen(e->x, e->y))
                 gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
 
-            e->x += e->vx;
-            e->y += e->vy;
+            int nx = e->x + e->vx;
+            int ny = e->y + e->vy;
+
+            int id = world_getxy(GLOBALS.game->world, nx, ny);
+            id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, nx, ny);
+
+            if (!id) {
+                e->x += e->vx;
+                e->y += e->vy;
+            }
+
             e->vx = 0;
             e->vy = 0;
 
             if (game_on_screen(e->x, e->y))
                 gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+
             break;
     }
 }
@@ -53,16 +63,8 @@ void default_tick(Entity* e) {
 static inline void set_entity_facing(Entity* e, int x, int y, int vx, int vy, EntityFacing direction) {
     e->facing = direction;
 
-    int id = world_getxy(GLOBALS.game->world, x, y);
-    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, x, y);
-
-    if (id == 0) {
-        e->vx = vx;
-        e->vy = vy;
-    } else {
-        e->vx = 0;
-        e->vy = 0;
-    }
+    e->vx = vx;
+    e->vy = vy;
 }
 
 void default_find_path(Entity* e, int x, int y) {

@@ -15,6 +15,32 @@ byte *WORLD_ENTITY_CACHE;
 byte *GAME_ENTITY_CACHE;
 DirtyFlags *GAME_DIRTY_FLAGS;
 
+
+void game_input_move_up(InputEvent *ie) {
+    GLOBALS.player->vy = -1;
+    qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+}
+
+void game_input_move_left(InputEvent *ie) {
+    GLOBALS.player->vx = -1;
+    qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+}
+
+void game_input_move_down(InputEvent *ie) {
+    GLOBALS.player->vy = +1;
+    qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+}
+
+void game_input_move_right(InputEvent *ie) {
+    GLOBALS.player->vx = +1;
+    qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+}
+
+void game_input_tile_place(InputEvent *ie) {
+    qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
+}
+
+
 /* Helper Functions */
 int game_on_screen(int x, int y) {
     int minx = g_game->world_view_x;
@@ -294,7 +320,11 @@ int game_init() {
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
     player->speed = 1;
     entity_set_keyboard_controller(player);
-    input_register_handler(game_event_handler);
+    input_register_event(E_KB_W, E_NOMOD, game_input_move_up);
+    input_register_event(E_KB_A, E_NOMOD, game_input_move_left);
+    input_register_event(E_KB_S, E_NOMOD, game_input_move_down);
+    input_register_event(E_KB_D, E_NOMOD, game_input_move_right);
+    input_register_event(E_KB_C, E_NOMOD, game_input_tile_place);
 
     GLOBALS.player = player;
 

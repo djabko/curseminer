@@ -11,44 +11,37 @@
 #include "UI.h"
 #include "input.h"
 
-event_t NCURSES_MAPPING[] = {};
+void (*g_mapper_mod_array[E_END][E_MOD_7])(InputEvent*);
+
+void handler_stub(InputEvent *ie) {}
+
+event_t g_ncurses_mapping['z'+1];
+
+void ncurses_init_keys() {
+    for (int i = 0; i < 'Z'+1; i++) 
+        g_ncurses_mapping[i] = E_NULL;
+
+    g_ncurses_mapping['w'] = E_KB_W;
+    g_ncurses_mapping['a'] = E_KB_A;
+    g_ncurses_mapping['s'] = E_KB_S;
+    g_ncurses_mapping['d'] = E_KB_D;
+    g_ncurses_mapping['c'] = E_KB_C;
+    g_ncurses_mapping['g'] = E_KB_G;
+    g_ncurses_mapping['q'] = E_KB_Q;
+}
 
 void ncurses_map_event(InputEvent *ev, int key) {
     event_type_t type = E_TYPE_KB;
     event_state_t state = ES_DOWN;
-    event_mods_t mods = 0;
+    event_mod_t mods = 0;
     event_t id = 0;
 
     if ('A' <= key && key <= 'Z') {
-        mods |= E_MOD_0;
+        mods |= 1U << E_MOD_0;
         key += ' ';
     }
 
-    switch (key) {
-        case 'w':
-            id = E_KB_W;
-            break;
-        case 'a':
-            id = E_KB_A;
-            break;
-        case 'd':
-            id = E_KB_D;
-            break;
-        case 's':
-            id = E_KB_S;
-            break;
-        case 'c':
-            id = E_KB_C;
-            break;
-        case 'g':
-            id = E_KB_G;
-            break;
-        case 'q':
-            id = E_KB_Q;
-            break;
-        default:
-            id = E_NULL;
-    }
+    id = g_ncurses_mapping[key];
 
     ev->type = type;
     ev->state = state;
@@ -62,21 +55,16 @@ void handle_event_ncurses(int signo) {
     InputEvent ev;
     ncurses_map_event(&ev, key);
 
-    InputHandler *ih = &GLOBALS.keyboard;
-
-    for (int i = 0; i < ih->handler_c; i++)
-        ih->handlers[i](&ev);
+    g_mapper_mod_array[ev.mods][ev.id](&ev);
 }
 
-int input_register_handler(void (*func)(InputEvent*)) {
-    InputHandler *ih = &GLOBALS.keyboard;
-
-    if (ih->handler_c >= MAX_INPUT_HANDLERS) return -1;
-
-    ih->handlers[ ih->handler_c++ ] = func;
+int input_register_event(event_t id, event_mod_t mod, void (*func)(InputEvent*)) {
+    g_mapper_mod_array[mod][id] = func;
 }
 
 int input_init_ncurses() {
+    ncurses_init_keys();
+
     void (*event_handler) = handle_event_ncurses;
 
     struct sigaction sa;
@@ -92,7 +80,11 @@ int input_init_ncurses() {
 
 void input_init(game_frontent_t frontend) {
 
-    GLOBALS.keyboard.handler_c = 0;
+    for (int i = E_NOMOD; i < E_MOD_7; i++) {
+        for (int j = E_NULL; j < E_END; j++) {
+            g_mapper_mod_array[i][j] = handler_stub;
+        }
+    }
 
     switch (frontend) {
 

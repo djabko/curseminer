@@ -66,7 +66,7 @@ void cb_exit(Task* task) {
 }
 
 void main_event_handler(InputEvent *ev) {
-    if (ev->id == E_KB_Q) kill_all_tasks();
+    kill_all_tasks();
 }
 
 int main(int argc, const char** argv) {
@@ -81,7 +81,7 @@ int main(int argc, const char** argv) {
 
     init(nogui_mode);
 
-    input_register_handler(main_event_handler);
+    input_register_event(E_KB_Q, E_NOMOD, main_event_handler);
 
     schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
     schedule_cb(g_runqueue, 0, 0, game_update, NULL, cb_exit);
