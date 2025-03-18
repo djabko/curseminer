@@ -264,12 +264,19 @@ uint64_t qu_peek_tail(Queue64* qu) {
     return qu->mempool[qu->tail];
 }
 
-
 // Returns the i'th element as offset from head, or 0
 // TODO: add error handling
 uint64_t qu_get(Queue64 *qu, int i, int *err) {
     if (i < 0 || qu->count <= i) return 0;
     return qu->mempool[ qu->head + i ];
+}
+
+uint64_t qu_contains(Queue64 *qu, uint64_t target) {
+    qu_foreach(qu, uint64_t, data) {
+        if (data == target) return 1;
+    }
+
+    return 0;
 }
 
 uint64_t qu_next(Queue64* qu) {
