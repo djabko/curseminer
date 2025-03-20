@@ -62,14 +62,16 @@ void game_input_place_tile(InputEvent *ie) {
 }
 
 void game_input_spawn_chaser(InputEvent *ie) {
-    int e_x = (1 + rand()) % GLOBALS.view_port_maxx;
-    int e_y = (1 + rand()) % GLOBALS.view_port_maxy;
-    int e_s = (20 + rand()) % 150;
+    if (ie->state == ES_DOWN) {
+        int e_x = (1 + rand()) % GLOBALS.view_port_maxx;
+        int e_y = (1 + rand()) % GLOBALS.view_port_maxy;
+        int e_s = (20 + rand()) % 150;
 
-    Entity *entity = entity_spawn(g_game->world, g_game->entity_types + ge_chaser_mob,
-            e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+        Entity *entity = entity_spawn(g_game->world, g_game->entity_types + ge_chaser_mob,
+                e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
 
-    entity->speed = e_s;
+        entity->speed = e_s;
+    }
 }
 
 
@@ -347,7 +349,6 @@ int game_init() {
     int e_x, e_y;
     Entity *player, *entity;
 
-    // Spawn some moving entities
     player = entity_spawn(g_game->world, g_game->entity_types + ge_player,
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
     player->speed = 1;

@@ -63,31 +63,27 @@ void init_keys_ncurses() {
     g_ncurses_mapping_ms[ BUTTON1_RELEASED ].state = ES_UP;
     g_ncurses_mapping_ms[ BUTTON1_RELEASED ].mods = E_NOMOD;
 
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].id = E_MS_MMB;
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].type = E_TYPE_MS;
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].state = ES_UP;
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].mods = E_NOMOD;
+    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].id = E_MS_MMB;
+    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].type = E_TYPE_MS;
+    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].state = ES_UP;
+    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].mods = E_NOMOD;
 
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].id = E_MS_RMB;
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].type = E_TYPE_MS;
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].state = ES_UP;
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].mods = E_NOMOD;
+    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].id = E_MS_RMB;
+    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].type = E_TYPE_MS;
+    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].state = ES_UP;
+    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].mods = E_NOMOD;
 
 }
 
 void map_event_ncurses(InputEvent *ev, int key) {
-    event_type_t type;
-    event_t id;
-    event_mod_t mods = 0;
 
-    //log_debug("NCURSES KEY: %d", key);
+    log_debug("NCURSES KEY: %d", key);
     if (key == -103) {
         MEVENT mouse;
         if (getmouse(&mouse) != OK) log_debug("ERROR GETTING MOUSE EVENT!");
         log_debug("MOUSE BSTATE: %d", mouse.bstate);
 
-        ev->type = E_TYPE_MS;
-        ev->id = g_ncurses_mapping_kb[mouse.bstate];
+        *ev = g_ncurses_mapping_ms[mouse.bstate];
 
     } else {
         if ('A' <= key && key <= 'Z') {
@@ -122,6 +118,8 @@ void handle_kdown_ncurses(int signo) {
 
     char key = getch();
 
+    if (key == -1) return;
+
     map_event_ncurses(&ev, key);
 
     // Set timer to simulate key release after n nanoseconds
@@ -141,11 +139,10 @@ void handle_kdown_ncurses(int signo) {
         timer_settime(g_input_timer, 0, &its, NULL);
     }
 
-    /*log_debug("InputEvent: {%d, %c, %d, %d}", 
+    log_debug("InputEvent: {%d, %c, %d, %d}", 
             ev.id, ev.state==ES_UP ? 'u' : 'd', ev.type, ev.mods);
-            */
-    if (ev.type == E_TYPE_KB)
-        g_mapper_mod_array[ev.mods][ev.id](&ev);
+
+    g_mapper_mod_array[ev.mods][ev.id](&ev);
 }
 
 int input_init_ncurses() {

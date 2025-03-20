@@ -429,9 +429,10 @@ int UI_init(int nogui_mode) {
         curs_set(0);
         nodelay(stdscr, 1);
         keypad(stdscr, TRUE);
+        mouseinterval(0);
         mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);
 
-        ESCDELAY = 25;
+        ESCDELAY = 0;
 
     }
 
