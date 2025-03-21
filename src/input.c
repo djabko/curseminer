@@ -14,7 +14,7 @@
 
 #undef tv_nsec
 
-void (*g_mapper_mod_array[E_END][E_MOD_7])(InputEvent*);
+void (*g_mapper_ctx_array[E_CTX_END][E_END])(InputEvent*);
 
 void handler_stub(InputEvent *ie) {}
 
@@ -30,10 +30,7 @@ void init_keys_ncurses() {
         g_ncurses_mapping_kb[i] = E_NULL;
 
     for (int i = 0; i < BUTTON4_TRIPLE_CLICKED; i++) 
-        g_ncurses_mapping_ms[i] = (InputEvent){0, 0, 0, 0};
-
-    log_debug("MOUSE BSTATES:\nBUTTON1_PRESSED: %d\nBUTTON1_RELEASED: %d\nBUTTON2_PRESSED: %d\nBUTTON2_RELEASED: %d\nBUTTON3_PRESSED: %d\nBUTTON3_RELEASED: %d\n",
-            BUTTON1_PRESSED, BUTTON1_RELEASED, BUTTON2_PRESSED, BUTTON2_RELEASED, BUTTON3_PRESSED, BUTTON3_RELEASED);
+        g_ncurses_mapping_ms[i] = (InputEvent){0, 0, 0, 0, 0};
 
     g_ncurses_mapping_kb['w'] = E_KB_W;
     g_ncurses_mapping_kb['a'] = E_KB_A;
@@ -77,17 +74,21 @@ void init_keys_ncurses() {
 
 void map_event_ncurses(InputEvent *ev, int key) {
 
-    log_debug("NCURSES KEY: %d", key);
     if (key == -103) {
         MEVENT mouse;
         if (getmouse(&mouse) != OK) log_debug("ERROR GETTING MOUSE EVENT!");
-        log_debug("MOUSE BSTATE: %d", mouse.bstate);
 
         *ev = g_ncurses_mapping_ms[mouse.bstate];
+        uint16_t x = mouse.x;
+        uint16_t y = mouse.y;
+        uint16_t z = mouse.z;
+
+        int bits = 16;
+        ev->data = (x << (bits * 0)) + (y << (bits * 1)) + (z << (bits * 2));
 
     } else {
         if ('A' <= key && key <= 'Z') {
-            ev->mods |= 1U << E_MOD_0;
+            ev->mods |= 1U << (E_MOD_0 - 1);
             key += ' ';
         } else
             ev->mods = E_NOMOD;
@@ -108,7 +109,9 @@ void handle_kup_ncurses(int signo) {
     event_t id = qu_dequeue(g_queued_kdown);
     while (id != -1) {
         ev.id = id;
-        g_mapper_mod_array[ev.mods][ev.id](&ev);
+        event_ctx_t ctx = GLOBALS.input_context;
+
+        g_mapper_ctx_array[ctx][ev.id](&ev);
         id = qu_dequeue(g_queued_kdown);
     }
 }
@@ -132,17 +135,16 @@ void handle_kdown_ncurses(int signo) {
         struct itimerspec its;
 
         its.it_value.tv_sec = 0;
-        its.it_value.tv_nsec = 900000000;
+        its.it_value.tv_nsec = 100000000;
         its.it_interval.tv_sec = 0;
         its.it_interval.tv_nsec = 0;
 
         timer_settime(g_input_timer, 0, &its, NULL);
     }
 
-    log_debug("InputEvent: {%d, %c, %d, %d}", 
-            ev.id, ev.state==ES_UP ? 'u' : 'd', ev.type, ev.mods);
-
-    g_mapper_mod_array[ev.mods][ev.id](&ev);
+    event_ctx_t ctx = GLOBALS.input_context;
+    //log_debug("InputEvent: {%d %d %d %d} in E_CTX_%d => %p", ev.id, ev.type, ev.state, ev.mods, ctx, g_mapper_ctx_array[ctx][ev.id]);
+    g_mapper_ctx_array[ctx][ev.id](&ev);
 }
 
 int input_init_ncurses() {
@@ -177,15 +179,16 @@ int input_init_ncurses() {
 
 
 /* Generic Functions */
-int input_register_event(event_t id, event_mod_t mod, void (*func)(InputEvent*)) {
-    g_mapper_mod_array[mod][id] = func;
+int input_register_event(event_t id, event_ctx_t ctx, void (*func)(InputEvent*)) {
+    g_mapper_ctx_array[ctx][id] = func;
+    log_debug("Mapped %d [E_CTX_%d] to %p", id, ctx, func);
 }
 
 void input_init(game_frontent_t frontend) {
 
-    for (int i = E_NOMOD; i < E_MOD_7; i++) {
+    for (int i = E_CTX_0; i < E_CTX_END; i++) {
         for (int j = E_NULL; j < E_END; j++) {
-            g_mapper_mod_array[i][j] = handler_stub;
+            g_mapper_ctx_array[i][j] = handler_stub;
         }
     }
 

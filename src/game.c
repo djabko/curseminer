@@ -63,8 +63,18 @@ void game_input_place_tile(InputEvent *ie) {
 
 void game_input_spawn_chaser(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
-        int e_x = (1 + rand()) % GLOBALS.view_port_maxx;
-        int e_y = (1 + rand()) % GLOBALS.view_port_maxy;
+
+        uint16_t x = ie->data >> 0;
+        uint16_t y = ie->data >> 16;
+        int gwx = GLOBALS.view_port_x;
+        int gwy = GLOBALS.view_port_y;
+        int gwmx = gwx + GLOBALS.view_port_maxx;
+        int gwmy = gwy + GLOBALS.view_port_maxy;
+
+        if (!(gwx <= x && gwy <= y && x <= gwmx && y <= gwmy)) return;
+
+        int e_x = x - gwx;
+        int e_y = y - gwy;
         int e_s = (20 + rand()) % 150;
 
         Entity *entity = entity_spawn(g_game->world, g_game->entity_types + ge_chaser_mob,
@@ -353,12 +363,12 @@ int game_init() {
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
     player->speed = 1;
     entity_set_keyboard_controller(player);
-    input_register_event(E_KB_W,   E_NOMOD, game_input_move_up);
-    input_register_event(E_KB_A,   E_NOMOD, game_input_move_left);
-    input_register_event(E_KB_S,   E_NOMOD, game_input_move_down);
-    input_register_event(E_KB_D,   E_NOMOD, game_input_move_right);
-    input_register_event(E_KB_C,   E_NOMOD, game_input_place_tile);
-    input_register_event(E_MS_LMB, E_NOMOD, game_input_spawn_chaser);
+    input_register_event(E_KB_W,   E_CTX_GAME, game_input_move_up);
+    input_register_event(E_KB_A,   E_CTX_GAME, game_input_move_left);
+    input_register_event(E_KB_S,   E_CTX_GAME, game_input_move_down);
+    input_register_event(E_KB_D,   E_CTX_GAME, game_input_move_right);
+    input_register_event(E_KB_C,   E_CTX_GAME, game_input_place_tile);
+    input_register_event(E_MS_LMB, E_CTX_GAME, game_input_spawn_chaser);
 
     GLOBALS.player = player;
 

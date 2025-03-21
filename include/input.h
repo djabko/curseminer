@@ -3,6 +3,8 @@
 
 #define ASCII_ESC 27
 
+#include <stdint.h>
+
 #include "timer.h"
 
 typedef enum {
@@ -53,22 +55,28 @@ typedef enum {
     E_END,
 } event_t;
 
+typedef enum {
+    E_CTX_0,
+    E_CTX_1,
+    E_CTX_2,
+    E_CTX_3,
+    E_CTX_4,
+    E_CTX_5,
+    E_CTX_6,
+    E_CTX_7,
+    E_CTX_END,
+} event_ctx_t;
+
 typedef struct {
     event_t id;
     event_type_t type;
     event_state_t state;
     event_mod_t mods; // Bitmap
+    uint64_t data;
 } InputEvent;
 
-#define MAX_INPUT_HANDLERS 16
-typedef struct {
-    void (*handlers[E_END])(InputEvent*);
-    int count;
-} InputHandler;
-
 void input_init(game_frontent_t);
-int input_register_event(event_t, event_mod_t, void (*)(InputEvent*));
-void map_input(InputEvent*, void (*)()); // Replace multiple handlers with one handler and a jump table
+int input_register_event(event_t, event_ctx_t, void (*)(InputEvent*));
 void print_ncurses_mapping(const char* tag);
 
 #endif

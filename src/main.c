@@ -13,7 +13,8 @@
 #define KEYBOARD_EMPTY_RATE 1000000 / 2
 
 struct Globals GLOBALS = {
-    .player = NULL
+    .player = NULL,
+    .input_context = E_CTX_0,
 };
 
 ll_head* g_runqueue_list = NULL;
@@ -81,7 +82,9 @@ int main(int argc, const char** argv) {
 
     init(nogui_mode);
 
-    input_register_event(E_KB_Q, E_NOMOD, main_event_handler);
+    input_register_event(E_KB_Q, E_CTX_GAME, main_event_handler);
+    input_register_event(E_KB_Q, E_CTX_NOISE, main_event_handler);
+    input_register_event(E_KB_Q, E_CTX_CLOCK, main_event_handler);
 
     schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
     schedule_cb(g_runqueue, 0, 0, game_update, NULL, cb_exit);
