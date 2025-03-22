@@ -1,17 +1,35 @@
-#include <globals.h>
-#include <stack64.h>
-#include <timer.h>
-#include <entity.h>
-
+#include <stdbool.h>
 #include <stdio.h>
+
+#include "globals.h"
+#include "util.h"
+#include "stack64.h"
+#include "timer.h"
+#include "entity.h"
 
 EntityController* DEFAULT_CONTROLLER = NULL;
 EntityController* KEYBOARD_CONTROLLER = NULL;
 Entity* ENTITY_ARRAY = NULL;
 int MAX = 32;
 
+int entity_command(Entity *e, BehaviourID be) {
+    return qu_enqueue(e->controller->behaviour_queue, be);
+}
+
+static inline void set_entity_facing(Entity* e, int vx, int vy, EntityFacing direction) {
+    e->facing = direction;
+
+    e->vx = vx;
+    e->vy = vy;
+}
+
 void tick_entity_behaviour(Entity* e) {
     Queue64* qu = e->controller->behaviour_queue;
+
+    if (qu_empty(qu)) return;
+
+    int v = 1;
+
     switch (qu_dequeue(qu)) {
 
         case be_attack:
@@ -25,121 +43,123 @@ void tick_entity_behaviour(Entity* e) {
             break;
 
         case be_move:
-            if (game_on_screen(e->x, e->y))
-                gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
+            e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+            break;
 
-            int nx = e->x + e->vx;
-            int ny = e->y + e->vy;
-
-            int id = world_getxy(GLOBALS.game->world, nx, ny);
-            id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, nx, ny);
-
-            if (!id) {
-                e->x += e->vx;
-                e->y += e->vy;
-            }
-
+        case be_stop: 
             e->vx = 0;
             e->vy = 0;
+            break;
 
-            if (game_on_screen(e->x, e->y))
-                gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+        case be_face_up:
+            set_entity_facing(e, !v, -v, ENTITY_FACING_UP);
+            break;
 
+        case be_face_down:
+            set_entity_facing(e, !v, +v, ENTITY_FACING_DOWN);
+            break;
+
+        case be_face_left:
+            set_entity_facing(e, -v, !v, ENTITY_FACING_LEFT);
+            break;
+
+        case be_face_right:
+            set_entity_facing(e, +v, !v, ENTITY_FACING_RIGHT);
+            break;
+
+        case be_face_ul:
+            set_entity_facing(e, -v, -v, ENTITY_FACING_UL);
+            break;
+
+        case be_face_ur:
+            set_entity_facing(e, +v, -v, ENTITY_FACING_UR);
+            break;
+
+        case be_face_dl:
+            set_entity_facing(e, -v, +v, ENTITY_FACING_DL);
+            break;
+
+        case be_face_dr:
+            set_entity_facing(e, +v, +v, ENTITY_FACING_DR);
             break;
     }
 }
 
+void update_entity_position(Entity *e) {
+    if (game_on_screen(e->x, e->y))
+        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
+
+    int nx = e->x + e->vx;
+    int ny = e->y + e->vy;
+
+    int id = world_getxy(GLOBALS.game->world, nx, ny);
+    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, nx, ny);
+
+    if (!id) {
+        e->x += e->vx;
+        e->y += e->vy;
+    }
+
+    if (game_on_screen(e->x, e->y))
+        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+}
+
 /* Defines default entity action for each tick
- * Current behaviour is to follow the player via find_path() 
+ * Current behaviour is to follow the player via find_path() if player is
+ * nearby.
  */
 void default_tick(Entity* e) {
     Queue64* qu = e->controller->behaviour_queue;
-    e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
-    qu_enqueue(qu, be_move);
 
-    tick_entity_behaviour(e);
-}
+    Entity *p = GLOBALS.player;
 
-static inline void set_entity_facing(Entity* e, int x, int y, int vx, int vy, EntityFacing direction) {
-    e->facing = direction;
+    bool moving = e->vx != 0 || e->vy != 0;
 
-    e->vx = vx;
-    e->vy = vy;
+    if (moving) {
+        if (man_dist(e->x, e->y, p->x, p->y) > 40) {
+            entity_command(e, be_stop);
+            return;
+        }
+
+        e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+        tick_entity_behaviour(e);
+        update_entity_position(e);
+
+    } else {
+        entity_command(e, be_move);
+        tick_entity_behaviour(e);
+    }
 }
 
 void default_find_path(Entity* e, int x, int y) {
     if (e->x == x && e->y == y) return;
 
-    #define _up 1 << 0
-    #define _down 1 << 1
-    #define _left 1 << 2
-    #define _right 1 << 3
-    #define _ul 1 << 4
-    #define _ur 1 << 5
-    #define _dl 1 << 6
-    #define _dr 1 << 7
+    const int up = (e->y > y);
+    const int down = (e->y < y);
+    const int left = (e->x > x);
+    const int right = (e->x < x);
 
-    const int up = (e->y > y) ? _up : 0;
-    const int down = (e->y < y) ? _down : 0;
-    const int left = (e->x > x) ? _left : 0;
-    const int right = (e->x < x) ? _right : 0;
-    const int ul = (up && left) ? _ul : 0;
-    const int ur = (up && right) ? _ur : 0;
-    const int dl = (down && left) ? _dl : 0;
-    const int dr = (down && right) ? _dr : 0;
+    BehaviourID be = be_stop;
+    
+    if      (up && left)    be = be_face_ul;
+    else if (up && right)   be = be_face_ur;
+    else if (down && left)  be = be_face_dl;
+    else if (down && right) be = be_face_dr;
+    else if (up)            be = be_face_up;
+    else if (down)          be = be_face_down;
+    else if (left)          be = be_face_left;
+    else if (right)         be = be_face_right;
+    else log_debug(
+"ERROR: unable to execute pathfinding for entity %p(%d, %d) with respect to\
+point (%d, %d)}", e->id, e->x, e->y, x, y, be);
 
-    const int bitmap = (ul + ur + dl + dr > 0) ? 
-                        ul + ur + dl + dr  :
-                        up + down + left + right;
-
-    int v = 1;
-    x = e->x;
-    y = e->y;
-    switch (bitmap) {
-        case _ul:
-            set_entity_facing(e, x-1, y-1, -v, -v, ENTITY_FACING_UL);
-            break;
-        case _ur:
-            set_entity_facing(e, x+1, y-1, +v, -v, ENTITY_FACING_UR);
-            break;
-        case _dl:
-            set_entity_facing(e, x-1, y+1, -v, +v, ENTITY_FACING_DL);
-            break;
-        case _dr:
-            set_entity_facing(e, x+1, y+1, +v, +v, ENTITY_FACING_DR);
-            break;
-        case _up:
-            set_entity_facing(e, x+0, y-1, !v, -v, ENTITY_FACING_UP);
-            break;
-        case _down:
-            set_entity_facing(e, x+0, y+1, !v, +v, ENTITY_FACING_DOWN);
-            break;
-        case _left:
-            set_entity_facing(e, x-1, y+0, -v, !v, ENTITY_FACING_LEFT);
-            break;
-        case _right:
-            set_entity_facing(e, x+1, y+0, +v, !v, ENTITY_FACING_RIGHT);
-            break;
-        default: 
-            log_debug("ERROR: unable to execute pathfinding for entity %d, direction bitmap: %d}", e->id, bitmap);
-            break;
-    }
-
-    #undef _up
-    #undef _down
-    #undef _left
-    #undef _right
-    #undef _ul
-    #undef _ur
-    #undef _dl
-    #undef _dr
+    entity_command(e, be);
 }
 
 /* Defines player action for each tick */
 void player_tick(Entity* player) {
-    Queue64* qu = player->controller->behaviour_queue;
-
     tick_entity_behaviour(player);
+    update_entity_position(player);
 }
 
 int create_default_entity_controller() {

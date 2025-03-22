@@ -18,41 +18,41 @@ DirtyFlags *GAME_DIRTY_FLAGS;
 
 void game_input_move_up(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
-        GLOBALS.player->vy = -1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        entity_command(GLOBALS.player, be_face_up);
+        entity_command(GLOBALS.player, be_move);
 
     } else {
-        GLOBALS.player->vy = 0;
+        entity_command(GLOBALS.player, be_stop);
     }
 }
 
 void game_input_move_left(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
-        GLOBALS.player->vx = -1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        entity_command(GLOBALS.player, be_face_left);
+        entity_command(GLOBALS.player, be_move);
 
     } else {
-        GLOBALS.player->vx = 0;
+        entity_command(GLOBALS.player, be_stop);
     }
 }
 
 void game_input_move_down(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
-        GLOBALS.player->vy = +1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        entity_command(GLOBALS.player, be_face_down);
+        entity_command(GLOBALS.player, be_move);
 
     } else {
-        GLOBALS.player->vy = 0;
+        entity_command(GLOBALS.player, be_stop);
     }
 }
 
 void game_input_move_right(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
-        GLOBALS.player->vx = +1;
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_move);
+        entity_command(GLOBALS.player, be_face_right);
+        entity_command(GLOBALS.player, be_move);
 
     } else {
-        GLOBALS.player->vx = 0;
+        entity_command(GLOBALS.player, be_stop);
     }
 }
 
@@ -70,11 +70,13 @@ void game_input_spawn_chaser(InputEvent *ie) {
         int gwy = GLOBALS.view_port_y;
         int gwmx = gwx + GLOBALS.view_port_maxx;
         int gwmy = gwy + GLOBALS.view_port_maxy;
+        int wvx = GLOBALS.game->world_view_x;
+        int wvy = GLOBALS.game->world_view_y;
 
         if (!(gwx <= x && gwy <= y && x <= gwmx && y <= gwmy)) return;
 
-        int e_x = x - gwx;
-        int e_y = y - gwy;
+        int e_x = x - gwx + wvx;
+        int e_y = y - gwy + wvy;
         int e_s = (20 + rand()) % 150;
 
         Entity *entity = entity_spawn(g_game->world, g_game->entity_types + ge_chaser_mob,

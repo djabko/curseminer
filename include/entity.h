@@ -6,11 +6,16 @@
 #include <world.h>
 
 typedef enum {
+    be_stop,
     be_move,
     be_face_up,
     be_face_down,
     be_face_left,
     be_face_right,
+    be_face_ul,
+    be_face_ur,
+    be_face_dl,
+    be_face_dr,
     be_place,
     be_attack,
     be_interact
@@ -35,6 +40,7 @@ typedef struct EntityController {
 } EntityController;
 
 Entity* entity_spawn(World*, EntityType*, int, int, EntityFacing, int, int);
+int entity_command(Entity*, BehaviourID);
 void entity_kill_by_id(int);
 void entity_kill_by_pos(int, int);
 void entity_rm(World*, Entity*);
