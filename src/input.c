@@ -20,6 +20,9 @@ void handler_stub(InputEvent *ie) {}
 
 
 /* Ncurses Specific */
+#define msec_to_nsec(ms) ms * 1000000
+#define g_keyup_delay msec_to_nsec(100)
+
 typedef struct {
     event_t id;
     milliseconds_t last_pressed;
@@ -83,7 +86,7 @@ void init_keys_ncurses() {
 
 void map_event_ncurses(InputEvent *ev, int key) {
 
-    if (key == -103) {
+    if (key == -103 || key == KEY_MOUSE) {
         MEVENT mouse;
         if (getmouse(&mouse) != OK) log_debug("ERROR GETTING MOUSE EVENT!");
 
@@ -122,16 +125,14 @@ void handle_kdown_ncurses(int signo) {
     event_ctx_t ctx = GLOBALS.input_context;
     map_event_ncurses(&ev, key);
     ev.state = ES_DOWN;
+    g_mapper_ctx_array[ctx][ev.id](&ev);
 
     if (ev.type == E_TYPE_KB) {
 
         // Reset keyup timer
-        struct itimerspec its;
+        struct itimerspec its = {0};
 
-        its.it_value.tv_sec = 0;
-        its.it_value.tv_nsec = 100000000;
-        its.it_interval.tv_sec = 0;
-        its.it_interval.tv_nsec = 0;
+        its.it_value.tv_nsec = msec_to_nsec(g_keyup_delay);
 
         timer_settime(g_input_timer, 0, &its, NULL);
 
@@ -143,7 +144,7 @@ void handle_kdown_ncurses(int signo) {
 
                 KeyDownState *kds = (KeyDownState*) qu_next(g_queued_kdown);
 
-                bool is_expired = kds->last_pressed + 200 < TIMER_NOW_MS;
+                bool is_expired = TIMER_NOW_MS < kds->last_pressed + g_keyup_delay;
                 bool is_kds_full = KDS_MAX <= g_queued_kdown->count + 1;
 
                 if (is_expired || is_kds_full) {
@@ -159,7 +160,7 @@ void handle_kdown_ncurses(int signo) {
                         .mods = ev.mods,
                     };
 
-                    log_debug("InputEvent: {%d %d %d %d} in E_CTX_%d => %p", ev_up.id, ev_up.type, ev_up.state, ev_up.mods, ctx, g_mapper_ctx_array[ctx][ev_up.id]);
+                    //log_debug("[%lu] InputEvent: {%d %d %d %d} in E_CTX_%d => %p, lp=%lu [%d,%d]", TIMER_NOW_MS/1000, ev_up.id, ev_up.type, ev_up.state, ev_up.mods, ctx, g_mapper_ctx_array[ctx][ev_up.id], kds->last_pressed, is_expired, is_kds_full);
                     g_mapper_ctx_array[ctx][ev_up.id](&ev_up);
                 }
             }
@@ -177,9 +178,9 @@ void handle_kdown_ncurses(int signo) {
             *p = new_kds;
             qu_enqueue(g_queued_kdown, (uint64_t) p);
         }
+        //log_debug("[%lu] InputEvent: {%d %d %d %d} in E_CTX_%d => %p, lp=%lu", TIMER_NOW_MS/1000, ev.id, ev.type, ev.state, ev.mods, ctx, g_mapper_ctx_array[ctx][ev.id], new_kds.last_pressed/1000);
     }
 
-    log_debug("InputEvent: {%d %d %d %d} in E_CTX_%d => %p", ev.id, ev.type, ev.state, ev.mods, ctx, g_mapper_ctx_array[ctx][ev.id]);
     g_mapper_ctx_array[ctx][ev.id](&ev);
 }
 
@@ -198,7 +199,7 @@ void handle_kup_ncurses(int signo) {
             .mods = E_NOMOD,
         };
 
-        log_debug("InputEvent: {%d %d %d %d} in E_CTX_%d => %p", ev_up.id, ev_up.type, ev_up.state, ev_up.mods, ctx, g_mapper_ctx_array[ctx][ev_up.id]);
+        //log_debug("[%lu] InputEvent: {%d %d %d %d} in E_CTX_%d => %p", TIMER_NOW_MS/1000, ev_up.id, ev_up.type, ev_up.state, ev_up.mods, ctx, g_mapper_ctx_array[ctx][ev_up.id]);
         g_mapper_ctx_array[ctx][ev_up.id](&ev_up);
 
         NEXT_AVAILABLE_KDS--;

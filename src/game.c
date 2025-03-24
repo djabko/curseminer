@@ -26,9 +26,11 @@ void game_input_move_up(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         g_player_moving_up = true;
         g_player_moving_down = false;
+        log_debug("[%lu] ISR W UP", TIMER_NOW_MS);
 
     } else if (ie->state == ES_UP) {
         g_player_moving_up = false;
+        log_debug("[%lu] ISR W DOWN", TIMER_NOW_MS);
     }
 
     g_player_moving_changed = true;
@@ -325,7 +327,12 @@ int game_update(Task* task, Stack64* stack) {
             bool right = g_player_moving_right;
 
             if (up || down || left || right) {
-                entity_command(player, be_move);
+
+                // Only send move/stop command when necessary
+                // When to send move command? When interrupt occurs and player isn't already moving
+                // When to send stop command? When interrupt occurs and player is moving
+
+                if (player->vx == 0 && player->vy == 0) entity_command(player, be_move);
 
                 if      (up && left)    entity_command(player, be_face_ul);
                 else if (up && right)   entity_command(player, be_face_ur);
@@ -336,7 +343,7 @@ int game_update(Task* task, Stack64* stack) {
                 else if (left)          entity_command(player, be_face_left);
                 else if (right)         entity_command(player, be_face_right);
 
-            } else entity_command(player, be_stop);
+            } else if (player->vx != 0 || player->vy != 0) entity_command(player, be_stop);
 
             g_player_moving_changed = false;
         }
