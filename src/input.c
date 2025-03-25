@@ -33,55 +33,58 @@ KeyDownState KEY_DOWN_STATES_ARRAY[KDS_MAX];
 KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
 
 
-event_t g_ncurses_mapping_kb['z'+1];
-InputEvent g_ncurses_mapping_ms[BUTTON4_TRIPLE_CLICKED];
+#define NCURSES_KBMAP_MAX 64
+#define NCURSES_MSMAP_MAX BUTTON4_TRIPLE_CLICKED
+event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
+InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
 timer_t g_input_timer = 0;
 Queue64 *g_queued_kdown = NULL;
 
 void init_keys_ncurses() {
-    for (int i = 0; i < 'Z'+1; i++) 
+    for (int i = 0; i < NCURSES_KBMAP_MAX; i++) 
         g_ncurses_mapping_kb[i] = E_NULL;
 
-    for (int i = 0; i < BUTTON4_TRIPLE_CLICKED; i++) 
+    for (int i = 0; i < NCURSES_MSMAP_MAX; i++) 
         g_ncurses_mapping_ms[i] = (InputEvent){0, 0, 0, 0, 0};
 
-    g_ncurses_mapping_kb['w'] = E_KB_W;
-    g_ncurses_mapping_kb['a'] = E_KB_A;
-    g_ncurses_mapping_kb['s'] = E_KB_S;
-    g_ncurses_mapping_kb['d'] = E_KB_D;
-    g_ncurses_mapping_kb['c'] = E_KB_C;
-    g_ncurses_mapping_kb['g'] = E_KB_G;
-    g_ncurses_mapping_kb['q'] = E_KB_Q;
+    for (char c = 'a'; c <= 'z'; c++)
+        g_ncurses_mapping_kb[c] = E_KB_A + c - 'a';
+
+    g_ncurses_mapping_kb[ KEY_UP ] = E_KB_UP;
+    g_ncurses_mapping_kb[ KEY_DOWN ] = E_KB_DOWN;
+    g_ncurses_mapping_kb[ KEY_LEFT ] = E_KB_LEFT;
+    g_ncurses_mapping_kb[ KEY_RIGHT ] = E_KB_RIGHT;
 
     g_ncurses_mapping_ms[ BUTTON1_PRESSED ].id = E_MS_LMB;
-    g_ncurses_mapping_ms[ BUTTON1_PRESSED ].type = E_TYPE_MS;
     g_ncurses_mapping_ms[ BUTTON1_PRESSED ].state = ES_DOWN;
     g_ncurses_mapping_ms[ BUTTON1_PRESSED ].mods = E_NOMOD;
 
     g_ncurses_mapping_ms[ BUTTON2_PRESSED ].id = E_MS_MMB;
-    g_ncurses_mapping_ms[ BUTTON2_PRESSED ].type = E_TYPE_MS;
     g_ncurses_mapping_ms[ BUTTON2_PRESSED ].state = ES_DOWN;
     g_ncurses_mapping_ms[ BUTTON2_PRESSED ].mods = E_NOMOD;
 
     g_ncurses_mapping_ms[ BUTTON3_PRESSED ].id = E_MS_RMB;
-    g_ncurses_mapping_ms[ BUTTON3_PRESSED ].type = E_TYPE_MS;
     g_ncurses_mapping_ms[ BUTTON3_PRESSED ].state = ES_DOWN;
     g_ncurses_mapping_ms[ BUTTON3_PRESSED ].mods = E_NOMOD;
 
     g_ncurses_mapping_ms[ BUTTON1_RELEASED ].id = E_MS_LMB;
-    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].type = E_TYPE_MS;
     g_ncurses_mapping_ms[ BUTTON1_RELEASED ].state = ES_UP;
     g_ncurses_mapping_ms[ BUTTON1_RELEASED ].mods = E_NOMOD;
 
     g_ncurses_mapping_ms[ BUTTON2_RELEASED ].id = E_MS_MMB;
-    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].type = E_TYPE_MS;
     g_ncurses_mapping_ms[ BUTTON2_RELEASED ].state = ES_UP;
     g_ncurses_mapping_ms[ BUTTON2_RELEASED ].mods = E_NOMOD;
 
     g_ncurses_mapping_ms[ BUTTON3_RELEASED ].id = E_MS_RMB;
-    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].type = E_TYPE_MS;
     g_ncurses_mapping_ms[ BUTTON3_RELEASED ].state = ES_UP;
     g_ncurses_mapping_ms[ BUTTON3_RELEASED ].mods = E_NOMOD;
+
+    int states[] = {BUTTON1_PRESSED, BUTTON2_PRESSED, BUTTON3_PRESSED,
+        BUTTON1_RELEASED, BUTTON2_RELEASED, BUTTON3_RELEASED, -1};
+
+    for (int *p=states; *p != -1; p++) {
+        g_ncurses_mapping_ms[*p].type = E_TYPE_MS;
+    }
 }
 
 void map_event_ncurses(InputEvent *ev, int key) {
@@ -112,10 +115,6 @@ void map_event_ncurses(InputEvent *ev, int key) {
 }
 
 void handle_kdown_ncurses(int signo) {
-    // 1. reset timer
-    // 2. check queue & remove expired items
-    // 3. enqueue current event
-
     InputEvent ev;
 
     char key = getch();
@@ -124,10 +123,10 @@ void handle_kdown_ncurses(int signo) {
 
     event_ctx_t ctx = GLOBALS.input_context;
     map_event_ncurses(&ev, key);
-    ev.state = ES_DOWN;
-    g_mapper_ctx_array[ctx][ev.id](&ev);
 
     if (ev.type == E_TYPE_KB) {
+
+        ev.state = ES_DOWN;
 
         // Reset keyup timer
         struct itimerspec its = {0};
@@ -144,7 +143,7 @@ void handle_kdown_ncurses(int signo) {
 
                 KeyDownState *kds = (KeyDownState*) qu_next(g_queued_kdown);
 
-                bool is_expired = TIMER_NOW_MS < kds->last_pressed + g_keyup_delay;
+                bool is_expired = TIMER_NOW_MS >= kds->last_pressed + g_keyup_delay;
                 bool is_kds_full = KDS_MAX <= g_queued_kdown->count + 1;
 
                 if (is_expired || is_kds_full) {
@@ -160,7 +159,6 @@ void handle_kdown_ncurses(int signo) {
                         .mods = ev.mods,
                     };
 
-                    //log_debug("[%lu] InputEvent: {%d %d %d %d} in E_CTX_%d => %p, lp=%lu [%d,%d]", TIMER_NOW_MS/1000, ev_up.id, ev_up.type, ev_up.state, ev_up.mods, ctx, g_mapper_ctx_array[ctx][ev_up.id], kds->last_pressed, is_expired, is_kds_full);
                     g_mapper_ctx_array[ctx][ev_up.id](&ev_up);
                 }
             }
@@ -170,6 +168,8 @@ void handle_kdown_ncurses(int signo) {
         KeyDownState *p = KEY_DOWN_STATES_ARRAY;
         int c = g_queued_kdown->count;
 
+        /* If this event is already in the KDS array just update it with the
+           new KeyDownState.last_pressed value. */
         if      (0 < c && new_kds.id == p[0].id) p[0] = new_kds;
         else if (1 < c && new_kds.id == p[1].id) p[1] = new_kds;
         else if (2 < c && new_kds.id == p[2].id) p[2] = new_kds;
@@ -178,15 +178,12 @@ void handle_kdown_ncurses(int signo) {
             *p = new_kds;
             qu_enqueue(g_queued_kdown, (uint64_t) p);
         }
-        //log_debug("[%lu] InputEvent: {%d %d %d %d} in E_CTX_%d => %p, lp=%lu", TIMER_NOW_MS/1000, ev.id, ev.type, ev.state, ev.mods, ctx, g_mapper_ctx_array[ctx][ev.id], new_kds.last_pressed/1000);
     }
 
     g_mapper_ctx_array[ctx][ev.id](&ev);
 }
 
 void handle_kup_ncurses(int signo) {
-    // 1. dequeue all events
-
     event_ctx_t ctx = GLOBALS.input_context;
 
     while (!qu_empty(g_queued_kdown)) {
@@ -199,7 +196,6 @@ void handle_kup_ncurses(int signo) {
             .mods = E_NOMOD,
         };
 
-        //log_debug("[%lu] InputEvent: {%d %d %d %d} in E_CTX_%d => %p", TIMER_NOW_MS/1000, ev_up.id, ev_up.type, ev_up.state, ev_up.mods, ctx, g_mapper_ctx_array[ctx][ev_up.id]);
         g_mapper_ctx_array[ctx][ev_up.id](&ev_up);
 
         NEXT_AVAILABLE_KDS--;
@@ -207,33 +203,34 @@ void handle_kup_ncurses(int signo) {
 }
 
 int input_init_ncurses() {
+    
+    /* 1. Initialized data structures */
     init_keys_ncurses();
-
     g_queued_kdown = qu_init(1);
-
 
     struct sigevent se = {
         .sigev_notify = SIGEV_SIGNAL,
         .sigev_signo = SIGALRM,
     };
 
-    timer_create(CLOCK_MONOTONIC, &se, &g_input_timer);
-
-
-
     struct sigaction sa;
     sa.sa_flags = 0;
     sigemptyset(&sa.sa_mask);
 
+    /* 2. Create timer to simulate ES_KEYUP events using SIGALRM interrupt */
+    timer_create(CLOCK_MONOTONIC, &se, &g_input_timer);
+
+    sa.sa_handler = handle_kup_ncurses;
+    sigaction(SIGALRM, &sa, NULL);
+
+    /* 3. Register SIGIO interrupt to trigger when input is available on stdin
+     *    and process it in handle_kdown_ncurses */
     sa.sa_handler = handle_kdown_ncurses;
     sigaction(SIGIO, &sa, NULL);
 
     int flags = fcntl(STDIN_FILENO, F_GETFL);
     fcntl(STDIN_FILENO, F_SETFL, flags | O_ASYNC);
     fcntl(STDIN_FILENO, F_SETOWN, getpid());
-
-    sa.sa_handler = handle_kup_ncurses;
-    sigaction(SIGALRM, &sa, NULL);
 }
 
 #undef KDS_MAX
@@ -242,7 +239,6 @@ int input_init_ncurses() {
 /* Generic Functions */
 int input_register_event(event_t id, event_ctx_t ctx, void (*func)(InputEvent*)) {
     g_mapper_ctx_array[ctx][id] = func;
-    log_debug("Mapped %d [E_CTX_%d] to %p", id, ctx, func);
 }
 
 void input_init(game_frontent_t frontend) {

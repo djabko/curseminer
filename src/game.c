@@ -26,11 +26,9 @@ void game_input_move_up(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         g_player_moving_up = true;
         g_player_moving_down = false;
-        log_debug("[%lu] ISR W UP", TIMER_NOW_MS);
 
     } else if (ie->state == ES_UP) {
         g_player_moving_up = false;
-        log_debug("[%lu] ISR W DOWN", TIMER_NOW_MS);
     }
 
     g_player_moving_changed = true;
@@ -78,6 +76,8 @@ void game_input_place_tile(InputEvent *ie) {
 }
 
 void game_input_spawn_chaser(InputEvent *ie) {
+    log_debug("IE: %d %d %d %d", ie->id, ie->type, ie->state, ie->mods);
+
     if (ie->state == ES_DOWN) {
 
         uint16_t x = ie->data >> 0;
@@ -328,10 +328,6 @@ int game_update(Task* task, Stack64* stack) {
 
             if (up || down || left || right) {
 
-                // Only send move/stop command when necessary
-                // When to send move command? When interrupt occurs and player isn't already moving
-                // When to send stop command? When interrupt occurs and player is moving
-
                 if (player->vx == 0 && player->vy == 0) entity_command(player, be_move);
 
                 if      (up && left)    entity_command(player, be_face_ul);
@@ -413,12 +409,16 @@ int game_init() {
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
     player->speed = 1;
     entity_set_keyboard_controller(player);
-    input_register_event(E_KB_W,   E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_A,   E_CTX_GAME, game_input_move_left);
-    input_register_event(E_KB_S,   E_CTX_GAME, game_input_move_down);
-    input_register_event(E_KB_D,   E_CTX_GAME, game_input_move_right);
-    input_register_event(E_KB_C,   E_CTX_GAME, game_input_place_tile);
-    input_register_event(E_MS_LMB, E_CTX_GAME, game_input_spawn_chaser);
+    input_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
+    input_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
+    input_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
+    input_register_event(E_KB_RIGHT,E_CTX_GAME, game_input_move_right);
+    input_register_event(E_KB_W,    E_CTX_GAME, game_input_move_up);
+    input_register_event(E_KB_A,    E_CTX_GAME, game_input_move_left);
+    input_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
+    input_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
+    input_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
+    input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
 
     GLOBALS.player = player;
 
