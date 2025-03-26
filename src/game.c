@@ -410,8 +410,8 @@ int game_init() {
     player->speed = 1;
     entity_set_keyboard_controller(player);
     input_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
     input_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
+    input_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
     input_register_event(E_KB_RIGHT,E_CTX_GAME, game_input_move_right);
     input_register_event(E_KB_W,    E_CTX_GAME, game_input_move_up);
     input_register_event(E_KB_A,    E_CTX_GAME, game_input_move_left);

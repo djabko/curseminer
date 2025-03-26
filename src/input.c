@@ -21,7 +21,7 @@ void handler_stub(InputEvent *ie) {}
 
 /* Ncurses Specific */
 #define msec_to_nsec(ms) ms * 1000000
-#define g_keyup_delay msec_to_nsec(100)
+#define g_keyup_delay 250
 
 typedef struct {
     event_t id;
@@ -33,7 +33,7 @@ KeyDownState KEY_DOWN_STATES_ARRAY[KDS_MAX];
 KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
 
 
-#define NCURSES_KBMAP_MAX 64
+#define NCURSES_KBMAP_MAX 256
 #define NCURSES_MSMAP_MAX BUTTON4_TRIPLE_CLICKED
 event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
 InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
@@ -47,7 +47,7 @@ void init_keys_ncurses() {
     for (int i = 0; i < NCURSES_MSMAP_MAX; i++) 
         g_ncurses_mapping_ms[i] = (InputEvent){0, 0, 0, 0, 0};
 
-    for (char c = 'a'; c <= 'z'; c++)
+    for (int c = 'a'; c <= 'z'; c++)
         g_ncurses_mapping_kb[c] = E_KB_A + c - 'a';
 
     g_ncurses_mapping_kb[ KEY_UP ] = E_KB_UP;
@@ -89,7 +89,7 @@ void init_keys_ncurses() {
 
 void map_event_ncurses(InputEvent *ev, int key) {
 
-    if (key == -103 || key == KEY_MOUSE) {
+    if (key == KEY_MOUSE) {
         MEVENT mouse;
         if (getmouse(&mouse) != OK) log_debug("ERROR GETTING MOUSE EVENT!");
 
@@ -117,7 +117,7 @@ void map_event_ncurses(InputEvent *ev, int key) {
 void handle_kdown_ncurses(int signo) {
     InputEvent ev;
 
-    char key = getch();
+    int key = getch();
 
     if (key == -1) return;
 
@@ -231,6 +231,8 @@ int input_init_ncurses() {
     int flags = fcntl(STDIN_FILENO, F_GETFL);
     fcntl(STDIN_FILENO, F_SETFL, flags | O_ASYNC);
     fcntl(STDIN_FILENO, F_SETOWN, getpid());
+
+    return 1;
 }
 
 #undef KDS_MAX
@@ -238,7 +240,10 @@ int input_init_ncurses() {
 
 /* Generic Functions */
 int input_register_event(event_t id, event_ctx_t ctx, void (*func)(InputEvent*)) {
+    if (id < 0 || E_END <= id) return -1; 
+
     g_mapper_ctx_array[ctx][id] = func;
+    return 1;
 }
 
 void input_init(game_frontent_t frontend) {
