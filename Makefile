@@ -1,5 +1,5 @@
 CC=gcc
-CF_DEBUG=-Wall -g -DDEBUG -pg
+CF_DEBUG=-Wall -g -DDEBUG
 CF_OPTIM=-Ofast
 CF_LIBS=-lncurses -lm -ldl -lpthread
 

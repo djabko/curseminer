@@ -3,6 +3,9 @@
 
 #include <unistd.h>
 
+#include "input.h"
+#include "game.h"
+
 typedef unsigned char byte_t;
 
 /* Useful Macros */
@@ -46,15 +49,15 @@ typedef unsigned char byte_t;
 #define assert_log(condition, ...)
 #endif
 
-
-#include "keyboard.h"
-#include "game.h"
+#define E_CTX_GAME E_CTX_0
+#define E_CTX_NOISE E_CTX_1
+#define E_CTX_CLOCK E_CTX_2
 
 struct Globals{
-    int view_port_maxx, view_port_maxy;
-    Keyboard keyboard;
+    int view_port_x, view_port_y, view_port_maxx, view_port_maxy;
     Entity* player;
     GameContext* game;
+    event_ctx_t input_context;
 };
 
 extern struct Globals GLOBALS;

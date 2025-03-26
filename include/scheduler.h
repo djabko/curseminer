@@ -85,6 +85,7 @@ void scheduler_free();
 RunQueue* scheduler_new_rq();
 RunQueueList *scheduler_new_rqll();
 int scheduler_wake_tasks();
+int scheduler_kill_all_tasks();
 
 int schedule(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*);
 int schedule_cb(RunQueue*, int, int, int (*func)(Task*, Stack64*), Stack64*, void (*callback)(Task*));

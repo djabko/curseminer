@@ -311,7 +311,7 @@ int kill_rqll(ll_head* rqll) {
     return count;
 }
 
-int tk_kill_all() {
+int scheduler_kill_all_tasks() {
 
     // Force wake all tasks and kill them
     Task *stk = (Task*) pq_peek(g_sleep_queue);
