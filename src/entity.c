@@ -42,8 +42,12 @@ void tick_entity_behaviour(Entity* e) {
             game_world_setxy(e->x, e->y, ENTITY_STONE);
             break;
 
+        case be_move_one:
+            e->x += e->vx;
+            e->y += e->vy;
+            break;
+
         case be_move:
-            e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
             break;
 
         case be_stop: 
@@ -115,15 +119,17 @@ void default_tick(Entity* e) {
 
     bool moving = e->vx != 0 || e->vy != 0;
 
+    e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+
     if (moving) {
         if (man_dist(e->x, e->y, p->x, p->y) > 40) {
             entity_command(e, be_stop);
             return;
         }
 
-        e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
         tick_entity_behaviour(e);
-        update_entity_position(e);
+
+        if (e->vx || e->vy) update_entity_position(e);
 
     } else {
         entity_command(e, be_move);

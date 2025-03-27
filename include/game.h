@@ -5,6 +5,9 @@
 #include "scheduler.h"
 #include "world.h"
 
+#define E_MOD_CROUCHING E_MOD_0
+#define TILE_BREAK_DISTANCE 10
+
 /* Screen Cache */
 typedef struct DirtyFlags {
     byte_t *groups, *flags;

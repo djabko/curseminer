@@ -1,12 +1,13 @@
-#include "stdlib.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <globals.h>
-#include <game.h>
-#include <world.h>
-#include <entity.h>
-#include <stack64.h>
+#include "globals.h"
+#include "util.h"
+#include "game.h"
+#include "world.h"
+#include "entity.h"
+#include "stack64.h"
 
 #define GAME_REFRESH_RATE 20
 
@@ -21,53 +22,53 @@ bool g_player_moving_up = false;
 bool g_player_moving_down = false;
 bool g_player_moving_left = false;
 bool g_player_moving_right = false;
+bool g_player_crouching = false;
 
-void game_input_move_up(InputEvent *ie) {
+int world_from_mouse_xy(InputEvent *ie, int *world_x, int *world_y) {
+    uint16_t x = ie->data >> 16 * 0;
+    uint16_t y = ie->data >> 16 * 1;
+    int gwx = GLOBALS.view_port_x;
+    int gwy = GLOBALS.view_port_y;
+    int gwmx = gwx + GLOBALS.view_port_maxx;
+    int gwmy = gwy + GLOBALS.view_port_maxy;
+    int wvx = GLOBALS.game->world_view_x;
+    int wvy = GLOBALS.game->world_view_y;
+
+    // Mouse outside game window boundaries
+    if (!(gwx <= x && gwy <= y && x <= gwmx && y <= gwmy)) return -1;
+
+    *world_x = x - gwx + wvx;
+    *world_y = y - gwy + wvy;
+
+    return 0;
+}
+
+void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_kd_reset) {
     if (ie->state == ES_DOWN) {
-        g_player_moving_up = true;
-        g_player_moving_down = false;
+        *on_kd_true = true;
+        *on_kd_reset = false;
 
-    } else if (ie->state == ES_UP) {
-        g_player_moving_up = false;
-    }
+    } else *on_kd_true = false;
+
+    g_player_crouching = ie->mods && E_MOD_CROUCHING;
 
     g_player_moving_changed = true;
+}
+
+void game_input_move_up(InputEvent *ie) {
+    game_input_player_state(ie, &g_player_moving_up, &g_player_moving_down);
 }
 
 void game_input_move_left(InputEvent *ie) {
-    if (ie->state == ES_DOWN) {
-        g_player_moving_left = true;
-        g_player_moving_right = false;
-
-    } else if (ie->state == ES_UP) {
-        g_player_moving_left = false;
-    }
-
-    g_player_moving_changed = true;
+    game_input_player_state(ie, &g_player_moving_left, &g_player_moving_right);
 }
 
 void game_input_move_down(InputEvent *ie) {
-    if (ie->state == ES_DOWN) {
-        g_player_moving_down = true;
-        g_player_moving_up = false;
-
-    } else if (ie->state == ES_UP) {
-        g_player_moving_down = false;
-    }
-
-    g_player_moving_changed = true;
+    game_input_player_state(ie, &g_player_moving_down, &g_player_moving_up);
 }
 
 void game_input_move_right(InputEvent *ie) {
-    if (ie->state == ES_DOWN) {
-        g_player_moving_right = true;
-        g_player_moving_left = false;
-
-    } else if (ie->state == ES_UP) {
-        g_player_moving_right = false;
-    }
-
-    g_player_moving_changed = true;
+    game_input_player_state(ie, &g_player_moving_right, &g_player_moving_left);
 }
 
 void game_input_place_tile(InputEvent *ie) {
@@ -76,29 +77,33 @@ void game_input_place_tile(InputEvent *ie) {
 }
 
 void game_input_spawn_chaser(InputEvent *ie) {
-    log_debug("IE: %d %d %d %d", ie->id, ie->type, ie->state, ie->mods);
-
     if (ie->state == ES_DOWN) {
+        int x, y;
+        int s = (20 + rand()) % 150;
+        EntityType* skin = g_game->entity_types + ENTITY_CHASER;
 
-        uint16_t x = ie->data >> 0;
-        uint16_t y = ie->data >> 16;
-        int gwx = GLOBALS.view_port_x;
-        int gwy = GLOBALS.view_port_y;
-        int gwmx = gwx + GLOBALS.view_port_maxx;
-        int gwmy = gwy + GLOBALS.view_port_maxy;
-        int wvx = GLOBALS.game->world_view_x;
-        int wvy = GLOBALS.game->world_view_y;
+        if (world_from_mouse_xy(ie, &x, &y) != 0) return;
 
-        if (!(gwx <= x && gwy <= y && x <= gwmx && y <= gwmy)) return;
+        Entity *e = entity_spawn(g_game->world, skin,
+                x, y, ENTITY_FACING_RIGHT, 1, 0);
 
-        int e_x = x - gwx + wvx;
-        int e_y = y - gwy + wvy;
-        int e_s = (20 + rand()) % 150;
+        e->speed = s;
+    }
+}
 
-        Entity *entity = entity_spawn(g_game->world, g_game->entity_types + ENTITY_CHASER,
-                e_x, e_y, ENTITY_FACING_RIGHT, 1, 0);
+void game_input_break_tile(InputEvent *ie) {
+    if (ie->state == ES_DOWN) {
+        int x, y;
 
-        entity->speed = e_s;
+        if (world_from_mouse_xy(ie, &x, &y) != 0) return;
+
+        EntityType *id = game_world_getxy(x, y);
+        int d = man_dist(GLOBALS.player->x, GLOBALS.player->y, x, y);
+
+        bool is_tile_exists = id != E_TYPE_NULL;
+        bool is_player_close = d < TILE_BREAK_DISTANCE;
+
+        if (is_tile_exists && is_player_close) game_world_setxy(x, y, E_TYPE_NULL);
     }
 }
 
@@ -328,7 +333,13 @@ int game_update(Task* task, Stack64* stack) {
 
             if (up || down || left || right) {
 
-                if (player->vx == 0 && player->vy == 0) entity_command(player, be_move);
+                if (player->vx == 0 && player->vy == 0) {
+
+                    if (g_player_crouching)
+                        entity_command(player, be_move_one);
+                    else 
+                        entity_command(player, be_move);
+                }
 
                 if      (up && left)    entity_command(player, be_face_ul);
                 else if (up && right)   entity_command(player, be_face_ur);
@@ -339,7 +350,8 @@ int game_update(Task* task, Stack64* stack) {
                 else if (left)          entity_command(player, be_face_left);
                 else if (right)         entity_command(player, be_face_right);
 
-            } else if (player->vx != 0 || player->vy != 0) entity_command(player, be_stop);
+            } else if (player->vx != 0 || player->vy != 0)
+                entity_command(player, be_stop);
 
             g_player_moving_changed = false;
         }
@@ -348,30 +360,6 @@ int game_update(Task* task, Stack64* stack) {
     tk_sleep(task, 1000 / GAME_REFRESH_RATE);
 
     return 0;
-}
-
-void game_event_handler(InputEvent *ev) {
-    Queue64 *bq = GLOBALS.player->controller->behaviour_queue;
-
-    if (ev->id == E_KB_W) {
-        GLOBALS.player->vy = -1;
-        qu_enqueue(bq, be_move);
-
-    } else if (ev->id == E_KB_S) {
-        GLOBALS.player->vy = +1;
-        qu_enqueue(bq, be_move);
-
-    } else if (ev->id == E_KB_A) {
-        GLOBALS.player->vx = -1;
-        qu_enqueue(bq, be_move);
-
-    } else if (ev->id == E_KB_D) {
-        GLOBALS.player->vx = +1;
-        qu_enqueue(bq, be_move);
-
-    } else if (ev->id == E_KB_C) {
-        qu_enqueue(bq, be_place);
-    }
 }
 
 int game_init() {
@@ -420,6 +408,7 @@ int game_init() {
     input_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
     input_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
     input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
+    input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile);
 
     GLOBALS.player = player;
     GLOBALS.game = g_game;

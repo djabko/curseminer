@@ -8,6 +8,7 @@
 typedef enum {
     be_stop,
     be_move,
+    be_move_one,
     be_face_up,
     be_face_down,
     be_face_left,
