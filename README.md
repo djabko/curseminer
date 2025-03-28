@@ -1,7 +1,7 @@
 # CurseMiner
 
 ## Overview
-CurseMiner is a lightweight execution framework for running multiple tasks concurrently. It also provides a bare-minimum 2D grid-based game engine and a procedural world generator.
+CurseMiner is a lightweight execution framework for running multiple tasks concurrently. It also provides a bare-minimum 2D grid-based game engine and a procedural world generator. Single threaded at the moment with efficient CPU usage.
 
 ## Components
 ### Stack64
@@ -21,7 +21,7 @@ A simple task scheduler with the following architecture:
 
 Overall this design heavily discourages threading (once implemented) and each task is assumed to execute quickly through simple code and asynchronous system calls. This has the benefit of avoiding overhead and race conditions.
 
-As of the heavy optimizations release sleeping tasks are stored on a minheap, taking almost cpu.
+As of the heavy optimizations release sleeping tasks are stored on a minheap, taking almost CPU.
 
 ### Files
 An interface for asynchronous file IO. Current implementation uses aio.h so IO operations are not truly asynchronous. This component is an artifact from the very first development stage and is not yet used anywhere in the project.
