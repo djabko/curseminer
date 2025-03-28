@@ -331,15 +331,9 @@ int game_update(Task* task, Stack64* stack) {
             bool left = g_player_moving_left;
             bool right = g_player_moving_right;
 
+            log_debug("%d %d %d %d", up, down, left, right);
+
             if (up || down || left || right) {
-
-                if (player->vx == 0 && player->vy == 0) {
-
-                    if (g_player_crouching)
-                        entity_command(player, be_move_one);
-                    else 
-                        entity_command(player, be_move);
-                }
 
                 if      (up && left)    entity_command(player, be_face_ul);
                 else if (up && right)   entity_command(player, be_face_ur);
@@ -350,7 +344,16 @@ int game_update(Task* task, Stack64* stack) {
                 else if (left)          entity_command(player, be_face_left);
                 else if (right)         entity_command(player, be_face_right);
 
-            } else if (player->vx != 0 || player->vy != 0)
+                if (!player->moving) {
+
+                    if (g_player_crouching)
+                        entity_command(player, be_move_one);
+                    else 
+                        entity_command(player, be_move);
+                }
+
+
+            } else if (player->moving)
                 entity_command(player, be_stop);
 
             g_player_moving_changed = false;

@@ -16,11 +16,69 @@ int entity_command(Entity *e, BehaviourID be) {
     return qu_enqueue(e->controller->behaviour_queue, be);
 }
 
-static inline void set_entity_facing(Entity* e, int vx, int vy, EntityFacing direction) {
-    e->facing = direction;
-
+void set_entity_velocity(Entity *e, int vx, int vy) {
     e->vx = vx;
     e->vy = vy;
+}
+
+void update_entity_position(Entity *e) {
+    if (!e->moving) return;
+
+    if (game_on_screen(e->x, e->y))
+        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
+
+    int v = 1;
+
+    switch (e->facing) {
+        case ENTITY_FACING_UL:
+            set_entity_velocity(e, -v, -v);
+            break;
+
+        case ENTITY_FACING_UR:
+            set_entity_velocity(e, +v, -v);
+            break;
+
+        case ENTITY_FACING_DL:
+            set_entity_velocity(e, -v, +v);
+            break;
+
+        case ENTITY_FACING_DR:
+            set_entity_velocity(e, +v, +v);
+            break;
+
+        case ENTITY_FACING_UP:
+            set_entity_velocity(e, !v, -v);
+            break;
+
+        case ENTITY_FACING_DOWN:
+            set_entity_velocity(e, !v, +v);
+            break;
+
+        case ENTITY_FACING_LEFT:
+            set_entity_velocity(e, -v, !v);
+            break;
+
+        case ENTITY_FACING_RIGHT:
+            set_entity_velocity(e, +v, !v);
+            break;
+
+        default:
+            log_debug("ERROR: Invalid direction for entity %p", e);
+    }
+
+    int nx = e->x + e->vx;
+    int ny = e->y + e->vy;
+
+    int id = world_getxy(GLOBALS.game->world, nx, ny);
+    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, nx, ny);
+
+    if (!id) {
+        e->x += e->vx;
+        e->y += e->vy;
+    }
+
+    if (game_on_screen(e->x, e->y))
+        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
 }
 
 void tick_entity_behaviour(Entity* e) {
@@ -43,69 +101,54 @@ void tick_entity_behaviour(Entity* e) {
             break;
 
         case be_move_one:
-            e->x += e->vx;
-            e->y += e->vy;
+            log_debug("Player crouch walk");
+            e->moving = true;
+            update_entity_position(e);
+            e->moving = false;
             break;
 
         case be_move:
+            log_debug("Player move");
+            e->moving = true;
             break;
 
         case be_stop: 
-            e->vx = 0;
-            e->vy = 0;
+            log_debug("Player stop");
+            e->moving = false;
             break;
 
         case be_face_up:
-            set_entity_facing(e, !v, -v, ENTITY_FACING_UP);
+            e->facing = ENTITY_FACING_UP;
             break;
 
         case be_face_down:
-            set_entity_facing(e, !v, +v, ENTITY_FACING_DOWN);
+            e->facing = ENTITY_FACING_DOWN;
             break;
 
         case be_face_left:
-            set_entity_facing(e, -v, !v, ENTITY_FACING_LEFT);
+            e->facing = ENTITY_FACING_LEFT;
             break;
 
         case be_face_right:
-            set_entity_facing(e, +v, !v, ENTITY_FACING_RIGHT);
+            e->facing = ENTITY_FACING_RIGHT;
             break;
 
         case be_face_ul:
-            set_entity_facing(e, -v, -v, ENTITY_FACING_UL);
+            e->facing = ENTITY_FACING_UL;
             break;
 
         case be_face_ur:
-            set_entity_facing(e, +v, -v, ENTITY_FACING_UR);
+            e->facing = ENTITY_FACING_UR;
             break;
 
         case be_face_dl:
-            set_entity_facing(e, -v, +v, ENTITY_FACING_DL);
+            e->facing = ENTITY_FACING_DL;
             break;
 
         case be_face_dr:
-            set_entity_facing(e, +v, +v, ENTITY_FACING_DR);
+            e->facing = ENTITY_FACING_DR;
             break;
     }
-}
-
-void update_entity_position(Entity *e) {
-    if (game_on_screen(e->x, e->y))
-        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
-
-    int nx = e->x + e->vx;
-    int ny = e->y + e->vy;
-
-    int id = world_getxy(GLOBALS.game->world, nx, ny);
-    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, nx, ny);
-
-    if (!id) {
-        e->x += e->vx;
-        e->y += e->vy;
-    }
-
-    if (game_on_screen(e->x, e->y))
-        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
 }
 
 /* Defines default entity action for each tick
@@ -117,24 +160,22 @@ void default_tick(Entity* e) {
 
     Entity *p = GLOBALS.player;
 
-    bool moving = e->vx != 0 || e->vy != 0;
+    int radius = 40;
 
-    e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+    bool is_in_radius = man_dist(e->x, e->y, p->x, p->y) <= radius;
+    if (!is_in_radius && e->moving) {
+        entity_command(e, be_stop);
 
-    if (moving) {
-        if (man_dist(e->x, e->y, p->x, p->y) > 40) {
-            entity_command(e, be_stop);
-            return;
-        }
-
-        tick_entity_behaviour(e);
-
-        if (e->vx || e->vy) update_entity_position(e);
-
-    } else {
+    } else if (is_in_radius && !e->moving) {
         entity_command(e, be_move);
-        tick_entity_behaviour(e);
     }
+
+    if (is_in_radius) {
+        e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+        update_entity_position(e);
+    }
+
+    tick_entity_behaviour(e);
 }
 
 void default_find_path(Entity* e, int x, int y) {
@@ -155,9 +196,8 @@ void default_find_path(Entity* e, int x, int y) {
     else if (down)          be = be_face_down;
     else if (left)          be = be_face_left;
     else if (right)         be = be_face_right;
-    else log_debug(
-"ERROR: unable to execute pathfinding for entity %p(%d, %d) with respect to\
-point (%d, %d)}", e->id, e->x, e->y, x, y, be);
+    else log_debug("ERROR: unable to execute pathfinding for entity %p(%d, %d)"
+            "with respect to point (%d, %d)}", e->id, e->x, e->y, x, y, be);
 
     entity_command(e, be);
 }
@@ -186,7 +226,6 @@ void entity_set_keyboard_controller(Entity* e) {
     e->controller = KEYBOARD_CONTROLLER;
 }
 
-
 Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing face, int num, int t) {
     if (ENTITY_ARRAY == NULL)
         ENTITY_ARRAY = calloc(world->entity_maxc, sizeof(Entity));
@@ -205,6 +244,7 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
     new_entity->health = 10;
     new_entity->facing = face;
     new_entity->next_tick = TIMER_NOW_MS;
+    new_entity->moving = false;
 
     create_default_entity_controller();
     new_entity->controller = DEFAULT_CONTROLLER;

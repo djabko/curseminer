@@ -1,6 +1,8 @@
 #ifndef WORLD_HEADER
 #define WORLD_HEADER
 
+#include <stdbool.h>
+
 #include "game.h"
 #include "timer.h"
 
@@ -13,6 +15,7 @@ typedef struct Entity {
     EntityController* controller;
     milliseconds_t next_tick;
     int id, x, y, vx, vy, speed, health, facing;
+    bool moving;
 } Entity;
 
 typedef enum ChunkType {
