@@ -100,20 +100,42 @@ void tick_entity_behaviour(Entity* e) {
             game_world_setxy(e->x, e->y, ENTITY_STONE);
             break;
 
+        case be_break:
+            int f = e->facing;
+            int c_x = 
+                   1 * (f == ENTITY_FACING_RIGHT
+                    || f == ENTITY_FACING_UR || f == ENTITY_FACING_DR)
+                + -1 * (f == ENTITY_FACING_LEFT
+                    || f == ENTITY_FACING_UL || f == ENTITY_FACING_DL);
+
+            int c_y = 
+                   1 * (f == ENTITY_FACING_DOWN
+                    || f == ENTITY_FACING_DL || f == ENTITY_FACING_DR)
+                + -1 * (f == ENTITY_FACING_UP
+                    || f == ENTITY_FACING_UL || f == ENTITY_FACING_UR);
+
+            log_debug("Breaking in direction: %d,%d (%d)", c_x, c_y, e->facing);
+
+            int x = e->x + c_x;
+            int y = e->y + c_y;
+            world_setxy(GLOBALS.game->world, x, y, 0);
+
+            if (game_on_screen(x, y))
+                gamew_cache_set(WORLD_ENTITY_CACHE, x, y, 0);
+
+            break;
+
         case be_move_one:
-            log_debug("Player crouch walk");
             e->moving = true;
             update_entity_position(e);
             e->moving = false;
             break;
 
         case be_move:
-            log_debug("Player move");
             e->moving = true;
             break;
 
         case be_stop: 
-            log_debug("Player stop");
             e->moving = false;
             break;
 

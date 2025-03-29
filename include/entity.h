@@ -18,6 +18,7 @@ typedef enum {
     be_face_dl,
     be_face_dr,
     be_place,
+    be_break,
     be_attack,
     be_interact
 } BehaviourID;

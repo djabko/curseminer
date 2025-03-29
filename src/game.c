@@ -92,6 +92,11 @@ void game_input_spawn_chaser(InputEvent *ie) {
 }
 
 void game_input_break_tile(InputEvent *ie) {
+    entity_command(GLOBALS.player, be_break);
+}
+
+void game_input_break_tile_mouse(InputEvent *ie) {
+    // TODO must be moved outside interrupt handler logic, this is too slow
     if (ie->state == ES_DOWN) {
         int x, y;
 
@@ -103,7 +108,8 @@ void game_input_break_tile(InputEvent *ie) {
         bool is_tile_exists = id != E_TYPE_NULL;
         bool is_player_close = d < TILE_BREAK_DISTANCE;
 
-        if (is_tile_exists && is_player_close) game_world_setxy(x, y, E_TYPE_NULL);
+        if (is_tile_exists && is_player_close)
+            game_world_setxy(x, y, E_TYPE_NULL);
     }
 }
 
@@ -410,8 +416,9 @@ int game_init() {
     input_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
     input_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
     input_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
+    input_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
     input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
-    input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile);
+    input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
 
     GLOBALS.player = player;
     GLOBALS.game = g_game;
