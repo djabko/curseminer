@@ -332,6 +332,32 @@ void draw_uiwin(window_t *uiwin) {
     wnoutrefresh(uiwin->win);
 }
 
+void draw_invwin_nogui(window_t *invwin) {}
+
+void draw_invwin(window_t *invwin) {
+    // TODO: check if inventory changed
+
+    if (GLOBALS.player->inventory == NULL) return;
+
+    werase(invwin->win);
+
+    for (int i = 0; i <= ENTITY_REDORE; i++) {
+
+        if (i == GLOBALS.player->inventory_index)
+            wattron(invwin->win, COLOR_PAIR(SKIN_INVENTORY_SELECTED));
+        else
+            wattron(invwin->win, COLOR_PAIR(SKIN_NULL + i));
+
+        mvwprintw(invwin->win, i, 1, "%d. %d (%d)",
+                i, ENTITY_AIR + i, GLOBALS.player->inventory[i]);
+
+        mvwprintw(stdscr, invwin->y, invwin->x+invwin->w+2, "index=%d",
+                GLOBALS.player->inventory_index);
+    }
+
+    wnoutrefresh(invwin->win);
+}
+
 void draw_widgetwin_nogui(window_t *widgetwin) {}
 
 void draw_widgetwin_rt_clock(window_t *widgetwin) {
@@ -504,7 +530,7 @@ int UI_init(int nogui_mode) {
 
     getmaxyx(stdscr, LINES, COLS);
 
-    int gwx, gwy, gww, gwh, uwx, uwy, uww, uwh;
+    int gwx, gwy, gww, gwh, uwx, uwy, uww, uwh, iwx, iwy, iww, iwh;
     gwx = COLS  * .05 - 1;
     gwy = LINES * .08;
     gww = COLS  * .6;
@@ -515,15 +541,26 @@ int UI_init(int nogui_mode) {
     uww = COLS  * .8 - 1;
     uwh = LINES * .2 - 1;
 
-    window_t *gamewin, *uiwin;
+    iwx = gwx + gww + 2;
+    iwy = gwy;
+    iww = 10;
+    iwh = 10;
+
+    window_t *gamewin, *uiwin, *invwin;
 
     window_mgr_init(4);
-    gamewin    = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", ENTITY_PLAYER);
-    uiwin      = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", ENTITY_DIAMOND);
-    g_widgetwin  = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", ENTITY_REDORE);
+    gamewin     = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", ENTITY_PLAYER);
+    uiwin       = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", ENTITY_DIAMOND);
+    invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", ENTITY_DIAMOND);
+    g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", ENTITY_REDORE);
+
+    assert_log(gamewin && uiwin && invwin && g_widgetwin,
+            "Failed to initialize windows: game<%p> ui<%p> inv<%p> widget<%p>",
+            gamewin, uiwin, invwin, g_widgetwin);
 
     window_insert_draw_func(gamewin,        nogui_mode ? draw_gamewin_nogui     : draw_gamewin);
     window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);
+    window_insert_draw_func(invwin,         nogui_mode ? draw_invwin_nogui      : draw_invwin);
     window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
     window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
 
@@ -558,6 +595,7 @@ int UI_init(int nogui_mode) {
     // These functions require colors initialized
     box_win(gamewin);
     box_win(uiwin);
+    box_win(invwin);
     g_widgetwin->active = 0;
 
     wnoutrefresh(stdscr);

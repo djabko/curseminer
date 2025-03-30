@@ -51,6 +51,7 @@ typedef enum {
     SKIN_REDORE,
     SKIN_PLAYER,
     SKIN_CHASER,
+    SKIN_INVENTORY_SELECTED,
     SKIN_END,
 } SkinTypeID;
 

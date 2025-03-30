@@ -113,6 +113,24 @@ void game_input_break_tile_mouse(InputEvent *ie) {
     }
 }
 
+void game_input_inventory_up(InputEvent *ie) {
+    Entity* p = GLOBALS.player;
+
+    if (ie->state == ES_DOWN)
+        p->inventory_index = (p->inventory_index + 1) % ENTITY_END;
+}
+
+void game_input_inventory_down(InputEvent *ie) {
+    Entity* p = GLOBALS.player;
+
+    if (ie->state == ES_DOWN) {
+        p->inventory_index = p->inventory_index - 1;
+
+        if (p->inventory_index < 0)
+            p->inventory_index += ENTITY_END - 1;
+    }
+}
+
 
 /* Helper Functions */
 int game_on_screen(int x, int y) {
@@ -269,14 +287,15 @@ void create_entity_type(Skin* skin) {
 }
 
 int init_skins() {
-    create_skin(SKIN_NULL,        ' ', 0, 0, 0, 255, 255, 255);
-    create_skin(SKIN_DEFAULT,     '*', 0, 0, 0, 120, 120, 120);
-    create_skin(SKIN_GOLD,        'o', 0, 0, 0, 255, 215,   0);
-    create_skin(SKIN_DIAMOND,     '&', 0, 0, 0,  80, 240, 220);
-    create_skin(SKIN_IRON,        'f', 0, 0, 0, 120, 120, 120);
-    create_skin(SKIN_REDORE,      '.', 0, 0, 0, 120,   6,   2);
-    create_skin(SKIN_PLAYER,      'D', 0, 0, 0, 255, 215,   0);
-    create_skin(SKIN_CHASER,  'M', 0, 0, 0, 215, 215,   50);
+    create_skin(SKIN_NULL,                  ' ', 0, 0, 0, 255, 255, 255);
+    create_skin(SKIN_DEFAULT,               '*', 0, 0, 0, 120, 120, 120);
+    create_skin(SKIN_GOLD,                  'o', 0, 0, 0, 255, 215,   0);
+    create_skin(SKIN_DIAMOND,               '&', 0, 0, 0,  80, 240, 220);
+    create_skin(SKIN_IRON,                  'f', 0, 0, 0, 120, 120, 120);
+    create_skin(SKIN_REDORE,                '.', 0, 0, 0, 120,   6,   2);
+    create_skin(SKIN_PLAYER,                'D', 0, 0, 0, 255, 215,   0);
+    create_skin(SKIN_CHASER,                'M', 0, 0, 0, 215, 215,  50);
+    create_skin(SKIN_INVENTORY_SELECTED,    ' ', 0, 0, 0,  42, 133,  57);
     return 1;
 }
 
@@ -336,8 +355,6 @@ int game_update(Task* task, Stack64* stack) {
             bool down = g_player_moving_down;
             bool left = g_player_moving_left;
             bool right = g_player_moving_right;
-
-            log_debug("%d %d %d %d", up, down, left, right);
 
             if (up || down || left || right) {
 
@@ -416,6 +433,8 @@ int game_init() {
     input_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
     input_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
     input_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
+    input_register_event(E_KB_E,    E_CTX_GAME, game_input_inventory_up);
+    input_register_event(E_KB_R,    E_CTX_GAME, game_input_inventory_down);
     input_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
     input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
     input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);

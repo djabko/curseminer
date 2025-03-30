@@ -97,7 +97,12 @@ void tick_entity_behaviour(Entity* e) {
             break;
 
         case be_place:
-            game_world_setxy(e->x, e->y, ENTITY_STONE);
+            if (entity_inventory_selected(e)) {
+                int id = e->inventory_index;
+                game_world_setxy(e->x, e->y, id);
+                e->inventory[id]--;
+            }
+
             break;
 
         case be_break:
@@ -114,10 +119,11 @@ void tick_entity_behaviour(Entity* e) {
                 + -1 * (f == ENTITY_FACING_UP
                     || f == ENTITY_FACING_UL || f == ENTITY_FACING_UR);
 
-            log_debug("Breaking in direction: %d,%d (%d)", c_x, c_y, e->facing);
-
             int x = e->x + c_x;
             int y = e->y + c_y;
+            int tid = world_getxy(GLOBALS.game->world, x, y);
+
+            entity_inventory_add(e, tid);
             world_setxy(GLOBALS.game->world, x, y, 0);
 
             if (game_on_screen(x, y))
@@ -224,6 +230,23 @@ void default_find_path(Entity* e, int x, int y) {
     entity_command(e, be);
 }
 
+void entity_inventory_add(Entity *e, int tid) {
+    if (!e->inventory)
+        e->inventory = calloc(ENTITY_END, sizeof(typeof(ENTITY_END)));
+    
+    e->inventory[tid]++;
+}
+
+int entity_inventory_get(Entity *e, int tid) {
+    if (e->inventory) return *(e->inventory + tid);
+    return 0;
+}
+
+int entity_inventory_selected(Entity* e) {
+    return entity_inventory_get(e, e->inventory_index);
+}
+
+
 /* Defines player action for each tick */
 void player_tick(Entity* player) {
     tick_entity_behaviour(player);
@@ -267,6 +290,8 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
     new_entity->facing = face;
     new_entity->next_tick = TIMER_NOW_MS;
     new_entity->moving = false;
+    new_entity->inventory = NULL;
+    new_entity->inventory_index = 0;
 
     create_default_entity_controller();
     new_entity->controller = DEFAULT_CONTROLLER;
@@ -282,6 +307,7 @@ void entity_rm(World* world, Entity* entity) {
     if (world->entity_c <= 0) return;
     entity->id = -1;
     entity->type = NULL;
+    if (entity->inventory) free(entity->inventory);
     world->entity_c--;
 }
 

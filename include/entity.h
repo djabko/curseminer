@@ -47,5 +47,8 @@ void entity_kill_by_id(int);
 void entity_kill_by_pos(int, int);
 void entity_rm(World*, Entity*);
 void entity_set_keyboard_controller(Entity*);
+void entity_inventory_add(Entity*, int);
+int entity_inventory_get(Entity*, int);
+int entity_inventory_selected(Entity*);
 
 #endif
