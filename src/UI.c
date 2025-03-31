@@ -8,7 +8,7 @@
 #include "util.h"
 #include "stack64.h"
 #include "UI.h"
-#include "game.h"
+#include "core_game.h"
 #include "input.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion

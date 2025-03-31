@@ -67,7 +67,6 @@ typedef enum {
     ENTITY_END,
 } EntityTypeID;
 
-
 typedef struct Skin {
     int id;
     char character;
@@ -92,7 +91,17 @@ typedef struct GameContext {
         entity_types_max, scroll_threshold;
     EntityType *entity_types;
     Skin *skins;
+
+    int (*f_init)(int);
+    int (*f_update)();
+    int (*f_free)();
 } GameContext;
+
+
+void game_create_skin(int id, char c, color_t, color_t, color_t,
+        color_t, color_t, color_t);
+void game_create_entity_type(Skin* skin);
+
 
 int game_init();
 void game_free();

@@ -2,7 +2,7 @@
 #define ENTITY_HEADER
 
 #include "stack64.h"
-#include "game.h"
+#include "core_game.h"
 #include "world.h"
 
 typedef enum {

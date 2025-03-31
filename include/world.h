@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "game.h"
+#include "core_game.h"
 #include "timer.h"
 
 typedef struct EntityType EntityType;

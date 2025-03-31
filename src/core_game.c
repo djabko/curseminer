@@ -4,10 +4,11 @@
 
 #include "globals.h"
 #include "util.h"
-#include "game.h"
+#include "core_game.h"
 #include "world.h"
 #include "entity.h"
 #include "stack64.h"
+#include "games/curseminer.h"
 
 #define GAME_REFRESH_RATE 20
 
@@ -248,7 +249,7 @@ void game_flush_dirty() {
     df->command = -1;
 }
 
-void create_skin(int id, char c,
+void game_create_skin(int id, char c,
         color_t bg_r, color_t bg_g, color_t bg_b,
         color_t fg_r, color_t fg_g, color_t fg_b) {
 
@@ -273,7 +274,7 @@ void create_skin(int id, char c,
     skin->fg_b = fg_b;
 }
 
-void create_entity_type(Skin* skin) {
+void game_create_entity_type(Skin* skin) {
     if (g_game->entity_types_c == g_game->entity_types_max) {
         g_game->entity_types_max *= 2;
 
@@ -284,26 +285,6 @@ void create_entity_type(Skin* skin) {
     EntityType* entitiyt = g_game->entity_types + g_game->entity_types_c;
     entitiyt->skin = skin;
     entitiyt->id = g_game->entity_types_c++;
-}
-
-int init_skins() {
-    create_skin(SKIN_NULL,                  ' ', 0, 0, 0, 255, 255, 255);
-    create_skin(SKIN_DEFAULT,               '*', 0, 0, 0, 120, 120, 120);
-    create_skin(SKIN_GOLD,                  'o', 0, 0, 0, 255, 215,   0);
-    create_skin(SKIN_DIAMOND,               '&', 0, 0, 0,  80, 240, 220);
-    create_skin(SKIN_IRON,                  'f', 0, 0, 0, 120, 120, 120);
-    create_skin(SKIN_REDORE,                '.', 0, 0, 0, 120,   6,   2);
-    create_skin(SKIN_PLAYER,                'D', 0, 0, 0, 255, 215,   0);
-    create_skin(SKIN_CHASER,                'M', 0, 0, 0, 215, 215,  50);
-    create_skin(SKIN_INVENTORY_SELECTED,    ' ', 0, 0, 0,  42, 133,  57);
-    return 1;
-}
-
-void init_entity_types() {
-    int c = g_game->skins_c;
-    for (int i=0; i<c; i++)
-        create_entity_type( g_game->skins + i );
-    g_game->entity_types_c = c;
 }
 
 int game_update(Task* task, Stack64* stack) {
@@ -383,6 +364,8 @@ int game_update(Task* task, Stack64* stack) {
         }
     }
 
+    g_game->f_update();
+
     tk_sleep(task, 1000 / GAME_REFRESH_RATE);
 
     return 0;
@@ -407,9 +390,10 @@ int game_init() {
     g_game->world_view_x = 0;
     g_game->world_view_y = 0;
     g_game->scroll_threshold = 5;
+    g_game->f_init = game_curseminer_init;
+    g_game->f_update = game_curseminer_update;
+    g_game-> f_free = game_curseminer_free;
 
-    init_skins();
-    init_entity_types();
     g_game->world = world_init(20, g_game->skins_c - 1, PAGE_SIZE * 64);
     game_init_dirty_flags();
 
@@ -424,6 +408,7 @@ int game_init() {
 
     player->speed = 1;
     entity_set_keyboard_controller(player);
+
     input_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
     input_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
     input_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
@@ -442,10 +427,13 @@ int game_init() {
     GLOBALS.player = player;
     GLOBALS.game = g_game;
 
+    g_game->f_init(0);
+
     return status;
 }
 
 void game_free() {
+    g_game->f_free();
     world_free(g_game->world);
     free(g_game->entity_types);
     free(g_game->skins);
