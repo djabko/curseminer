@@ -29,6 +29,18 @@ typedef enum ChunkType {
     CHUNK_TYPE_MINE,
 } ChunkType;
 
+typedef enum {
+    ENTITY_AIR,
+    ENTITY_STONE,
+    ENTITY_GOLD,
+    ENTITY_DIAMOND,
+    ENTITY_IRON,
+    ENTITY_REDORE,
+    ENTITY_PLAYER,
+    ENTITY_CHASER,
+    ENTITY_END,
+} EntityTypeID;
+
 typedef struct Chunk {
     char *data;
     int tl_x, tl_y;

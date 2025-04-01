@@ -1,6 +1,8 @@
 #ifndef UI_HEADER
 #define UI_HEADER
 
+#define GLYPH_MAX 256
+
 int UI_init();
 int UI_loop();
 int UI_exit();

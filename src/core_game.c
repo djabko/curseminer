@@ -18,13 +18,6 @@ byte_t *WORLD_ENTITY_CACHE;
 byte_t *GAME_ENTITY_CACHE;
 DirtyFlags *GAME_DIRTY_FLAGS;
 
-bool g_player_moving_changed = false;
-bool g_player_moving_up = false;
-bool g_player_moving_down = false;
-bool g_player_moving_left = false;
-bool g_player_moving_right = false;
-bool g_player_crouching = false;
-
 int world_from_mouse_xy(InputEvent *ie, int *world_x, int *world_y) {
     uint16_t x = ie->data >> 16 * 0;
     uint16_t y = ie->data >> 16 * 1;
@@ -42,94 +35,6 @@ int world_from_mouse_xy(InputEvent *ie, int *world_x, int *world_y) {
     *world_y = y - gwy + wvy;
 
     return 0;
-}
-
-void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_kd_reset) {
-    if (ie->state == ES_DOWN) {
-        *on_kd_true = true;
-        *on_kd_reset = false;
-
-    } else *on_kd_true = false;
-
-    g_player_crouching = ie->mods && E_MOD_CROUCHING;
-
-    g_player_moving_changed = true;
-}
-
-void game_input_move_up(InputEvent *ie) {
-    game_input_player_state(ie, &g_player_moving_up, &g_player_moving_down);
-}
-
-void game_input_move_left(InputEvent *ie) {
-    game_input_player_state(ie, &g_player_moving_left, &g_player_moving_right);
-}
-
-void game_input_move_down(InputEvent *ie) {
-    game_input_player_state(ie, &g_player_moving_down, &g_player_moving_up);
-}
-
-void game_input_move_right(InputEvent *ie) {
-    game_input_player_state(ie, &g_player_moving_right, &g_player_moving_left);
-}
-
-void game_input_place_tile(InputEvent *ie) {
-    if (ie->state == ES_DOWN)
-        qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
-}
-
-void game_input_spawn_chaser(InputEvent *ie) {
-    if (ie->state == ES_DOWN) {
-        int x, y;
-        int s = (20 + rand()) % 150;
-        EntityType* skin = g_game->entity_types + ENTITY_CHASER;
-
-        if (world_from_mouse_xy(ie, &x, &y) != 0) return;
-
-        Entity *e = entity_spawn(g_game->world, skin,
-                x, y, ENTITY_FACING_RIGHT, 1, 0);
-
-        e->speed = s;
-    }
-}
-
-void game_input_break_tile(InputEvent *ie) {
-    entity_command(GLOBALS.player, be_break);
-}
-
-void game_input_break_tile_mouse(InputEvent *ie) {
-    // TODO must be moved outside interrupt handler logic, this is too slow
-    if (ie->state == ES_DOWN) {
-        int x, y;
-
-        if (world_from_mouse_xy(ie, &x, &y) != 0) return;
-
-        EntityType *id = game_world_getxy(x, y);
-        int d = man_dist(GLOBALS.player->x, GLOBALS.player->y, x, y);
-
-        bool is_tile_exists = id != E_TYPE_NULL;
-        bool is_player_close = d < TILE_BREAK_DISTANCE;
-
-        if (is_tile_exists && is_player_close)
-            game_world_setxy(x, y, E_TYPE_NULL);
-    }
-}
-
-void game_input_inventory_up(InputEvent *ie) {
-    Entity* p = GLOBALS.player;
-
-    if (ie->state == ES_DOWN)
-        p->inventory_index = (p->inventory_index + 1) % ENTITY_END;
-}
-
-void game_input_inventory_down(InputEvent *ie) {
-    Entity* p = GLOBALS.player;
-
-    if (ie->state == ES_DOWN) {
-        p->inventory_index = p->inventory_index - 1;
-
-        if (p->inventory_index < 0)
-            p->inventory_index += ENTITY_END - 1;
-    }
 }
 
 
@@ -249,22 +154,11 @@ void game_flush_dirty() {
     df->command = -1;
 }
 
-void game_create_skin(int id, char c,
+void game_create_skin(Skin *skin, int id,
         color_t bg_r, color_t bg_g, color_t bg_b,
         color_t fg_r, color_t fg_g, color_t fg_b) {
 
-    if (g_game->skins_c == g_game->skins_max) {
-
-        g_game->skins_max *= 2;
-
-        size_t ns = g_game->skins_max * sizeof(Skin);
-        g_game->skins = realloc(g_game->skins, ns);
-    }
-    
-    Skin* skin = g_game->skins + g_game->skins_c++;
-
-    skin->id = id;
-    skin->character = c;
+    skin->glyph = id;
 
     skin->bg_r = bg_r;
     skin->bg_g = bg_g;
@@ -274,17 +168,9 @@ void game_create_skin(int id, char c,
     skin->fg_b = fg_b;
 }
 
-void game_create_entity_type(Skin* skin) {
-    if (g_game->entity_types_c == g_game->entity_types_max) {
-        g_game->entity_types_max *= 2;
-
-        size_t ns = g_game->entity_types_max * sizeof(EntityType);
-        g_game->entity_types = realloc(g_game->entity_types, ns);
-    }
-
-    EntityType* entitiyt = g_game->entity_types + g_game->entity_types_c;
-    entitiyt->skin = skin;
-    entitiyt->id = g_game->entity_types_c++;
+void game_create_entity_type(EntityType *type, Skin* skin) {
+    type->default_skin = skin;
+    type->id = g_game->entity_types_c++;
 }
 
 int game_update(Task* task, Stack64* stack) {
@@ -305,64 +191,7 @@ int game_update(Task* task, Stack64* stack) {
         }
     }
 
-    Entity *plr = GLOBALS.player;
-    int wvx = g_game->world_view_x;
-    int wvy = g_game->world_view_y;
-    int sth = g_game->scroll_threshold;
-    int mxx = GLOBALS.view_port_maxx;
-    int mxy = GLOBALS.view_port_maxy;
 
-    byte_t leftb = plr->x < wvx + sth;
-    byte_t topb = plr->y < wvy + sth;
-    byte_t rightb = plr->x >= wvx + mxx - sth;
-    byte_t bottomb = plr->y >= wvy + mxy - sth;
-
-    if (leftb || topb || rightb || bottomb || g_player_moving_changed) {
-        
-        // Check for screen scrolling
-        if      (leftb)      g_game->world_view_x--;
-        else if (rightb)     g_game->world_view_x++;
-        if      (topb)       g_game->world_view_y--;
-        else if (bottomb)    g_game->world_view_y++;
-
-        flush_world_entity_cache();
-        flush_game_entity_cache();
-        game_flush_dirty();
-
-        // Check for player movement
-        if (g_player_moving_changed) {
-            Entity *player = GLOBALS.player;
-            bool up = g_player_moving_up;
-            bool down = g_player_moving_down;
-            bool left = g_player_moving_left;
-            bool right = g_player_moving_right;
-
-            if (up || down || left || right) {
-
-                if      (up && left)    entity_command(player, be_face_ul);
-                else if (up && right)   entity_command(player, be_face_ur);
-                else if (down && left)  entity_command(player, be_face_dl);
-                else if (down && right) entity_command(player, be_face_dr);
-                else if (up)            entity_command(player, be_face_up);
-                else if (down)          entity_command(player, be_face_down);
-                else if (left)          entity_command(player, be_face_left);
-                else if (right)         entity_command(player, be_face_right);
-
-                if (!player->moving) {
-
-                    if (g_player_crouching)
-                        entity_command(player, be_move_one);
-                    else 
-                        entity_command(player, be_move);
-                }
-
-
-            } else if (player->moving)
-                entity_command(player, be_stop);
-
-            g_player_moving_changed = false;
-        }
-    }
 
     g_game->f_update();
 
@@ -403,31 +232,10 @@ int game_init() {
     int e_x, e_y;
     Entity *player, *entity;
 
-    player = entity_spawn(g_game->world, g_game->entity_types + ENTITY_PLAYER,
-            20, 20, ENTITY_FACING_RIGHT, 1, 0);
-
-    player->speed = 1;
-    entity_set_keyboard_controller(player);
-
-    input_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
-    input_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
-    input_register_event(E_KB_RIGHT,E_CTX_GAME, game_input_move_right);
-    input_register_event(E_KB_W,    E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_A,    E_CTX_GAME, game_input_move_left);
-    input_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
-    input_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
-    input_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
-    input_register_event(E_KB_E,    E_CTX_GAME, game_input_inventory_up);
-    input_register_event(E_KB_R,    E_CTX_GAME, game_input_inventory_down);
-    input_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
-    input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
-    input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
-
     GLOBALS.player = player;
     GLOBALS.game = g_game;
 
-    g_game->f_init(0);
+    g_game->f_init(g_game, 0);
 
     return status;
 }
@@ -448,7 +256,7 @@ EntityType *game_world_getxy(int x, int y) {
     int id = game_cache_get(GAME_ENTITY_CACHE, x, y);
     id = id > 0 ? id : game_cache_get(WORLD_ENTITY_CACHE, x, y);
 
-    assert_log(ENTITY_AIR <= id && id < ENTITY_END,
+    assert_log(0 <= id && id < g_game->entity_types_c,
             "attempting to access invalid id %d at position (%d,%d)", id, x, y);
 
     return g_game->entity_types + id;
@@ -461,13 +269,13 @@ EntityType *game_cache_getxy(int index) {
     assert_log(index < GLOBALS.view_port_maxx * GLOBALS.view_port_maxy,
             "attempting to access invalid game screen cache ID at index=%d", index);
 
-    assert_log(id < ENTITY_AIR || ENTITY_END <= id,
+    assert_log(id < 0 || g_game->entity_types_c <= id,
             "attempting to access invalid id %d at index %d", id, index);
 
     return g_game->entity_types + id;
 }
 
-int game_world_setxy(int x, int y, EntityTypeID tid) {
+int game_world_setxy(int x, int y, entity_id_t tid) {
     world_setxy(g_game->world, x, y, tid);
     
     x -= g_game->world_view_x;
@@ -479,7 +287,7 @@ int game_world_setxy(int x, int y, EntityTypeID tid) {
     return 0;
 }
 
-int game_cache_setxy(int index, EntityTypeID tid) {
+int game_cache_setxy(int index, entity_id_t tid) {
     if (index < GLOBALS.view_port_maxx * GLOBALS.view_port_maxy) return -1;
 
     GAME_ENTITY_CACHE[index] = tid;

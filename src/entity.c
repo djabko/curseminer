@@ -231,8 +231,11 @@ void default_find_path(Entity* e, int x, int y) {
 }
 
 void entity_inventory_add(Entity *e, int tid) {
-    if (!e->inventory)
-        e->inventory = calloc(ENTITY_END, sizeof(typeof(ENTITY_END)));
+    if (!e->inventory) {
+        int count = GLOBALS.game->entity_types_c;
+
+        e->inventory = calloc(count, sizeof(typeof(count)));
+    }
     
     e->inventory[tid]++;
 }

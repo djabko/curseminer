@@ -3,6 +3,7 @@
 
 #include "stack64.h"
 #include "scheduler.h"
+#include "input.h"
 #include "world.h"
 
 #define E_MOD_CROUCHING E_MOD_0
@@ -19,6 +20,7 @@ extern byte_t *WORLD_ENTITY_CACHE;
 extern byte_t *GAME_ENTITY_CACHE;
 extern DirtyFlags *GAME_DIRTY_FLAGS;
 
+int world_from_mouse_xy(InputEvent*, int *world_x, int *world_y);
 int game_on_screen(int, int);
 void game_cache_set(byte_t*, int, int, byte_t);
 void gamew_cache_set(byte_t*, int, int, byte_t);
@@ -27,8 +29,11 @@ byte_t gamew_cache_get(byte_t*, int, int);
 byte_t game_world_dirty(int x, int y);
 void game_set_dirty(int, int, int);
 void game_flush_dirty();
+void flush_game_entity_cache();
+void flush_world_entity_cache();
 
 typedef byte_t color_t;
+typedef int entity_id_t;
 
 typedef enum {
     DIRECTION_NULL,
@@ -42,34 +47,8 @@ typedef enum {
     DIRECTION_DOWN_RIGHT
 } Direction;
 
-typedef enum {
-    SKIN_NULL,
-    SKIN_DEFAULT,
-    SKIN_GOLD,
-    SKIN_DIAMOND,
-    SKIN_IRON,
-    SKIN_REDORE,
-    SKIN_PLAYER,
-    SKIN_CHASER,
-    SKIN_INVENTORY_SELECTED,
-    SKIN_END,
-} SkinTypeID;
-
-typedef enum {
-    ENTITY_AIR,
-    ENTITY_STONE,
-    ENTITY_GOLD,
-    ENTITY_DIAMOND,
-    ENTITY_IRON,
-    ENTITY_REDORE,
-    ENTITY_PLAYER,
-    ENTITY_CHASER,
-    ENTITY_END,
-} EntityTypeID;
-
 typedef struct Skin {
-    int id;
-    char character;
+    int glyph;
     unsigned char bg_r, 
                   bg_g,
                   bg_b,
@@ -81,7 +60,7 @@ typedef struct Skin {
 typedef struct EntityType {
     int id;
     char *name;
-    Skin *skin;
+    Skin *default_skin;
 } EntityType;
 
 typedef struct World World;
@@ -92,15 +71,15 @@ typedef struct GameContext {
     EntityType *entity_types;
     Skin *skins;
 
-    int (*f_init)(int);
+    int (*f_init)(struct GameContext*, int);
     int (*f_update)();
     int (*f_free)();
 } GameContext;
 
 
-void game_create_skin(int id, char c, color_t, color_t, color_t,
+void game_create_skin(Skin*, int id, color_t, color_t, color_t,
         color_t, color_t, color_t);
-void game_create_entity_type(Skin* skin);
+void game_create_entity_type(EntityType*, Skin*);
 
 
 int game_init();
@@ -108,8 +87,8 @@ void game_free();
 int game_update(Task*, Stack64*);
 EntityType *game_world_getxy(int x, int y);
 EntityType *game_cache_getxy(int i);
-int game_world_setxy(int x, int y, EntityTypeID);
-int game_cache_setxy(int i, EntityTypeID);
+int game_world_setxy(int x, int y, entity_id_t);
+int game_cache_setxy(int i, entity_id_t);
 GameContext* game_get_context();
 
 #endif

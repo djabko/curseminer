@@ -19,7 +19,7 @@ typedef void (*voidfunc) ();
 typedef struct window_t {
     WINDOW *win;
     Queue64 *draw_qu;
-    SkinTypeID color;
+    int color;
     event_ctx_t input_context;
 
     struct window_t *parent;
@@ -44,6 +44,9 @@ Stack64* MENU_STACK = NULL;
 int LINES = 0;
 int COLS = 0;
 
+bool g_glyph_init[GLYPH_MAX];
+char g_glyph_charset[GLYPH_MAX];
+
 milliseconds_t TIME_MSEC = 0;
 
 static inline char sign_of_int(int x) {
@@ -52,6 +55,9 @@ static inline char sign_of_int(int x) {
     else if (x > 0)  return '+';
     return '\0';
 }
+
+int new_glyph(Skin *skin);
+
 
 /* Input Handler Functions*/
 double WIDGET_WIN_C = 1;
@@ -249,7 +255,7 @@ void draw_gamewin_nogui(window_t *gamewin) {
 
 //int SKIPPED_UPDATES = 0;
 void draw_gamewin(window_t *gamewin) {
-    EntityType* entity;
+    EntityType* type;
 
     DirtyFlags *df = GAME_DIRTY_FLAGS;
 
@@ -276,9 +282,14 @@ void draw_gamewin(window_t *gamewin) {
                         int x = index % maxx;
                         int y = index / maxx;
 
-                        entity = game_world_getxy(x, y);
-                        wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
-                        mvwaddch(gamewin->win, y, x, entity->skin->character);
+                        type = game_world_getxy(x, y);
+
+                        int glyph = type->default_skin->glyph;
+
+                        if (!g_glyph_init[glyph]) new_glyph(type->default_skin);
+
+                        wattron(gamewin->win, COLOR_PAIR(glyph));
+                        mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
                         game_set_dirty(x, y, 0);
                     }
                 }
@@ -290,9 +301,14 @@ void draw_gamewin(window_t *gamewin) {
         for (int y=0; y < gamewin->h; y++) {
             for (int x=0; x < gamewin->w; x++) {
 
-                entity = game_world_getxy(x, y);
-                wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
-                mvwaddch(gamewin->win, y, x, entity->skin->character);
+                type = game_world_getxy(x, y);
+
+                int glyph = type->default_skin->glyph;
+
+                if (!g_glyph_init[glyph]) new_glyph(type->default_skin);
+
+                wattron(gamewin->win, COLOR_PAIR(glyph));
+                mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
             }
         }
 
@@ -341,15 +357,15 @@ void draw_invwin(window_t *invwin) {
 
     werase(invwin->win);
 
-    for (int i = 0; i <= ENTITY_REDORE; i++) {
+    for (int i = 0; i <= 10; i++) {
 
         if (i == GLOBALS.player->inventory_index)
-            wattron(invwin->win, COLOR_PAIR(SKIN_INVENTORY_SELECTED));
+            wattron(invwin->win, COLOR_PAIR(0));
         else
-            wattron(invwin->win, COLOR_PAIR(SKIN_NULL + i));
+            wattron(invwin->win, COLOR_PAIR(i));
 
         mvwprintw(invwin->win, i, 1, "%d. %d (%d)",
-                i, ENTITY_AIR + i, GLOBALS.player->inventory[i]);
+                i, i, GLOBALS.player->inventory[i]);
 
         mvwprintw(stdscr, invwin->y, invwin->x+invwin->w+2, "index=%d",
                 GLOBALS.player->inventory_index);
@@ -423,25 +439,33 @@ void draw_main_menu() {
 }
 
 /* Init Functions */
-int init_colors() {
-    GameContext* game = game_get_context();
+int new_glyph(Skin *skin) {
+    int fg = 0;
+    int bg = 1;
+    int err = 0;
 
-    int color_id = 0;
-    for (int i=0; i<game->skins_c; i++) {
-        int bg = color_id++;
-        int fg = color_id++;
+    err += init_color(fg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
+    err += init_color(bg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
 
-        Skin* skin = game->skins + i;
-        init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
-        init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
+    err += init_pair(skin->glyph, fg, bg);
 
-        init_pair(skin->id, fg, bg);
-    }
+    g_glyph_init[skin->glyph] = true;
 
-    return 1;
+    return err;
 }
 
-int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, SkinTypeID color) {
+int init_colors() {
+    for (int i = 0; i < GLYPH_MAX; i++) {
+        g_glyph_init[i] = false;
+    }
+
+    const char *s = "aeiouqwerty12345";
+    for (int i = 0; i != strlen(s); i++) g_glyph_charset[i] = s[i];
+
+    return 0;
+}
+
+int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, int color) {
     window->win = newwin(h, w, y, x);
     window->parent = parent;
     window->draw_qu = qu_init(1);
@@ -481,7 +505,7 @@ int window_mgr_init(int size) {
     return WINDOW_MGR.mempool != NULL;
 }
 
-window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, SkinTypeID color) {
+window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, int color) {
     if (WINDOW_MGR.count >= WINDOW_MGR.max) return NULL;
 
     window_t *win = &WINDOW_MGR.mempool[ WINDOW_MGR.count++ ];
@@ -549,10 +573,10 @@ int UI_init(int nogui_mode) {
     window_t *gamewin, *uiwin, *invwin;
 
     window_mgr_init(4);
-    gamewin     = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", ENTITY_PLAYER);
-    uiwin       = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", ENTITY_DIAMOND);
-    invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", ENTITY_DIAMOND);
-    g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", ENTITY_REDORE);
+    gamewin     = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", 0);
+    uiwin       = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", 1);
+    invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", 2);
+    g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", 3);
 
     assert_log(gamewin && uiwin && invwin && g_widgetwin,
             "Failed to initialize windows: game<%p> ui<%p> inv<%p> widget<%p>",
