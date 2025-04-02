@@ -45,7 +45,10 @@ int LINES = 0;
 int COLS = 0;
 
 bool g_glyph_init[GLYPH_MAX];
-char g_glyph_charset[GLYPH_MAX];
+char g_glyph_charset_0[GLYPH_MAX];
+char g_glyph_charset_1[GLYPH_MAX];
+char g_glyph_charset_2[GLYPH_MAX];
+char *g_glyph_charset = g_glyph_charset_0;
 
 milliseconds_t TIME_MSEC = 0;
 
@@ -65,8 +68,8 @@ static inline char sign_of_int(int x) {
 /* Utility Functions */
 int COLORS_COUNT = 0;
 int new_glyph(Skin *skin) {
-    int fg = COLORS_COUNT++;
     int bg = COLORS_COUNT++;
+    int fg = COLORS_COUNT++;
     int err = 0;
 
     err += init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
@@ -221,13 +224,9 @@ void box_win(window_t *window) {
             window->x - 1, window->y - 1,
             window->x + window->w,
             window->y + window->h);
-
-    wattroff(stdscr, COLOR_PAIR(window->glyph));
 }
 
 void box_win_clear(window_t * window) {
-    wattrset(stdscr, A_NORMAL);
-
     chtype spc = ' ';
 
     mvwprintw(stdscr, window->y-2, window->x, "                      ");
@@ -477,8 +476,12 @@ int init_colors() {
         g_glyph_init[i] = false;
     }
 
-    const char *s = " eiouqwerty12345";
-    for (int i = 0; i != strlen(s); i++) g_glyph_charset[i] = s[i];
+    const char *s0 = " 123456789a";
+    const char *s1 = " eiouqwerty";
+    const char *s2 = " **********";
+    for (int i = 0; i != strlen(s0); i++) g_glyph_charset_0[i] = s0[i];
+    for (int i = 0; i != strlen(s1); i++) g_glyph_charset_1[i] = s1[i];
+    for (int i = 0; i != strlen(s2); i++) g_glyph_charset_2[i] = s2[i];
 
     return 0;
 }
