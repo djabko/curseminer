@@ -79,7 +79,7 @@ typedef struct GameContext {
 
 void game_create_skin(Skin*, int id, color_t, color_t, color_t,
         color_t, color_t, color_t);
-void game_create_entity_type(EntityType*, Skin*);
+EntityType *game_create_entity_type(Skin*);
 
 
 int game_init();

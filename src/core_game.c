@@ -168,9 +168,13 @@ void game_create_skin(Skin *skin, int id,
     skin->fg_b = fg_b;
 }
 
-void game_create_entity_type(EntityType *type, Skin* skin) {
+EntityType* game_create_entity_type(Skin* skin) {
+    EntityType *type = g_game->entity_types + g_game->entity_types_c;
+
     type->default_skin = skin;
     type->id = g_game->entity_types_c++;
+
+    return type;
 }
 
 int game_update(Task* task, Stack64* stack) {
@@ -229,10 +233,6 @@ int game_init() {
     flush_world_entity_cache();
     game_flush_dirty();
 
-    int e_x, e_y;
-    Entity *player, *entity;
-
-    GLOBALS.player = player;
     GLOBALS.game = g_game;
 
     g_game->f_init(g_game, 0);

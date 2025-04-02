@@ -225,7 +225,7 @@ void default_find_path(Entity* e, int x, int y) {
     else if (left)          be = be_face_left;
     else if (right)         be = be_face_right;
     else log_debug("ERROR: unable to execute pathfinding for entity %p(%d, %d)"
-            "with respect to point (%d, %d)}", e->id, e->x, e->y, x, y, be);
+            "with respect to point (%d, %d)}", e, e->x, e->y, x, y);
 
     entity_command(e, be);
 }

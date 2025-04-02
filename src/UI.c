@@ -19,7 +19,7 @@ typedef void (*voidfunc) ();
 typedef struct window_t {
     WINDOW *win;
     Queue64 *draw_qu;
-    int color;
+    int glyph;
     event_ctx_t input_context;
 
     struct window_t *parent;
@@ -49,6 +49,11 @@ char g_glyph_charset[GLYPH_MAX];
 
 milliseconds_t TIME_MSEC = 0;
 
+// TODO glyph management system?
+Skin g_win_skin_0 =     {.glyph = GLYPH_MAX-1, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=215, .fg_g=215, .fg_b=50};
+Skin g_win_skin_1 =     {.glyph = GLYPH_MAX-2, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=80, .fg_g=240, .fg_b=220};
+Skin g_win_skin_2 =     {.glyph = GLYPH_MAX-3, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=120, .fg_g=6, .fg_b=2};
+
 static inline char sign_of_int(int x) {
     if      (x == 0) return ' ';
     else if (x < 0)  return '-';
@@ -56,7 +61,27 @@ static inline char sign_of_int(int x) {
     return '\0';
 }
 
-int new_glyph(Skin *skin);
+
+/* Utility Functions */
+int COLORS_COUNT = 0;
+int new_glyph(Skin *skin) {
+    int fg = COLORS_COUNT++;
+    int bg = COLORS_COUNT++;
+    int err = 0;
+
+    err += init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
+    err += init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
+
+    err += init_pair(skin->glyph, fg, bg);
+
+    g_glyph_init[skin->glyph] = true;
+
+    log_debug("Initialized pair: %d bg(%d %d %d) fg(%d %d %d)",
+            skin->glyph, skin->bg_r, skin->bg_g, skin->bg_b,
+            skin->fg_r, skin->fg_g, skin->fg_b);
+
+    return err;
+}
 
 
 /* Input Handler Functions*/
@@ -188,15 +213,21 @@ void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
 }
 
 void box_win(window_t *window) {
-    wattron(stdscr, COLOR_PAIR(window->color));
+    wattron(stdscr, COLOR_PAIR(window->glyph));
+
     mvwprintw(stdscr, window->y-2, window->x, window->title);
+
     draw_square(stdscr,
             window->x - 1, window->y - 1,
             window->x + window->w,
             window->y + window->h);
+
+    wattroff(stdscr, COLOR_PAIR(window->glyph));
 }
 
 void box_win_clear(window_t * window) {
+    wattrset(stdscr, A_NORMAL);
+
     chtype spc = ' ';
 
     mvwprintw(stdscr, window->y-2, window->x, "                      ");
@@ -249,6 +280,7 @@ void draw_gamewin_nogui(window_t *gamewin) {
     for (int x=0; x <= gamewin->w; x++) {
         for (int y=0; y <= gamewin->h; y++) {
             EntityType *e = game_world_getxy(x, y); 
+            *e;
         }
     }
 }
@@ -322,6 +354,7 @@ void draw_gamewin(window_t *gamewin) {
 
 void draw_uiwin_nogui(window_t *uiwin) {
     EntityType *e = game_world_getxy(1, 1);
+    *e;
 }
 
 void draw_uiwin(window_t *uiwin) {
@@ -439,33 +472,18 @@ void draw_main_menu() {
 }
 
 /* Init Functions */
-int new_glyph(Skin *skin) {
-    int fg = 0;
-    int bg = 1;
-    int err = 0;
-
-    err += init_color(fg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
-    err += init_color(bg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
-
-    err += init_pair(skin->glyph, fg, bg);
-
-    g_glyph_init[skin->glyph] = true;
-
-    return err;
-}
-
 int init_colors() {
     for (int i = 0; i < GLYPH_MAX; i++) {
         g_glyph_init[i] = false;
     }
 
-    const char *s = "aeiouqwerty12345";
+    const char *s = " eiouqwerty12345";
     for (int i = 0; i != strlen(s); i++) g_glyph_charset[i] = s[i];
 
     return 0;
 }
 
-int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, int color) {
+int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, int glyph) {
     window->win = newwin(h, w, y, x);
     window->parent = parent;
     window->draw_qu = qu_init(1);
@@ -475,7 +493,7 @@ int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int
     window->y = y;
     window->w = w;
     window->h = h;
-    window->color = color;
+    window->glyph = glyph;
     window->hidden = 0;
     window->active = 1;
     strncpy(window->title, title, MAX_TITLE);
@@ -505,11 +523,13 @@ int window_mgr_init(int size) {
     return WINDOW_MGR.mempool != NULL;
 }
 
-window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, int color) {
+window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, Skin *skin) {
     if (WINDOW_MGR.count >= WINDOW_MGR.max) return NULL;
 
+    if (!g_glyph_init[skin->glyph]) new_glyph(skin);
+
     window_t *win = &WINDOW_MGR.mempool[ WINDOW_MGR.count++ ];
-    init_window(win, parent, ectx, x, y, w, h, title, color);
+    init_window(win, parent, ectx, x, y, w, h, title, skin->glyph);
     qu_enqueue(WINDOW_MGR.window_qu, (uint64_t) win);
 
     return win;
@@ -573,10 +593,10 @@ int UI_init(int nogui_mode) {
     window_t *gamewin, *uiwin, *invwin;
 
     window_mgr_init(4);
-    gamewin     = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", 0);
-    uiwin       = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", 1);
-    invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", 2);
-    g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", 3);
+    gamewin     = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", &g_win_skin_0);
+    uiwin       = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", &g_win_skin_1);
+    invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", &g_win_skin_1);
+    g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", &g_win_skin_2);
 
     assert_log(gamewin && uiwin && invwin && g_widgetwin,
             "Failed to initialize windows: game<%p> ui<%p> inv<%p> widget<%p>",

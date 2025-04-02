@@ -16,7 +16,7 @@ typedef enum {
 } skin_t;
 
 Skin g_skins[g_skin_end];
-EntityType g_etypes[g_skin_end];
+EntityType* g_etypes[g_skin_end];
 
 bool g_player_moving_changed = false;
 bool g_player_moving_up = false;
@@ -66,7 +66,8 @@ void game_input_spawn_chaser(InputEvent *ie) {
 
         if (world_from_mouse_xy(ie, &x, &y) != 0) return;
 
-        Entity *e = entity_spawn(GLOBALS.game->world, g_etypes + g_skin_chaser,
+        Entity *e = entity_spawn(GLOBALS.game->world,
+                GLOBALS.game->entity_types + g_skin_chaser,
                 x, y, ENTITY_FACING_RIGHT, 1, 0);
 
         e->speed = s;
@@ -117,7 +118,7 @@ int game_curseminer_init(GameContext *game, int) {
     int glyph = 0;
 
     int i = 0;
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 255, 255);
+    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 0, 0, 0);
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0,  80, 240, 220);
@@ -128,11 +129,11 @@ int game_curseminer_init(GameContext *game, int) {
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0,  42, 133,  57);
 
     for (i = 0; i < g_skin_end; i++)
-        game_create_entity_type(g_etypes + i, g_skins + i);
+        g_etypes[i] = game_create_entity_type(g_skins + i);
 
     GLOBALS.game->entity_types_c = g_skin_end;
 
-    Entity *player = entity_spawn(game->world, g_etypes + g_skin_player,
+    Entity *player = entity_spawn(game->world, g_etypes[g_skin_player],
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
 
     player->speed = 1;
@@ -152,6 +153,8 @@ int game_curseminer_init(GameContext *game, int) {
     input_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
     input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
     input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
+
+    GLOBALS.player = player;
 
     return 1;
 }
