@@ -7,8 +7,7 @@
 #include "timer.h"
 #include "entity.h"
 
-EntityController* DEFAULT_CONTROLLER = NULL;
-EntityController* KEYBOARD_CONTROLLER = NULL;
+EntityController DEFAULT_CONTROLLER;
 Entity* ENTITY_ARRAY = NULL;
 int MAX = 32;
 
@@ -249,29 +248,29 @@ int entity_inventory_selected(Entity* e) {
     return entity_inventory_get(e, e->inventory_index);
 }
 
+void entity_tick_abstract(Entity* e) {
+    tick_entity_behaviour(e);
 
-/* Defines player action for each tick */
-void player_tick(Entity* player) {
-    tick_entity_behaviour(player);
-    update_entity_position(player);
+    e->controller->tick(e);
+
+    update_entity_position(e);
 }
 
-int create_default_entity_controller() {
-    DEFAULT_CONTROLLER = calloc(2, sizeof(EntityController));
-    DEFAULT_CONTROLLER->behaviour_queue = qu_init(1);
-    DEFAULT_CONTROLLER->tick = default_tick;
-    DEFAULT_CONTROLLER->find_path = default_find_path;
+int entity_create_controller(
+        EntityController *controller,
+        void(*f_tick)(Entity*),
+        void(*f_find_path)(Entity*,int,int)) {
 
-    KEYBOARD_CONTROLLER = DEFAULT_CONTROLLER + 1;
-    *KEYBOARD_CONTROLLER = *DEFAULT_CONTROLLER;
-    KEYBOARD_CONTROLLER->tick = player_tick;
+    controller->behaviour_queue = qu_init(1);
+    controller->tick = f_tick;
+    controller->find_path = f_find_path;
 
     return 1;
 }
 
-void entity_set_keyboard_controller(Entity* e) {
-    if (!e) return;
-    e->controller = KEYBOARD_CONTROLLER;
+int entity_init_default_controller() {
+    entity_create_controller(&DEFAULT_CONTROLLER,
+            default_tick, default_find_path);
 }
 
 Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing face, int num, int t) {
@@ -296,8 +295,7 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
     new_entity->inventory = NULL;
     new_entity->inventory_index = 0;
 
-    create_default_entity_controller();
-    new_entity->controller = DEFAULT_CONTROLLER;
+    new_entity->controller = &DEFAULT_CONTROLLER;
 
     pq_enqueue(world->entities, new_entity, TIMER_NOW_MS);
 

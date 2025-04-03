@@ -41,6 +41,10 @@ typedef struct EntityController {
     void (*find_path)(Entity*, int, int);
 } EntityController;
 
+int entity_init_default_controller();
+int entity_create_controller(EntityController*, void(*)(Entity*), void(*)(Entity*, int, int));
+void entity_tick_abstract(Entity*);
+
 Entity* entity_spawn(World*, EntityType*, int, int, EntityFacing, int, int);
 int entity_command(Entity*, BehaviourID);
 void entity_kill_by_id(int);

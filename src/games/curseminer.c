@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "games/curseminer.h"
 #include "globals.h"
 #include "util.h"
@@ -17,6 +19,7 @@ typedef enum {
 
 Skin g_skins[g_skin_end];
 EntityType* g_etypes[g_skin_end];
+EntityController g_player_controller;
 
 bool g_player_moving_changed = false;
 bool g_player_moving_up = false;
@@ -114,6 +117,14 @@ void game_input_inventory_down(InputEvent *ie) {
     }
 }
 
+void player_tick(Entity *player) {
+    log_debug("Ticking");
+}
+
+void player_path_find(Entity *player, int x, int y) {
+    return;
+}
+
 int game_curseminer_init(GameContext *game, int) {
     int glyph = 0;
 
@@ -133,11 +144,13 @@ int game_curseminer_init(GameContext *game, int) {
 
     GLOBALS.game->entity_types_c = g_skin_end;
 
+    entity_create_controller(&g_player_controller, player_tick, player_path_find);
     Entity *player = entity_spawn(game->world, g_etypes[g_skin_player],
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
 
     player->speed = 1;
-    entity_set_keyboard_controller(player);
+    player->controller = &g_player_controller;
+
 
     input_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
     input_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);

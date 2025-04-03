@@ -186,7 +186,7 @@ int game_update(Task* task, Stack64* stack) {
         while (_pq_peek(entity_pq, 0) <= TIMER_NOW_MS) {
             Entity *e = (Entity*) pq_dequeue(entity_pq);
 
-            e->controller->tick(e);
+            entity_tick_abstract(e);
             e->next_tick = TIMER_NOW_MS + e->speed * 10;
 
             pq_enqueue(entity_pq, e, e->next_tick);
@@ -228,8 +228,10 @@ int game_init() {
     g_game-> f_free = game_curseminer_free;
 
     g_game->world = world_init(20, g_game->skins_c - 1, PAGE_SIZE * 64);
-    game_init_dirty_flags();
 
+    entity_init_default_controller();
+
+    game_init_dirty_flags();
     flush_world_entity_cache();
     game_flush_dirty();
 
