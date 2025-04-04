@@ -17,18 +17,36 @@ typedef enum {
      g_skin_end,
 } skin_t;
 
-Skin g_skins[g_skin_end];
-EntityType* g_etypes[g_skin_end];
-EntityController g_player_controller;
+typedef enum {
+    be_stop,
+    be_move,
+    be_move_one,
+    be_face_up,
+    be_face_down,
+    be_face_left,
+    be_face_right,
+    be_face_ul,
+    be_face_ur,
+    be_face_dl,
+    be_face_dr,
+    be_place,
+    be_break,
+    be_attack,
+    be_interact
+} BehaviourID;
 
-bool g_player_moving_changed = false;
-bool g_player_moving_up = false;
-bool g_player_moving_down = false;
-bool g_player_moving_left = false;
-bool g_player_moving_right = false;
-bool g_player_crouching = false;
+static Skin g_skins[g_skin_end];
+static EntityType* g_etypes[g_skin_end];
+static EntityController g_player_controller;
 
-void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_kd_reset) {
+static bool g_player_moving_changed = false;
+static bool g_player_moving_up = false;
+static bool g_player_moving_down = false;
+static bool g_player_moving_left = false;
+static bool g_player_moving_right = false;
+static bool g_player_crouching = false;
+
+static void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_kd_reset) {
     if (ie->state == ES_DOWN) {
         *on_kd_true = true;
         *on_kd_reset = false;
@@ -40,28 +58,29 @@ void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_kd_reset
     g_player_moving_changed = true;
 }
 
-void game_input_move_up(InputEvent *ie) {
+static void game_input_move_up(InputEvent *ie) {
     game_input_player_state(ie, &g_player_moving_up, &g_player_moving_down);
 }
 
-void game_input_move_left(InputEvent *ie) {
+static void game_input_move_left(InputEvent *ie) {
     game_input_player_state(ie, &g_player_moving_left, &g_player_moving_right);
 }
 
-void game_input_move_down(InputEvent *ie) {
+static void game_input_move_down(InputEvent *ie) {
     game_input_player_state(ie, &g_player_moving_down, &g_player_moving_up);
 }
 
-void game_input_move_right(InputEvent *ie) {
+static void game_input_move_right(InputEvent *ie) {
     game_input_player_state(ie, &g_player_moving_right, &g_player_moving_left);
 }
 
-void game_input_place_tile(InputEvent *ie) {
+static void game_input_place_tile(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
 }
 
-void game_input_spawn_chaser(InputEvent *ie) {
+static void chaser_tick(Entity*);
+static void game_input_spawn_chaser(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         int x, y;
         int s = (20 + rand()) % 150;
@@ -73,15 +92,17 @@ void game_input_spawn_chaser(InputEvent *ie) {
                 GLOBALS.game->entity_types + g_skin_chaser,
                 x, y, ENTITY_FACING_RIGHT, 1, 0);
 
+        e->controller->tick = chaser_tick;
+
         e->speed = s;
     }
 }
 
-void game_input_break_tile(InputEvent *ie) {
+static void game_input_break_tile(InputEvent *ie) {
     entity_command(GLOBALS.player, be_break);
 }
 
-void game_input_break_tile_mouse(InputEvent *ie) {
+static void game_input_break_tile_mouse(InputEvent *ie) {
     // TODO must be moved outside interrupt handler logic, this is too slow
     if (ie->state == ES_DOWN) {
         int x, y;
@@ -99,14 +120,14 @@ void game_input_break_tile_mouse(InputEvent *ie) {
     }
 }
 
-void game_input_inventory_up(InputEvent *ie) {
+static void game_input_inventory_up(InputEvent *ie) {
     Entity* p = GLOBALS.player;
 
     if (ie->state == ES_DOWN)
         p->inventory_index = (p->inventory_index + 1) % ENTITY_END;
 }
 
-void game_input_inventory_down(InputEvent *ie) {
+static void game_input_inventory_down(InputEvent *ie) {
     Entity* p = GLOBALS.player;
 
     if (ie->state == ES_DOWN) {
@@ -117,18 +138,159 @@ void game_input_inventory_down(InputEvent *ie) {
     }
 }
 
-void player_tick(Entity *player) {
-    log_debug("Ticking");
+static void tick_entity_behaviour(Entity* e) {
+    Queue64* qu = e->controller->behaviour_queue;
+
+    if (qu_empty(qu)) return;
+
+    int v = 1;
+
+    switch (qu_dequeue(qu)) {
+
+        case be_place:
+            if (entity_inventory_selected(e)) {
+                int id = e->inventory_index;
+                game_world_setxy(e->x, e->y, id);
+                e->inventory[id]--;
+            }
+
+            break;
+
+        case be_break:
+            int f = e->facing;
+            int c_x = 
+                   1 * (f == ENTITY_FACING_RIGHT
+                    || f == ENTITY_FACING_UR || f == ENTITY_FACING_DR)
+                + -1 * (f == ENTITY_FACING_LEFT
+                    || f == ENTITY_FACING_UL || f == ENTITY_FACING_DL);
+
+            int c_y = 
+                   1 * (f == ENTITY_FACING_DOWN
+                    || f == ENTITY_FACING_DL || f == ENTITY_FACING_DR)
+                + -1 * (f == ENTITY_FACING_UP
+                    || f == ENTITY_FACING_UL || f == ENTITY_FACING_UR);
+
+            int x = e->x + c_x;
+            int y = e->y + c_y;
+            int tid = world_getxy(GLOBALS.game->world, x, y);
+
+            entity_inventory_add(e, tid);
+            world_setxy(GLOBALS.game->world, x, y, 0);
+
+            if (game_on_screen(x, y))
+                gamew_cache_set(WORLD_ENTITY_CACHE, x, y, 0);
+
+            break;
+
+        case be_move_one:
+            e->moving = true;
+            entity_update_position(e);
+            e->moving = false;
+            break;
+
+        case be_move:
+            e->moving = true;
+            break;
+
+        case be_stop: 
+            e->moving = false;
+            break;
+
+        case be_face_up:
+            e->facing = ENTITY_FACING_UP;
+            break;
+
+        case be_face_down:
+            e->facing = ENTITY_FACING_DOWN;
+            break;
+
+        case be_face_left:
+            e->facing = ENTITY_FACING_LEFT;
+            break;
+
+        case be_face_right:
+            e->facing = ENTITY_FACING_RIGHT;
+            break;
+
+        case be_face_ul:
+            e->facing = ENTITY_FACING_UL;
+            break;
+
+        case be_face_ur:
+            e->facing = ENTITY_FACING_UR;
+            break;
+
+        case be_face_dl:
+            e->facing = ENTITY_FACING_DL;
+            break;
+
+        case be_face_dr:
+            e->facing = ENTITY_FACING_DR;
+            break;
+    }
 }
 
-void player_path_find(Entity *player, int x, int y) {
+/* Defines default entity action for each tick
+ * Current behaviour is to follow the player via find_path() if player is
+ * nearby.
+ */
+static void chaser_tick(Entity* e) {
+    Queue64* qu = e->controller->behaviour_queue;
+
+    Entity *p = GLOBALS.player;
+
+    int radius = 40;
+
+    bool is_in_radius = man_dist(e->x, e->y, p->x, p->y) <= radius;
+    if (!is_in_radius && e->moving) {
+        entity_command(e, be_stop);
+
+    } else if (is_in_radius && !e->moving) {
+        entity_command(e, be_move);
+    }
+
+    if (is_in_radius) {
+        e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+        entity_update_position(e);
+    }
+}
+
+static void chaser_find_path(Entity *e, int x, int y) {
+    if (e->x == x && e->y == y) return;
+
+    const int up = (e->y > y);
+    const int down = (e->y < y);
+    const int left = (e->x > x);
+    const int right = (e->x < x);
+
+    behaviour_t be = be_stop;
+    
+    if      (up && left)    be = be_face_ul;
+    else if (up && right)   be = be_face_ur;
+    else if (down && left)  be = be_face_dl;
+    else if (down && right) be = be_face_dr;
+    else if (up)            be = be_face_up;
+    else if (down)          be = be_face_down;
+    else if (left)          be = be_face_left;
+    else if (right)         be = be_face_right;
+    else log_debug("ERROR: unable to execute pathfinding for entity %p(%d, %d)"
+            "with respect to point (%d, %d)}", e, e->x, e->y, x, y);
+
+    entity_command(e, be);
+}
+
+static void player_tick(Entity *player) {
+    tick_entity_behaviour(player);
+}
+
+static void player_path_find(Entity *player, int x, int y) {
     return;
 }
 
 int game_curseminer_init(GameContext *game, int) {
     int glyph = 0;
-
     int i = 0;
+
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 255, 255);
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);

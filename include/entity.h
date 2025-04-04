@@ -5,23 +5,7 @@
 #include "core_game.h"
 #include "world.h"
 
-typedef enum {
-    be_stop,
-    be_move,
-    be_move_one,
-    be_face_up,
-    be_face_down,
-    be_face_left,
-    be_face_right,
-    be_face_ul,
-    be_face_ur,
-    be_face_dl,
-    be_face_dr,
-    be_place,
-    be_break,
-    be_attack,
-    be_interact
-} BehaviourID;
+typedef int behaviour_t;
 
 typedef enum {
     ENTITY_FACING_UP,
@@ -44,9 +28,10 @@ typedef struct EntityController {
 int entity_init_default_controller();
 int entity_create_controller(EntityController*, void(*)(Entity*), void(*)(Entity*, int, int));
 void entity_tick_abstract(Entity*);
+void entity_update_position(Entity*);
 
 Entity* entity_spawn(World*, EntityType*, int, int, EntityFacing, int, int);
-int entity_command(Entity*, BehaviourID);
+int entity_command(Entity*, behaviour_t);
 void entity_kill_by_id(int);
 void entity_kill_by_pos(int, int);
 void entity_rm(World*, Entity*);

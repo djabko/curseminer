@@ -48,7 +48,7 @@ bool g_glyph_init[GLYPH_MAX];
 char g_glyph_charset_0[GLYPH_MAX];
 char g_glyph_charset_1[GLYPH_MAX];
 char g_glyph_charset_2[GLYPH_MAX];
-char *g_glyph_charset = g_glyph_charset_0;
+char *g_glyph_charset = g_glyph_charset_2;
 
 milliseconds_t TIME_MSEC = 0;
 
@@ -224,6 +224,8 @@ void box_win(window_t *window) {
             window->x - 1, window->y - 1,
             window->x + window->w,
             window->y + window->h);
+
+    wattroff(stdscr, COLOR_PAIR(window->glyph));
 }
 
 void box_win_clear(window_t * window) {
@@ -322,6 +324,7 @@ void draw_gamewin(window_t *gamewin) {
                         wattron(gamewin->win, COLOR_PAIR(glyph));
                         mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
                         game_set_dirty(x, y, 0);
+                        wattroff(gamewin->win, COLOR_PAIR(glyph));
                     }
                 }
             }
@@ -340,6 +343,7 @@ void draw_gamewin(window_t *gamewin) {
 
                 wattron(gamewin->win, COLOR_PAIR(glyph));
                 mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
+                wattroff(gamewin->win, COLOR_PAIR(glyph));
             }
         }
 
@@ -476,9 +480,9 @@ int init_colors() {
         g_glyph_init[i] = false;
     }
 
-    const char *s0 = " 123456789a";
-    const char *s1 = " eiouqwerty";
-    const char *s2 = " **********";
+    const char *s0 = " 123456789abcd";
+    const char *s1 = " eiouqwertylkj";
+    const char *s2 = " @~#^*+0......";
     for (int i = 0; i != strlen(s0); i++) g_glyph_charset_0[i] = s0[i];
     for (int i = 0; i != strlen(s1); i++) g_glyph_charset_1[i] = s1[i];
     for (int i = 0; i != strlen(s2); i++) g_glyph_charset_2[i] = s2[i];
