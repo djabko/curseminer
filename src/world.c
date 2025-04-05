@@ -467,7 +467,7 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     new_world->chunk_s = chunk_s;
     new_world->chunk_arenas = NULL;
     new_world->entity_c = 0;
-    new_world->entity_maxc = 32;
+    new_world->entity_maxc = 256;
     new_world->entities = pq_init( (new_world->entity_maxc * sizeof(Entity) + PAGE_SIZE) / PAGE_SIZE );
     new_world->chunk_max = chunk_max;
     new_world->chunk_mem_used = 0;

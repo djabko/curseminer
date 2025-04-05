@@ -7,14 +7,43 @@
 
 #define g_skins_max 10
 #define g_entity_type_max g_skins_max
+static GameContext *g_game;
 static Skin g_skins[g_skins_max];
-static EntityController g_player_controller;
+static EntityController g_controller_0,
+                        g_controller_1,
+                        g_controller_2;
 
-static void handler(InputEvent *ie) {}
+static void handler(InputEvent *ie) {
+    if (ie->state == ES_UP) return;
 
-static void player_tick(Entity* e) {}
+    int x, y;
+    world_from_mouse_xy(ie, &x, &y);
+
+    int n = rand() % g_game->entity_types_c;
+    EntityType *type = g_game->entity_types + n;
+    Entity *e = entity_spawn(g_game->world, type, x, y, ENTITY_FACING_DOWN, 1, 0);
+    e->moving = true;
+
+    e->controller = &g_controller_1;
+}
+
+static void tick_0(Entity* e) {}
+
+static void tick_1(Entity* e) {
+    /*
+    if (world_getxy(g_game->world, e->x, e->y+1) == e->type->id) {
+        entity_rm(g_game->world, e);
+    }
+    */
+
+    entity_update_position(e);
+}
+
+static void tick_2(Entity* e) {}
 
 int game_other_init(GameContext *game, int) {
+    g_game = GLOBALS.game;
+
     int glyph = 0;
     int i = 0;
 
@@ -29,14 +58,16 @@ int game_other_init(GameContext *game, int) {
     for (int j = 0; j < i; j++)
         game_create_entity_type(g_skins + j);
 
-    GLOBALS.game->entity_types_c = i;
+    g_game->entity_types_c = i;
 
-    entity_create_controller(&g_player_controller, player_tick, NULL);
+    entity_create_controller(&g_controller_0, tick_0, NULL);
+    entity_create_controller(&g_controller_1, tick_1, NULL);
+    entity_create_controller(&g_controller_2, tick_2, NULL);
 
-    Entity *player = entity_spawn(game->world, GLOBALS.game->entity_types,
+    Entity *player = entity_spawn(game->world, g_game->entity_types,
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
 
-    player->controller = &g_player_controller;
+    player->controller = &g_controller_0;
 
     input_register_event(E_MS_LMB, E_CTX_GAME, handler);
 

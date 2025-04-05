@@ -48,7 +48,7 @@ bool g_glyph_init[GLYPH_MAX];
 char g_glyph_charset_0[GLYPH_MAX];
 char g_glyph_charset_1[GLYPH_MAX];
 char g_glyph_charset_2[GLYPH_MAX];
-char *g_glyph_charset = g_glyph_charset_2;
+char *g_glyph_charset = g_glyph_charset_1;
 
 milliseconds_t TIME_MSEC = 0;
 
@@ -481,7 +481,7 @@ int init_colors() {
     }
 
     const char *s0 = " 123456789abcd";
-    const char *s1 = " eiouqwertylkj";
+    const char *s1 = " *o&f.DM()-=r'";
     const char *s2 = " @~#^*+0......";
     for (int i = 0; i != strlen(s0); i++) g_glyph_charset_0[i] = s0[i];
     for (int i = 0; i != strlen(s1); i++) g_glyph_charset_1[i] = s1[i];
