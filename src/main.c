@@ -21,7 +21,7 @@ ll_head* g_runqueue_list = NULL;
 RunQueue* g_runqueue = NULL;
 
 
-void init(int nogui_mode) {
+static void init(int nogui_mode) {
     input_init(GAME_FRONTEND_NCURSES);
     timer_init(UPDATE_RATE);
 
@@ -36,7 +36,7 @@ void init(int nogui_mode) {
     log_debug("Initialized...\n");
 }
 
-int exit_state() {
+static int exit_state() {
     log_debug("Exiting...");
 
     UI_exit();
@@ -46,7 +46,7 @@ int exit_state() {
     return 0;
 }
 
-int job_ui (Task* task, Stack64* stack) {
+static int job_ui (Task* task, Stack64* stack) {
     milliseconds_t sec = TIMER_NOW.tv_sec;
     milliseconds_t msec = TIMER_NOW.tv_usec / 1000;
 
@@ -62,11 +62,11 @@ int job_ui (Task* task, Stack64* stack) {
     return 0;
 }
 
-void cb_exit(Task* task) {
+static void cb_exit(Task* task) {
     scheduler_kill_all_tasks();
 }
 
-void main_event_handler(InputEvent *ev) {
+static void main_event_handler(InputEvent *ev) {
     scheduler_kill_all_tasks();
 }
 

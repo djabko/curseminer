@@ -23,7 +23,7 @@ static inline void set_entity_facing(Entity* e, int vx, int vy, EntityFacing dir
     e->vy = vy;
 }
 
-void tick_entity_behaviour(Entity* e) {
+static void tick_entity_behaviour(Entity* e) {
     Queue64* qu = e->controller->behaviour_queue;
 
     if (qu_empty(qu)) return;
@@ -85,7 +85,7 @@ void tick_entity_behaviour(Entity* e) {
     }
 }
 
-void update_entity_position(Entity *e) {
+static void update_entity_position(Entity *e) {
     if (game_on_screen(e->x, e->y))
         gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
 
@@ -108,7 +108,7 @@ void update_entity_position(Entity *e) {
  * Current behaviour is to follow the player via find_path() if player is
  * nearby.
  */
-void default_tick(Entity* e) {
+static void default_tick(Entity* e) {
     Queue64* qu = e->controller->behaviour_queue;
 
     Entity *p = GLOBALS.player;
@@ -131,7 +131,7 @@ void default_tick(Entity* e) {
     }
 }
 
-void default_find_path(Entity* e, int x, int y) {
+static void default_find_path(Entity* e, int x, int y) {
     if (e->x == x && e->y == y) return;
 
     const int up = (e->y > y);
@@ -157,12 +157,12 @@ point (%d, %d)}", e->id, e->x, e->y, x, y, be);
 }
 
 /* Defines player action for each tick */
-void player_tick(Entity* player) {
+static void player_tick(Entity* player) {
     tick_entity_behaviour(player);
     update_entity_position(player);
 }
 
-int create_default_entity_controller() {
+static int create_default_entity_controller() {
     DEFAULT_CONTROLLER = calloc(2, sizeof(EntityController));
     DEFAULT_CONTROLLER->behaviour_queue = qu_init(1);
     DEFAULT_CONTROLLER->tick = default_tick;

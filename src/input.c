@@ -14,9 +14,9 @@
 
 #undef tv_nsec
 
-void (*g_mapper_ctx_array[E_CTX_END][E_END])(InputEvent*);
+static void (*g_mapper_ctx_array[E_CTX_END][E_END])(InputEvent*);
 
-void handler_stub(InputEvent *ie) {}
+static void handler_stub(InputEvent *ie) {}
 
 
 /* Ncurses Specific */
@@ -35,12 +35,12 @@ KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
 
 #define NCURSES_KBMAP_MAX 256
 #define NCURSES_MSMAP_MAX BUTTON4_TRIPLE_CLICKED
-event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
-InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
-timer_t g_input_timer = 0;
-Queue64 *g_queued_kdown = NULL;
+static event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
+static InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
+static timer_t g_input_timer = 0;
+static Queue64 *g_queued_kdown = NULL;
 
-void init_keys_ncurses() {
+static void init_keys_ncurses() {
     for (int i = 0; i < NCURSES_KBMAP_MAX; i++) 
         g_ncurses_mapping_kb[i] = E_NULL;
 
@@ -87,7 +87,7 @@ void init_keys_ncurses() {
     }
 }
 
-void map_event_ncurses(InputEvent *ev, int key) {
+static void map_event_ncurses(InputEvent *ev, int key) {
 
     if (key == KEY_MOUSE) {
         MEVENT mouse;
@@ -114,7 +114,7 @@ void map_event_ncurses(InputEvent *ev, int key) {
 
 }
 
-void handle_kdown_ncurses(int signo) {
+static void handle_kdown_ncurses(int signo) {
     InputEvent ev;
 
     int key = getch();
@@ -183,7 +183,7 @@ void handle_kdown_ncurses(int signo) {
     g_mapper_ctx_array[ctx][ev.id](&ev);
 }
 
-void handle_kup_ncurses(int signo) {
+static void handle_kup_ncurses(int signo) {
     event_ctx_t ctx = GLOBALS.input_context;
 
     while (!qu_empty(g_queued_kdown)) {
@@ -202,7 +202,7 @@ void handle_kup_ncurses(int signo) {
     }
 }
 
-int input_init_ncurses() {
+static int input_init_ncurses() {
     
     /* 1. Initialized data structures */
     init_keys_ncurses();

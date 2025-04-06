@@ -36,15 +36,16 @@ typedef struct {
     window_t *mempool;
 } windowmgr_t;
 
-window_t *g_widgetwin;
-windowmgr_t WINDOW_MGR = {};
-NoiseLattice *LATTICE1D;
-
-Stack64* MENU_STACK = NULL;
 int LINES = 0;
 int COLS = 0;
 
-milliseconds_t TIME_MSEC = 0;
+static window_t *g_widgetwin;
+static windowmgr_t WINDOW_MGR = {};
+static NoiseLattice *LATTICE1D;
+
+static Stack64* MENU_STACK = NULL;
+
+static milliseconds_t TIME_MSEC = 0;
 
 static inline char sign_of_int(int x) {
     if      (x == 0) return ' ';
@@ -54,11 +55,11 @@ static inline char sign_of_int(int x) {
 }
 
 /* Input Handler Functions*/
-double WIDGET_WIN_C = 1;
-double WIDGET_WIN_O = 1;
-int WIDGET_WIN_R = 10;
+static double WIDGET_WIN_C = 1;
+static double WIDGET_WIN_O = 1;
+static int WIDGET_WIN_R = 10;
 
-void ui_input_widget_toggle(InputEvent *ie) {
+static void ui_input_widget_toggle(InputEvent *ie) {
     if (ie->state == ES_UP) {
 
         UI_toggle_widgetwin();
@@ -68,17 +69,17 @@ void ui_input_widget_toggle(InputEvent *ie) {
     }
 }
 
-void ui_input_noise_zoomin(InputEvent *ie) {
+static void ui_input_noise_zoomin(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         WIDGET_WIN_C += 0.1;
 }
 
-void ui_input_noise_zoomout(InputEvent *ie) {
+static void ui_input_noise_zoomout(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         WIDGET_WIN_C -= 0.1;
 }
 
-void ui_input_noise_mover(InputEvent *ie) {
+static void ui_input_noise_mover(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
 
         if (ie->mods & E_MOD_0) {
@@ -92,22 +93,22 @@ void ui_input_noise_mover(InputEvent *ie) {
     }
 }
 
-void ui_input_noise_movel(InputEvent *ie) {
+static void ui_input_noise_movel(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         WIDGET_WIN_O -= 0.1;
 }
 
-void ui_input_clock_zoomin(InputEvent *ie) {
+static void ui_input_clock_zoomin(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         WIDGET_WIN_R += 1;
 }
 
-void ui_input_clock_zoomout(InputEvent *ie) {
+static void ui_input_clock_zoomout(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         WIDGET_WIN_R -= 1;
 }
 
-void ui_input_clock_move(InputEvent *ie) {
+static void ui_input_clock_move(InputEvent *ie) {
     if (ie->state == ES_DOWN && ie->mods & E_MOD_0) {
 
         g_widgetwin->draw_func =
@@ -120,7 +121,7 @@ void ui_input_clock_move(InputEvent *ie) {
 
 
 /* Draw Functions */
-void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
+static void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
     for (int x=x1; x<=x2; x++) {
         for (int y=y1; y<=y2; y++) {
             mvwaddch(win, y, x, c);
@@ -128,7 +129,7 @@ void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
     }
 }
 
-void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y2) {
+static void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y2) {
     int dx = abs(x2 - x1);
     int dy = abs(y2 - y1);
     int sx = (x1 < x2) + (x2 <= x1) * -1;
@@ -151,7 +152,7 @@ void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y2) {
     }
 }
 
-void draw_header() {
+static void draw_header() {
     for (int i=0; i<COLS; i++)
         mvaddch(1, i, '=');
 
@@ -159,7 +160,7 @@ void draw_header() {
         mvaddch(3, i, '=');
 }
 
-void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
+static void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
         chtype l1, chtype l2, chtype l3, chtype l4,
         chtype c1, chtype c2, chtype c3, chtype c4) {
 
@@ -175,13 +176,13 @@ void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
  
 }
 
-void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
+static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
    _draw_square(win, x1, y1, x2, y2,
             ACS_HLINE, ACS_HLINE, ACS_VLINE, ACS_VLINE,
             ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
 }
 
-void box_win(window_t *window) {
+static void box_win(window_t *window) {
     wattron(stdscr, COLOR_PAIR(window->color));
     mvwprintw(stdscr, window->y-2, window->x, window->title);
     draw_square(stdscr,
@@ -190,7 +191,7 @@ void box_win(window_t *window) {
             window->y + window->h);
 }
 
-void box_win_clear(window_t * window) {
+static void box_win_clear(window_t * window) {
     chtype spc = ' ';
 
     mvwprintw(stdscr, window->y-2, window->x, "                      ");
@@ -202,7 +203,7 @@ void box_win_clear(window_t * window) {
             spc, spc, spc, spc, spc, spc, spc, spc);
 }
 
-void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
+static void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
     double x2, y2;
 
     x2 = x1 + d * cos(angle);
@@ -211,7 +212,7 @@ void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, doub
     draw_line(win, c, x1, y1, x2, y2); 
 }
 
-void draw_rt_clock(WINDOW* win, int x, int y, int r) {
+static void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     seconds_t time_sec = TIME_MSEC / 1000;
 
     time_t sc = time_sec % 60;
@@ -235,11 +236,11 @@ void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     attroff(A_BOLD);
 }
 
-void draw_keyboard_state(WINDOW* scr, int x, int y) {
+static void draw_keyboard_state(WINDOW* scr, int x, int y) {
 
 }
 
-void draw_gamewin_nogui(window_t *gamewin) {
+static void draw_gamewin_nogui(window_t *gamewin) {
     for (int x=0; x <= gamewin->w; x++) {
         for (int y=0; y <= gamewin->h; y++) {
             EntityType *e = game_world_getxy(x, y); 
@@ -248,7 +249,7 @@ void draw_gamewin_nogui(window_t *gamewin) {
 }
 
 //int SKIPPED_UPDATES = 0;
-void draw_gamewin(window_t *gamewin) {
+static void draw_gamewin(window_t *gamewin) {
     EntityType* entity;
 
     DirtyFlags *df = GAME_DIRTY_FLAGS;
@@ -304,11 +305,11 @@ void draw_gamewin(window_t *gamewin) {
     wnoutrefresh(gamewin->win);
 }
 
-void draw_uiwin_nogui(window_t *uiwin) {
+static void draw_uiwin_nogui(window_t *uiwin) {
     EntityType *e = game_world_getxy(1, 1);
 }
 
-void draw_uiwin(window_t *uiwin) {
+static void draw_uiwin(window_t *uiwin) {
     werase(uiwin->win);
 
     draw_rt_clock(uiwin->win, uiwin->h/2+2, uiwin->h/2, uiwin->h/2);
@@ -332,9 +333,9 @@ void draw_uiwin(window_t *uiwin) {
     wnoutrefresh(uiwin->win);
 }
 
-void draw_widgetwin_nogui(window_t *widgetwin) {}
+static void draw_widgetwin_nogui(window_t *widgetwin) {}
 
-void draw_widgetwin_rt_clock(window_t *widgetwin) {
+static void draw_widgetwin_rt_clock(window_t *widgetwin) {
     werase(widgetwin->win);
 
     draw_rt_clock(widgetwin->win, widgetwin->w/2, widgetwin->h/2, WIDGET_WIN_R);
@@ -342,7 +343,7 @@ void draw_widgetwin_rt_clock(window_t *widgetwin) {
     wnoutrefresh(widgetwin->win);
 }
 
-void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*, double)) {
+static void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*, double)) {
     if (!widgetwin->active || widgetwin->hidden) return;
     werase(widgetwin->win);
 
@@ -378,15 +379,15 @@ void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*
     wnoutrefresh(widgetwin->win);
 }
 
-void draw_widgetwin_value_noise(window_t *widgetwin) {
+static void draw_widgetwin_value_noise(window_t *widgetwin) {
     draw_widgetwin_noise(widgetwin, value_noise_1D);
 }
 
-void draw_widgetwin_perlin_noise(window_t *widgetwin) {
+static void draw_widgetwin_perlin_noise(window_t *widgetwin) {
     draw_widgetwin_noise(widgetwin, perlin_noise_1D);
 }
 
-void draw_main_menu() {
+static void draw_main_menu() {
     Queue64* qu = WINDOW_MGR.window_qu;
 
     qu_foreach(qu, window_t*, win) {
@@ -397,7 +398,7 @@ void draw_main_menu() {
 }
 
 /* Init Functions */
-int init_colors() {
+static int init_colors() {
     GameContext* game = game_get_context();
 
     int color_id = 0;
@@ -415,7 +416,7 @@ int init_colors() {
     return 1;
 }
 
-int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, SkinTypeID color) {
+static int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, SkinTypeID color) {
     window->win = newwin(h, w, y, x);
     window->parent = parent;
     window->draw_qu = qu_init(1);
@@ -433,7 +434,7 @@ int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int
     return NULL < (void*) window->win;
 }
 
-int window_insert_draw_func(window_t *win, void (draw_func)(window_t*)) {
+static int window_insert_draw_func(window_t *win, void (draw_func)(window_t*)) {
     if (!win) return -1;
 
     qu_enqueue(win->draw_qu, (uint64_t) draw_func);
@@ -442,11 +443,11 @@ int window_insert_draw_func(window_t *win, void (draw_func)(window_t*)) {
     return 1;
 }
 
-void free_window(window_t *window) {
+static void free_window(window_t *window) {
     free(window->draw_qu);
 }
 
-int window_mgr_init(int size) {
+static int window_mgr_init(int size) {
     WINDOW_MGR.count = 0;
     WINDOW_MGR.max = size;
     WINDOW_MGR.window_qu = qu_init(size);
@@ -455,7 +456,7 @@ int window_mgr_init(int size) {
     return WINDOW_MGR.mempool != NULL;
 }
 
-window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, SkinTypeID color) {
+static window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, SkinTypeID color) {
     if (WINDOW_MGR.count >= WINDOW_MGR.max) return NULL;
 
     window_t *win = &WINDOW_MGR.mempool[ WINDOW_MGR.count++ ];
@@ -465,7 +466,7 @@ window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w
     return win;
 }
 
-void window_mgr_free() {
+static void window_mgr_free() {
     qu_foreach(WINDOW_MGR.window_qu, window_t*, win) {
         free_window(win);
     }

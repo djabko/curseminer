@@ -10,19 +10,19 @@
 
 #define GAME_REFRESH_RATE 20
 
-GameContext *g_game;
-
 byte_t *WORLD_ENTITY_CACHE;
 byte_t *GAME_ENTITY_CACHE;
 DirtyFlags *GAME_DIRTY_FLAGS;
 
-bool g_player_moving_changed = false;
-bool g_player_moving_up = false;
-bool g_player_moving_down = false;
-bool g_player_moving_left = false;
-bool g_player_moving_right = false;
+static GameContext *g_game;
 
-void game_input_move_up(InputEvent *ie) {
+static bool g_player_moving_changed = false;
+static bool g_player_moving_up = false;
+static bool g_player_moving_down = false;
+static bool g_player_moving_left = false;
+static bool g_player_moving_right = false;
+
+static void game_input_move_up(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         g_player_moving_up = true;
         g_player_moving_down = false;
@@ -34,7 +34,7 @@ void game_input_move_up(InputEvent *ie) {
     g_player_moving_changed = true;
 }
 
-void game_input_move_left(InputEvent *ie) {
+static void game_input_move_left(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         g_player_moving_left = true;
         g_player_moving_right = false;
@@ -46,7 +46,7 @@ void game_input_move_left(InputEvent *ie) {
     g_player_moving_changed = true;
 }
 
-void game_input_move_down(InputEvent *ie) {
+static void game_input_move_down(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         g_player_moving_down = true;
         g_player_moving_up = false;
@@ -58,7 +58,7 @@ void game_input_move_down(InputEvent *ie) {
     g_player_moving_changed = true;
 }
 
-void game_input_move_right(InputEvent *ie) {
+static void game_input_move_right(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         g_player_moving_right = true;
         g_player_moving_left = false;
@@ -70,12 +70,12 @@ void game_input_move_right(InputEvent *ie) {
     g_player_moving_changed = true;
 }
 
-void game_input_place_tile(InputEvent *ie) {
+static void game_input_place_tile(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
 }
 
-void game_input_spawn_chaser(InputEvent *ie) {
+static void game_input_spawn_chaser(InputEvent *ie) {
     log_debug("IE: %d %d %d %d", ie->id, ie->type, ie->state, ie->mods);
 
     if (ie->state == ES_DOWN) {
@@ -219,7 +219,7 @@ void game_flush_dirty() {
     df->command = -1;
 }
 
-void create_skin(int id, char c,
+static void create_skin(int id, char c,
         color_t bg_r, color_t bg_g, color_t bg_b,
         color_t fg_r, color_t fg_g, color_t fg_b) {
 
@@ -244,7 +244,7 @@ void create_skin(int id, char c,
     skin->fg_b = fg_b;
 }
 
-void create_entity_type(Skin* skin) {
+static void create_entity_type(Skin* skin) {
     if (g_game->entity_types_c == g_game->entity_types_max) {
         g_game->entity_types_max *= 2;
 
@@ -257,7 +257,7 @@ void create_entity_type(Skin* skin) {
     entitiyt->id = g_game->entity_types_c++;
 }
 
-int init_skins() {
+static int init_skins() {
     create_skin(SKIN_NULL,        ' ', 0, 0, 0, 255, 255, 255);
     create_skin(SKIN_DEFAULT,     '*', 0, 0, 0, 120, 120, 120);
     create_skin(SKIN_GOLD,        'o', 0, 0, 0, 255, 215,   0);
@@ -269,7 +269,7 @@ int init_skins() {
     return 1;
 }
 
-void init_entity_types() {
+static void init_entity_types() {
     int c = g_game->skins_c;
     for (int i=0; i<c; i++)
         create_entity_type( g_game->skins + i );

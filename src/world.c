@@ -9,37 +9,38 @@
 
 #define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 16
 
-int ITERATOR = 0;
+static int ITERATOR = 0;
+
 /* Global Variables
  * Initialized in world_init() 
  */
-HashTable *CHUNK_HASHTABLE;
-NoiseLattice *LATTICE_2D;
-int GLOBAL_CHUNK_COUNT = 0;
-int MAXID = 0;
+static HashTable *CHUNK_HASHTABLE;
+static NoiseLattice *LATTICE_2D;
+static int GLOBAL_CHUNK_COUNT = 0;
+static int MAXID = 0;
 
 
 /* Internal Helper Functions */
 
 // Cantor's pairing
-unsigned long chunk_ht_hash(int x, int y, int chunk_s) {
+static unsigned long chunk_ht_hash(int x, int y, int chunk_s) {
     return (x + y) * (x + y + 1) / 2 + x;
 
 } inline unsigned long chunk_ht_hash(int, int, int);
 
-int is_arena_full(ChunkArena *arena) {
+static int is_arena_full(ChunkArena *arena) {
     return arena->free == arena->end;
 }
 
 // All chunk_ functions that deal with coordinates only work when given
 // top-left values. This function is responsible for constraining any coordinate
 // to it's specific chunk's tl_x or tl_y value.
-int topleft_coordinate(int coordinate, int chunk_s) {
+static int topleft_coordinate(int coordinate, int chunk_s) {
     if (0 <= coordinate) return chunk_s * (coordinate / chunk_s);
     else return chunk_s * ((coordinate + 1) / chunk_s) - chunk_s;
 } inline int topleft_coordinate(int, int);
 
-ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
+static ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 
     size_t chunk_stride = sizeof(Chunk) + chunk_size * chunk_size;
     size_t min_mem = sizeof(ChunkArena) + chunk_stride;
@@ -64,7 +65,7 @@ ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 }
 
 // Retrieves the next chunk in memory arena or NULL
-Chunk *chunk_arena_next(World* world, ChunkArena *arena, Chunk *chunk) {
+static Chunk *chunk_arena_next(World* world, ChunkArena *arena, Chunk *chunk) {
     if (arena == NULL || chunk == NULL || (chunk < arena->start && arena->end <= chunk)) return NULL;
 
     uintptr_t ptr = (uintptr_t) (chunk);
@@ -73,7 +74,7 @@ Chunk *chunk_arena_next(World* world, ChunkArena *arena, Chunk *chunk) {
     return (Chunk*) ptr;
 }
 
-void recycle_oldest_arena(World *world) {
+static void recycle_oldest_arena(World *world) {
     ChunkArena *oldest = world->chunk_arenas;
 
     for (Chunk *c = oldest->start; c < oldest->end; c = chunk_arena_next(world, oldest, c)) {
@@ -99,7 +100,7 @@ void recycle_oldest_arena(World *world) {
 }
 
 // Returns a free area of memory for chunk allocation
-Chunk *chunk_get_free(World *world) {
+static Chunk *chunk_get_free(World *world) {
     ChunkArena *prev = NULL;
     ChunkArena *arena = world->chunk_arenas;
 
@@ -142,11 +143,11 @@ Chunk *chunk_get_free(World *world) {
     return re;
 }
 
-int chunk_populate_void(double noise_sample) {
+static int chunk_populate_void(double noise_sample) {
     return ENTITY_AIR;
 }
 
-int chunk_populate_plains(double noise_sample) {
+static int chunk_populate_plains(double noise_sample) {
     double v = noise_sample;
     double p = 0.7;
     double e = 1 - p;
@@ -164,17 +165,17 @@ int chunk_populate_plains(double noise_sample) {
     return id;
 }
 
-int chunk_populate_forest(double noise_sample) {
+static int chunk_populate_forest(double noise_sample) {
     // Stub code
     return chunk_populate_void(noise_sample);
 }
 
-int chunk_populate_ocean(double noise_sample) {
+static int chunk_populate_ocean(double noise_sample) {
     // Stub code
     return chunk_populate_void(noise_sample);
 }
 
-int chunk_populate_mountains(double noise_sample) {
+static int chunk_populate_mountains(double noise_sample) {
     double v = noise_sample;
     double p = 0.5;
     double e = 1 - p;
@@ -193,7 +194,7 @@ int chunk_populate_mountains(double noise_sample) {
     return id;
 }
 
-int chunk_populate_mine(double noise_sample) {
+static int chunk_populate_mine(double noise_sample) {
     double v = noise_sample;
     double p = 0.65;
     double e = 1 - p;
@@ -212,12 +213,12 @@ int chunk_populate_mine(double noise_sample) {
     return id;
 }
 
-int chunk_populate_redore(double noise_sample) {
+static int chunk_populate_redore(double noise_sample) {
     // Stub code
     return chunk_populate_void(noise_sample);
 }
 
-ChunkType chunk_determine_type(World *world, Chunk *chunk) {
+static ChunkType chunk_determine_type(World *world, Chunk *chunk) {
     int latlen = LATTICE_2D->length;
     double resolution = 200.0;
     double f_x = ((double) chunk->tl_x) / resolution;
@@ -238,7 +239,7 @@ ChunkType chunk_determine_type(World *world, Chunk *chunk) {
     else return CHUNK_TYPE_VOID;
 }
 
-int chunk_populate(World *world, Chunk *chunk) {
+static int chunk_populate(World *world, Chunk *chunk) {
     int (*populate_f) (double);
     double (*noise_f) (NoiseLattice*, double, double);
 
@@ -300,7 +301,7 @@ int chunk_populate(World *world, Chunk *chunk) {
     return 1;
 }
 
-Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chunk *left, Chunk *right) {
+static Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chunk *left, Chunk *right) {
     Chunk *chunk = chunk_get_free(world);
     chunk->data = (char*) (chunk + 1);
 
@@ -323,11 +324,11 @@ Chunk *_chunk_create(World *world, int x, int y, Chunk *top, Chunk *bottom, Chun
     return chunk;
 }
 
-Chunk *chunk_create(World *world, int x, int y) {
+static Chunk *chunk_create(World *world, int x, int y) {
     return _chunk_create(world, x, y, NULL, NULL, NULL, NULL);
 }
 
-Chunk *chunk_lookup(World *world, int x, int y) {
+static Chunk *chunk_lookup(World *world, int x, int y) {
     int chunk_s = world->chunk_s;
 
     unsigned long key = chunk_ht_hash(x, y, chunk_s);
@@ -337,7 +338,7 @@ Chunk *chunk_lookup(World *world, int x, int y) {
 }
 
 // Find chunk closest to position (x,y)
-Chunk *chunk_nearest(World *world, int x, int y) {
+static Chunk *chunk_nearest(World *world, int x, int y) {
     if (GLOBAL_CHUNK_COUNT < 1) return NULL;
 
     HashTableEntry *start, *end, *e;
@@ -366,7 +367,7 @@ Chunk *chunk_nearest(World *world, int x, int y) {
     return nearest;
 }
 
-Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
+static Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
     /* 1. Check based on direction
      * 2. Check if position not occupied
      * 3. Create new chunk
@@ -445,7 +446,7 @@ Chunk *chunk_insert(World* world, Chunk* source, Direction dir) {
     return new_chunk;
 }
 
-void chunk_free_all(World *world) {
+static void chunk_free_all(World *world) {
     ChunkArena *arena = world->chunk_arenas;
     while (arena) {
         ChunkArena* rm = arena;

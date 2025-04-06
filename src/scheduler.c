@@ -15,12 +15,13 @@ const unsigned char RQ_FLAG_NEW         = 0b01000000;
 const unsigned char RQ_FLAG_CUSTOM2     = 0b10000000;
 
 unsigned int GLOBAL_TASK_COUNT = 0;
-ll_head* g_default_rqll = NULL;
-ll_head* g_dying_tasks = NULL;
-PQueue64* g_sleep_queue = NULL;
+
+static ll_head* g_default_rqll = NULL;
+static ll_head* g_dying_tasks = NULL;
+static PQueue64* g_sleep_queue = NULL;
 
 
-Task* create_task(Task* task, RunQueue* rq, int delay, int runtime,
+static Task* create_task(Task* task, RunQueue* rq, int delay, int runtime,
         int (*func)(Task*, Stack64*), Stack64* stack, void (*callback)(Task*)) {
 
     task->flags = '\0';
@@ -44,7 +45,7 @@ Task* create_task(Task* task, RunQueue* rq, int delay, int runtime,
     return task;
 }
 
-void rm_task(Task* task) {
+static void rm_task(Task* task) {
     task->occupied = 0;
     GLOBAL_TASK_COUNT--;
 }
