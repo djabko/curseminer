@@ -224,14 +224,14 @@ int game_init() {
     g_game->world_view_x = 0;
     g_game->world_view_y = 0;
     g_game->scroll_threshold = 5;
-    /*
     g_game->f_init = game_curseminer_init;
     g_game->f_update = game_curseminer_update;
     g_game-> f_free = game_curseminer_free;
-    */
+    /*
     g_game->f_init = game_other_init;
     g_game->f_update = game_other_update;
     g_game-> f_free = game_other_free;
+    */
 
     g_game->world = world_init(20, g_game->skins_c - 1, PAGE_SIZE * 64);
 

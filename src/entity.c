@@ -14,7 +14,7 @@ int MAX = 32;
 static int g_behaviours_free_spots = 0;
 static behaviour_t g_behaviour_count = 0;
 static behaviour_t g_behaviour_max = 0;
-static behaviour_func_t* g_behaviours;
+static behaviour_func_t *g_behaviours;
 
 int entity_command(Entity *e, behaviour_t be) {
     if (be <= 0 && g_behaviour_max <= be) return -1;
@@ -40,20 +40,17 @@ behaviour_t entity_create_behaviour(behaviour_func_t func) {
 
         if (g_behaviour_max <= be) return -1;
 
-    } else {
+    } else if (g_behaviour_count <= g_behaviour_max) {
 
-        if (g_behaviour_count <= g_behaviour_max) {
+        g_behaviour_max = 0 < g_behaviour_max ? 2 * g_behaviour_max : 8;
+        size_t new_size = g_behaviour_max * sizeof(behaviour_func_t);
 
-            g_behaviour_max = g_behaviour_max < 1 ? 2 * g_behaviour_count : 8;
-            size_t new_size = g_behaviour_max * sizeof(behaviour_func_t);
-
-            g_behaviours = realloc(g_behaviours, new_size);
-        }
+        g_behaviours = realloc(g_behaviours, new_size);
     }
 
-    g_behaviours[ g_behaviour_count++ ] = func;
+    g_behaviours[ g_behaviour_count ] = func;
 
-    return g_behaviour_count;
+    return g_behaviour_count++;
 }
 
 void entity_process_behaviours(Entity *e) {
@@ -171,9 +168,9 @@ void entity_tick_abstract(Entity* e) {
 
     // Is this the right order?
 
-    entity_process_behaviours(e);
-
     e->controller->tick(e);
+
+    entity_process_behaviours(e);
 
     entity_update_position(e);
 }

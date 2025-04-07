@@ -17,7 +17,7 @@ typedef enum {
      g_skin_end,
 } skin_t;
 
-typedef enum {
+behaviour_t
     be_stop,
     be_move,
     be_move_one,
@@ -32,8 +32,7 @@ typedef enum {
     be_place,
     be_break,
     be_attack,
-    be_interact
-} BehaviourID;
+    be_interact;
 
 static Skin g_skins[g_skin_end];
 static EntityType* g_etypes[g_skin_end];
@@ -138,96 +137,83 @@ static void game_input_inventory_down(InputEvent *ie) {
     }
 }
 
-static void tick_entity_behaviour(Entity* e) {
-    Queue64* qu = e->controller->behaviour_queue;
-
-    if (qu_empty(qu)) return;
-
-    int v = 1;
-
-    switch (qu_dequeue(qu)) {
-
-        case be_place:
-            if (entity_inventory_selected(e)) {
-                int id = e->inventory_index;
-                game_world_setxy(e->x, e->y, id);
-                e->inventory[id]--;
-            }
-
-            break;
-
-        case be_break:
-            int f = e->facing;
-            int c_x = 
-                   1 * (f == ENTITY_FACING_RIGHT
-                    || f == ENTITY_FACING_UR || f == ENTITY_FACING_DR)
-                + -1 * (f == ENTITY_FACING_LEFT
-                    || f == ENTITY_FACING_UL || f == ENTITY_FACING_DL);
-
-            int c_y = 
-                   1 * (f == ENTITY_FACING_DOWN
-                    || f == ENTITY_FACING_DL || f == ENTITY_FACING_DR)
-                + -1 * (f == ENTITY_FACING_UP
-                    || f == ENTITY_FACING_UL || f == ENTITY_FACING_UR);
-
-            int x = e->x + c_x;
-            int y = e->y + c_y;
-            int tid = world_getxy(GLOBALS.game->world, x, y);
-
-            entity_inventory_add(e, tid);
-            world_setxy(GLOBALS.game->world, x, y, 0);
-
-            if (game_on_screen(x, y))
-                gamew_cache_set(WORLD_ENTITY_CACHE, x, y, 0);
-
-            break;
-
-        case be_move_one:
-            e->moving = true;
-            entity_update_position(e);
-            e->moving = false;
-            break;
-
-        case be_move:
-            e->moving = true;
-            break;
-
-        case be_stop: 
-            e->moving = false;
-            break;
-
-        case be_face_up:
-            e->facing = ENTITY_FACING_UP;
-            break;
-
-        case be_face_down:
-            e->facing = ENTITY_FACING_DOWN;
-            break;
-
-        case be_face_left:
-            e->facing = ENTITY_FACING_LEFT;
-            break;
-
-        case be_face_right:
-            e->facing = ENTITY_FACING_RIGHT;
-            break;
-
-        case be_face_ul:
-            e->facing = ENTITY_FACING_UL;
-            break;
-
-        case be_face_ur:
-            e->facing = ENTITY_FACING_UR;
-            break;
-
-        case be_face_dl:
-            e->facing = ENTITY_FACING_DL;
-            break;
-
-        case be_face_dr:
-            e->facing = ENTITY_FACING_DR;
-            break;
+static behaviour_t be_place_f(Entity *e) {
+    if (entity_inventory_selected(e)) {
+        int id = e->inventory_index;
+        game_world_setxy(e->x, e->y, id);
+        e->inventory[id]--;
     }
+}
+
+static behaviour_t be_break_f(Entity *e) {
+    int f = e->facing;
+    int c_x = 
+           1 * (f == ENTITY_FACING_RIGHT
+            || f == ENTITY_FACING_UR || f == ENTITY_FACING_DR)
+        + -1 * (f == ENTITY_FACING_LEFT
+            || f == ENTITY_FACING_UL || f == ENTITY_FACING_DL);
+
+    int c_y = 
+           1 * (f == ENTITY_FACING_DOWN
+            || f == ENTITY_FACING_DL || f == ENTITY_FACING_DR)
+        + -1 * (f == ENTITY_FACING_UP
+            || f == ENTITY_FACING_UL || f == ENTITY_FACING_UR);
+
+    int x = e->x + c_x;
+    int y = e->y + c_y;
+    int tid = world_getxy(GLOBALS.game->world, x, y);
+
+    entity_inventory_add(e, tid);
+    world_setxy(GLOBALS.game->world, x, y, 0);
+
+    if (game_on_screen(x, y))
+        gamew_cache_set(WORLD_ENTITY_CACHE, x, y, 0);
+}
+
+static behaviour_t be_move_one_f(Entity *e) {
+    e->moving = true;
+    entity_update_position(e);
+    e->moving = false;
+}
+
+static behaviour_t be_move_f(Entity *e) {
+    e->moving = true;
+}
+
+static behaviour_t be_stop_f(Entity *e) {
+    e->moving = false;
+}
+
+static behaviour_t be_face_up_f (Entity *e) {
+    e->facing = ENTITY_FACING_UP;
+}
+
+static behaviour_t be_face_down_f (Entity *e) {
+    e->facing = ENTITY_FACING_DOWN;
+}
+
+static behaviour_t be_face_left_f (Entity *e) {
+    e->facing = ENTITY_FACING_LEFT;
+}
+
+static behaviour_t be_face_right_f (Entity *e) {
+    e->facing = ENTITY_FACING_RIGHT;
+}
+
+static behaviour_t be_face_ul_f (Entity *e) {
+    e->facing = ENTITY_FACING_UL;
+}
+
+static behaviour_t be_face_ur_f (Entity *e) {
+    e->facing = ENTITY_FACING_UR;
+}
+
+static behaviour_t be_face_dl_f (Entity *e) {
+    e->facing = ENTITY_FACING_DL;
+}
+
+static behaviour_t be_face_dr_f (Entity *e) {
+    e->facing = ENTITY_FACING_DR;
 }
 
 /* Defines default entity action for each tick
@@ -279,13 +265,9 @@ static void chaser_find_path(Entity *e, int x, int y) {
     entity_command(e, be);
 }
 
-static void player_tick(Entity *player) {
-    tick_entity_behaviour(player);
-}
+static void player_tick(Entity *player) {}
 
-static void player_path_find(Entity *player, int x, int y) {
-    return;
-}
+static void player_path_find(Entity *player, int x, int y) {}
 
 int game_curseminer_init(GameContext *game, int) {
     int glyph = 0;
@@ -305,6 +287,20 @@ int game_curseminer_init(GameContext *game, int) {
         g_etypes[i] = game_create_entity_type(g_skins + i);
 
     GLOBALS.game->entity_types_c = g_skin_end;
+
+    be_place = entity_create_behaviour(be_place_f);
+    be_break = entity_create_behaviour(be_break_f);
+    be_move = entity_create_behaviour(be_move_f);
+    be_move_one = entity_create_behaviour(be_move_one_f);
+    be_stop = entity_create_behaviour(be_stop_f);
+    be_face_up = entity_create_behaviour(be_face_up_f);
+    be_face_down = entity_create_behaviour(be_face_down_f);
+    be_face_left = entity_create_behaviour(be_face_left_f);
+    be_face_right = entity_create_behaviour(be_face_right_f);
+    be_face_ul = entity_create_behaviour(be_face_ul_f);
+    be_face_ur = entity_create_behaviour(be_face_ur_f);
+    be_face_dl = entity_create_behaviour(be_face_dl_f);
+    be_face_dr = entity_create_behaviour(be_face_dr_f);
 
     entity_create_controller(&g_player_controller, player_tick, player_path_find);
     Entity *player = entity_spawn(game->world, g_etypes[g_skin_player],
