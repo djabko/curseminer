@@ -6,6 +6,8 @@
 #include "world.h"
 
 typedef int behaviour_t;
+typedef behaviour_t(*behaviour_func_t)(Entity*);
+
 
 typedef enum {
     ENTITY_FACING_UP,
@@ -24,6 +26,9 @@ typedef struct EntityController {
     void (*tick)(Entity*);
     void (*find_path)(Entity*, int, int);
 } EntityController;
+
+behaviour_t entity_create_behaviour(behaviour_func_t func);
+void entity_process_behaviours(Entity *e);
 
 int entity_init_default_controller();
 int entity_create_controller(EntityController*, void(*)(Entity*), void(*)(Entity*, int, int));

@@ -11,13 +11,69 @@ EntityController DEFAULT_CONTROLLER;
 Entity* ENTITY_ARRAY = NULL;
 int MAX = 32;
 
+static int g_behaviours_free_spots = 0;
+static behaviour_t g_behaviour_count = 0;
+static behaviour_t g_behaviour_max = 0;
+static behaviour_func_t* g_behaviours;
+
 int entity_command(Entity *e, behaviour_t be) {
+    if (be <= 0 && g_behaviour_max <= be) return -1;
+
     return qu_enqueue(e->controller->behaviour_queue, be);
 }
 
 void set_entity_velocity(Entity *e, int vx, int vy) {
     e->vx = vx;
     e->vy = vy;
+}
+
+behaviour_t entity_create_behaviour(behaviour_func_t func) {
+    behaviour_t be;
+
+    if (0 < g_behaviours_free_spots) {
+
+        for (be = 0; be < g_behaviour_count; be++) {
+            if (g_behaviours[be] == NULL) break;
+        }
+
+        g_behaviours_free_spots--;
+
+        if (g_behaviour_max <= be) return -1;
+
+    } else {
+
+        if (g_behaviour_count <= g_behaviour_max) {
+
+            g_behaviour_max = g_behaviour_max < 1 ? 2 * g_behaviour_count : 8;
+            size_t new_size = g_behaviour_max * sizeof(behaviour_func_t);
+
+            g_behaviours = realloc(g_behaviours, new_size);
+        }
+    }
+
+    g_behaviours[ g_behaviour_count++ ] = func;
+
+    return g_behaviour_count;
+}
+
+void entity_process_behaviours(Entity *e) {
+    Queue64* qu = e->controller->behaviour_queue;
+
+    if (qu_empty(qu)) return;
+
+    behaviour_t be = (behaviour_t) qu_dequeue(qu);
+
+    g_behaviours[be](e);
+}
+
+int entity_remove_behaviour(behaviour_t be) {
+    if (g_behaviour_max <= be)
+        return -1;
+
+    g_behaviours[be] = NULL;
+    g_behaviours_free_spots++;
+
+    return 0;
 }
 
 void entity_update_position(Entity *e) {
@@ -112,6 +168,11 @@ int entity_inventory_selected(Entity* e) {
 }
 
 void entity_tick_abstract(Entity* e) {
+
+    // Is this the right order?
+
+    entity_process_behaviours(e);
+
     e->controller->tick(e);
 
     entity_update_position(e);
