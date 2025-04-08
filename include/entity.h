@@ -6,7 +6,7 @@
 #include "world.h"
 
 typedef int behaviour_t;
-typedef behaviour_t(*behaviour_func_t)(Entity*);
+typedef void (*behaviour_func_t)(Entity*);
 
 
 typedef enum {

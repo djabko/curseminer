@@ -188,7 +188,7 @@ int entity_create_controller(
 }
 
 int entity_init_default_controller() {
-    entity_create_controller(&DEFAULT_CONTROLLER,
+    return entity_create_controller(&DEFAULT_CONTROLLER,
             default_tick, default_find_path);
 }
 

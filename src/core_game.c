@@ -205,7 +205,7 @@ int game_update(Task* task, Stack64* stack) {
     return 0;
 }
 
-int game_init() {
+int game_init(GameContextCFG *cfg) {
     int status = 0;
 
     size_t stride = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy;
@@ -215,23 +215,21 @@ int game_init() {
     GAME_DIRTY_FLAGS    = (DirtyFlags*) (tmp + stride * 2);
 
     g_game = calloc(sizeof(GameContext), 1);
+
+    g_game->skins_max = cfg->skins_max;
+    g_game->entity_types_max = cfg->entity_types_max;
+    g_game->scroll_threshold = cfg->scroll_threshold;
+    g_game->f_init = cfg->f_init;
+    g_game->f_update = cfg->f_update;
+    g_game-> f_free = cfg->f_free;
+
     g_game->skins_c = 0;
     g_game->entity_types_c = 0;
-    g_game->skins_max = 32;
-    g_game->entity_types_max = 32;
     g_game->skins = calloc(g_game->skins_max, sizeof(Skin));
     g_game->entity_types = calloc(g_game->entity_types_max, sizeof(EntityType));
     g_game->world_view_x = 0;
     g_game->world_view_y = 0;
-    g_game->scroll_threshold = 5;
-    g_game->f_init = game_curseminer_init;
-    g_game->f_update = game_curseminer_update;
-    g_game-> f_free = game_curseminer_free;
-    /*
-    g_game->f_init = game_other_init;
-    g_game->f_update = game_other_update;
-    g_game-> f_free = game_other_free;
-    */
+
 
     g_game->world = world_init(20, g_game->skins_c - 1, PAGE_SIZE * 64);
 

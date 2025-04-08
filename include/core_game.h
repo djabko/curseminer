@@ -64,6 +64,7 @@ typedef struct EntityType {
 } EntityType;
 
 typedef struct World World;
+
 typedef struct GameContext {
     World *world;
     int world_view_x, world_view_y, skins_c, skins_max, entity_types_c,
@@ -76,13 +77,21 @@ typedef struct GameContext {
     int (*f_free)();
 } GameContext;
 
+typedef struct GameContextCFG {
+    int skins_max, entity_types_max, scroll_threshold;
+
+    int (*f_init)(struct GameContext*, int);
+    int (*f_update)();
+    int (*f_free)();
+} GameContextCFG;
+
 
 void game_create_skin(Skin*, int id, color_t, color_t, color_t,
         color_t, color_t, color_t);
 EntityType *game_create_entity_type(Skin*);
 
 
-int game_init();
+int game_init(GameContextCFG*);
 void game_free();
 int game_update(Task*, Stack64*);
 EntityType *game_world_getxy(int x, int y);

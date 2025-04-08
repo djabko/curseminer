@@ -9,6 +9,7 @@
 #include "stack64.h"
 #include "UI.h"
 #include "core_game.h"
+#include "games/curseminer.h"
 #include "input.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
@@ -633,9 +634,18 @@ int UI_init(int nogui_mode) {
     GLOBALS.view_port_y = gwy;
     GLOBALS.view_port_maxx = gww;
     GLOBALS.view_port_maxy = gwh;
-    log_debug("maxx = %d", GLOBALS.view_port_maxx);
 
-    int status = game_init();
+    GameContextCFG gcfg = {
+        .skins_max = 32,
+        .entity_types_max = 32,
+        .scroll_threshold = 5,
+
+        .f_init = game_curseminer_init,
+        .f_update = game_curseminer_update,
+        .f_free = game_curseminer_free,
+    };
+
+    int status = game_init(&gcfg);
     if (status != 0) {
         UI_exit();
         return 0;

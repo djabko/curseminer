@@ -73,13 +73,15 @@ int game_other_init(GameContext *game, int) {
 
     GLOBALS.player = player;
 
-    return 1;
+    return 0;
 }
 
 int game_other_update() {
+    return 0;
 }
 
 int game_other_free() {
+    return 0;
 }
 
 #undef g_skins_max

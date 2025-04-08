@@ -79,11 +79,11 @@ static void game_input_place_tile(InputEvent *ie) {
 }
 
 static void chaser_tick(Entity*);
+static void chaser_find_path(Entity *e, int x, int y);
 static void game_input_spawn_chaser(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         int x, y;
         int s = (20 + rand()) % 150;
-        Skin* skin = g_skins + g_skin_chaser;
 
         if (world_from_mouse_xy(ie, &x, &y) != 0) return;
 
@@ -92,6 +92,7 @@ static void game_input_spawn_chaser(InputEvent *ie) {
                 x, y, ENTITY_FACING_RIGHT, 1, 0);
 
         e->controller->tick = chaser_tick;
+        e->controller->find_path = chaser_find_path;
 
         e->speed = s;
     }
@@ -137,7 +138,7 @@ static void game_input_inventory_down(InputEvent *ie) {
     }
 }
 
-static behaviour_t be_place_f(Entity *e) {
+static void be_place_f(Entity *e) {
     if (entity_inventory_selected(e)) {
         int id = e->inventory_index;
         game_world_setxy(e->x, e->y, id);
@@ -145,7 +146,7 @@ static behaviour_t be_place_f(Entity *e) {
     }
 }
 
-static behaviour_t be_break_f(Entity *e) {
+static void be_break_f(Entity *e) {
     int f = e->facing;
     int c_x = 
            1 * (f == ENTITY_FACING_RIGHT
@@ -170,49 +171,49 @@ static behaviour_t be_break_f(Entity *e) {
         gamew_cache_set(WORLD_ENTITY_CACHE, x, y, 0);
 }
 
-static behaviour_t be_move_one_f(Entity *e) {
+static void be_move_one_f(Entity *e) {
     e->moving = true;
     entity_update_position(e);
     e->moving = false;
 }
 
-static behaviour_t be_move_f(Entity *e) {
+static void be_move_f(Entity *e) {
     e->moving = true;
 }
 
-static behaviour_t be_stop_f(Entity *e) {
+static void be_stop_f(Entity *e) {
     e->moving = false;
 }
 
-static behaviour_t be_face_up_f (Entity *e) {
+static void be_face_up_f (Entity *e) {
     e->facing = ENTITY_FACING_UP;
 }
 
-static behaviour_t be_face_down_f (Entity *e) {
+static void be_face_down_f (Entity *e) {
     e->facing = ENTITY_FACING_DOWN;
 }
 
-static behaviour_t be_face_left_f (Entity *e) {
+static void be_face_left_f (Entity *e) {
     e->facing = ENTITY_FACING_LEFT;
 }
 
-static behaviour_t be_face_right_f (Entity *e) {
+static void be_face_right_f (Entity *e) {
     e->facing = ENTITY_FACING_RIGHT;
 }
 
-static behaviour_t be_face_ul_f (Entity *e) {
+static void be_face_ul_f (Entity *e) {
     e->facing = ENTITY_FACING_UL;
 }
 
-static behaviour_t be_face_ur_f (Entity *e) {
+static void be_face_ur_f (Entity *e) {
     e->facing = ENTITY_FACING_UR;
 }
 
-static behaviour_t be_face_dl_f (Entity *e) {
+static void be_face_dl_f (Entity *e) {
     e->facing = ENTITY_FACING_DL;
 }
 
-static behaviour_t be_face_dr_f (Entity *e) {
+static void be_face_dr_f (Entity *e) {
     e->facing = ENTITY_FACING_DR;
 }
 
@@ -221,8 +222,6 @@ static behaviour_t be_face_dr_f (Entity *e) {
  * nearby.
  */
 static void chaser_tick(Entity* e) {
-    Queue64* qu = e->controller->behaviour_queue;
-
     Entity *p = GLOBALS.player;
 
     int radius = 40;
@@ -391,8 +390,10 @@ int game_curseminer_update() {
             g_player_moving_changed = false;
         }
     }
+
+    return 0;
 }
 
 int game_curseminer_free() {
-
+    return 0;
 }
