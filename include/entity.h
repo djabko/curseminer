@@ -32,16 +32,16 @@ void entity_process_behaviours(Entity *e);
 
 int entity_init_default_controller();
 int entity_create_controller(EntityController*, void(*)(Entity*), void(*)(Entity*, int, int));
-void entity_tick_abstract(Entity*);
-void entity_update_position(Entity*);
+void entity_tick_abstract(GameContext*, Entity*);
+void entity_update_position(GameContext *, Entity*);
 
-Entity* entity_spawn(World*, EntityType*, int, int, EntityFacing, int, int);
+Entity* entity_spawn(GameContext*, World*, EntityType*, int, int, EntityFacing, int, int);
 int entity_command(Entity*, behaviour_t);
 void entity_kill_by_id(int);
 void entity_kill_by_pos(int, int);
 void entity_rm(World*, Entity*);
 void entity_set_keyboard_controller(Entity*);
-void entity_inventory_add(Entity*, int);
+void entity_inventory_add(GameContext*, Entity*, int);
 int entity_inventory_get(Entity*, int);
 int entity_inventory_selected(Entity*);
 

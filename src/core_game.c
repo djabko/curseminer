@@ -180,7 +180,7 @@ int game_update(Task* task, Stack64* stack) {
         while (_pq_peek(entity_pq, 0) <= TIMER_NOW_MS) {
             Entity *e = (Entity*) pq_dequeue(entity_pq);
 
-            entity_tick_abstract(e);
+            entity_tick_abstract(game, e);
             e->next_tick = TIMER_NOW_MS + e->speed * 10;
 
             pq_enqueue(entity_pq, e, e->next_tick);

@@ -73,13 +73,13 @@ int entity_remove_behaviour(behaviour_t be) {
     return 0;
 }
 
-void entity_update_position(Entity *e) {
+void entity_update_position(GameContext *game, Entity *e) {
     if (!e->moving) return;
 
-    byte_t *cache = GLOBALS.game->cache_entity;
+    byte_t *cache = game->cache_entity;
 
-    if (game_on_screen(GLOBALS.game, e->x, e->y))
-        gamew_cache_set(GLOBALS.game, cache, e->x, e->y, 0);
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, 0);
 
     int v = 1;
 
@@ -123,16 +123,16 @@ void entity_update_position(Entity *e) {
     int nx = e->x + e->vx;
     int ny = e->y + e->vy;
 
-    int id = world_getxy(GLOBALS.game->world, nx, ny);
-    id = id ? id : gamew_cache_get(GLOBALS.game, cache, nx, ny);
+    int id = world_getxy(game->world, nx, ny);
+    id = id ? id : gamew_cache_get(game, cache, nx, ny);
 
     if (!id) {
         e->x += e->vx;
         e->y += e->vy;
     }
 
-    if (game_on_screen(GLOBALS.game, e->x, e->y))
-        gamew_cache_set(GLOBALS.game, cache, e->x, e->y, e->type->id);
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, e->type->id);
 }
 
 /* Defines default entity action for each tick
@@ -147,9 +147,9 @@ void default_find_path(Entity* e, int x, int y) {
     return;
 }
 
-void entity_inventory_add(Entity *e, int tid) {
+void entity_inventory_add(GameContext *game, Entity *e, int tid) {
     if (!e->inventory) {
-        int count = GLOBALS.game->entity_types_c;
+        int count = game->entity_types_c;
 
         e->inventory = calloc(count, sizeof(typeof(count)));
     }
@@ -166,7 +166,7 @@ int entity_inventory_selected(Entity* e) {
     return entity_inventory_get(e, e->inventory_index);
 }
 
-void entity_tick_abstract(Entity* e) {
+void entity_tick_abstract(GameContext *game, Entity* e) {
 
     // Is this the right order?
 
@@ -174,7 +174,7 @@ void entity_tick_abstract(Entity* e) {
 
     entity_process_behaviours(e);
 
-    entity_update_position(e);
+    entity_update_position(game, e);
 }
 
 int entity_create_controller(
@@ -194,7 +194,9 @@ int entity_init_default_controller() {
             default_tick, default_find_path);
 }
 
-Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing face, int num, int t) {
+Entity* entity_spawn(GameContext *game, World* world, EntityType* type,
+        int x, int y, EntityFacing face, int num, int t) {
+
     if (ENTITY_ARRAY == NULL)
         ENTITY_ARRAY = calloc(world->entity_maxc, sizeof(Entity));
 
@@ -220,8 +222,8 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
 
     pq_enqueue(world->entities, new_entity, TIMER_NOW_MS);
 
-    byte_t *cache = GLOBALS.game->cache_entity;
-    gamew_cache_set(GLOBALS.game, cache, new_entity->x, new_entity->y, new_entity->type->id);
+    byte_t *cache = game->cache_entity;
+    gamew_cache_set(game, cache, new_entity->x, new_entity->y, new_entity->type->id);
 
     return new_entity;
 }

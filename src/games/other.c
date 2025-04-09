@@ -21,7 +21,7 @@ static void handler(InputEvent *ie) {
 
     int n = rand() % g_game->entity_types_c;
     EntityType *type = g_game->entity_types + n;
-    Entity *e = entity_spawn(g_game->world, type, x, y, ENTITY_FACING_DOWN, 1, 0);
+    Entity *e = entity_spawn(g_game, g_game->world, type, x, y, ENTITY_FACING_DOWN, 1, 0);
     e->moving = true;
 
     e->controller = &g_controller_1;
@@ -36,7 +36,7 @@ static void tick_1(Entity* e) {
     }
     */
 
-    entity_update_position(e);
+    entity_update_position(g_game, e);
 }
 
 static void tick_2(Entity* e) {}
@@ -56,7 +56,7 @@ int game_other_init(GameContext *game, int) {
     game_create_skin(g_skins + i++, glyph++, 240, 240, 255, 64, 0, 128);
 
     for (int j = 0; j < i; j++)
-        game_create_entity_type(GLOBALS.game, g_skins + j);
+        game_create_entity_type(g_game, g_skins + j);
 
     g_game->entity_types_c = i;
 
@@ -64,7 +64,7 @@ int game_other_init(GameContext *game, int) {
     entity_create_controller(&g_controller_1, tick_1, NULL);
     entity_create_controller(&g_controller_2, tick_2, NULL);
 
-    Entity *player = entity_spawn(game->world, g_game->entity_types,
+    Entity *player = entity_spawn(game, game->world, g_game->entity_types,
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
 
     player->controller = &g_controller_0;
