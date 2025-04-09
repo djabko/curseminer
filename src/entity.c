@@ -76,8 +76,10 @@ int entity_remove_behaviour(behaviour_t be) {
 void entity_update_position(Entity *e) {
     if (!e->moving) return;
 
-    if (game_on_screen(e->x, e->y))
-        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
+    byte_t *cache = GLOBALS.game->cache_entity;
+
+    if (game_on_screen(GLOBALS.game, e->x, e->y))
+        gamew_cache_set(GLOBALS.game, cache, e->x, e->y, 0);
 
     int v = 1;
 
@@ -122,15 +124,15 @@ void entity_update_position(Entity *e) {
     int ny = e->y + e->vy;
 
     int id = world_getxy(GLOBALS.game->world, nx, ny);
-    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, nx, ny);
+    id = id ? id : gamew_cache_get(GLOBALS.game, cache, nx, ny);
 
     if (!id) {
         e->x += e->vx;
         e->y += e->vy;
     }
 
-    if (game_on_screen(e->x, e->y))
-        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+    if (game_on_screen(GLOBALS.game, e->x, e->y))
+        gamew_cache_set(GLOBALS.game, cache, e->x, e->y, e->type->id);
 }
 
 /* Defines default entity action for each tick
@@ -218,7 +220,8 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
 
     pq_enqueue(world->entities, new_entity, TIMER_NOW_MS);
 
-    gamew_cache_set(GAME_ENTITY_CACHE, new_entity->x, new_entity->y, new_entity->type->id);
+    byte_t *cache = GLOBALS.game->cache_entity;
+    gamew_cache_set(GLOBALS.game, cache, new_entity->x, new_entity->y, new_entity->type->id);
 
     return new_entity;
 }

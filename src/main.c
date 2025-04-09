@@ -40,7 +40,7 @@ int exit_state() {
     log_debug("Exiting...");
 
     UI_exit();
-    game_free();
+    game_free(GLOBALS.game);
     scheduler_free();
 
     return 0;
@@ -86,8 +86,10 @@ int main(int argc, const char** argv) {
     input_register_event(E_KB_Q, E_CTX_NOISE, main_event_handler);
     input_register_event(E_KB_Q, E_CTX_CLOCK, main_event_handler);
 
+    Stack64 *gst = st_init(1);
+    st_push(gst, (uint64_t) GLOBALS.game);
     schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
-    schedule_cb(g_runqueue, 0, 0, game_update, NULL, cb_exit);
+    schedule_cb(g_runqueue, 0, 0, game_update, gst, cb_exit);
 
     schedule_run(g_runqueue_list);
 

@@ -109,14 +109,14 @@ static void game_input_break_tile_mouse(InputEvent *ie) {
 
         if (world_from_mouse_xy(ie, &x, &y) != 0) return;
 
-        EntityType *id = game_world_getxy(x, y);
+        EntityType *id = game_world_getxy(GLOBALS.game, x, y);
         int d = man_dist(GLOBALS.player->x, GLOBALS.player->y, x, y);
 
         bool is_tile_exists = id != E_TYPE_NULL;
         bool is_player_close = d < TILE_BREAK_DISTANCE;
 
         if (is_tile_exists && is_player_close)
-            game_world_setxy(x, y, E_TYPE_NULL);
+            game_world_setxy(GLOBALS.game, x, y, E_TYPE_NULL);
     }
 }
 
@@ -141,7 +141,7 @@ static void game_input_inventory_down(InputEvent *ie) {
 static void be_place_f(Entity *e) {
     if (entity_inventory_selected(e)) {
         int id = e->inventory_index;
-        game_world_setxy(e->x, e->y, id);
+        game_world_setxy(GLOBALS.game, e->x, e->y, id);
         e->inventory[id]--;
     }
 }
@@ -167,8 +167,8 @@ static void be_break_f(Entity *e) {
     entity_inventory_add(e, tid);
     world_setxy(GLOBALS.game->world, x, y, 0);
 
-    if (game_on_screen(x, y))
-        gamew_cache_set(WORLD_ENTITY_CACHE, x, y, 0);
+    if (game_on_screen(GLOBALS.game, x, y))
+        gamew_cache_set(GLOBALS.game, GLOBALS.game->cache_world, x, y, 0);
 }
 
 static void be_move_one_f(Entity *e) {
@@ -283,7 +283,7 @@ int game_curseminer_init(GameContext *game, int) {
     game_create_skin(g_skins + i++, glyph++, 0, 0, 0,  42, 133,  57);
 
     for (i = 0; i < g_skin_end; i++)
-        g_etypes[i] = game_create_entity_type(g_skins + i);
+        g_etypes[i] = game_create_entity_type(GLOBALS.game, g_skins + i);
 
     GLOBALS.game->entity_types_c = g_skin_end;
 
@@ -352,9 +352,9 @@ int game_curseminer_update() {
         if      (topb)       game->world_view_y--;
         else if (bottomb)    game->world_view_y++;
 
-        flush_world_entity_cache();
-        flush_game_entity_cache();
-        game_flush_dirty();
+        flush_world_entity_cache(GLOBALS.game);
+        flush_game_entity_cache(GLOBALS.game);
+        game_flush_dirty(GLOBALS.game);
 
         // Check for player movement
         if (g_player_moving_changed) {

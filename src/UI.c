@@ -281,7 +281,7 @@ void draw_keyboard_state(WINDOW* scr, int x, int y) {
 void draw_gamewin_nogui(window_t *gamewin) {
     for (int x=0; x <= gamewin->w; x++) {
         for (int y=0; y <= gamewin->h; y++) {
-            EntityType *e = game_world_getxy(x, y); 
+            EntityType *e = game_world_getxy(GLOBALS.game, x, y); 
             *e;
         }
     }
@@ -291,7 +291,7 @@ void draw_gamewin_nogui(window_t *gamewin) {
 void draw_gamewin(window_t *gamewin) {
     EntityType* type;
 
-    DirtyFlags *df = GAME_DIRTY_FLAGS;
+    DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
 
     // No tiles to draw
     if (df->command == 0) {
@@ -316,7 +316,7 @@ void draw_gamewin(window_t *gamewin) {
                         int x = index % maxx;
                         int y = index / maxx;
 
-                        type = game_world_getxy(x, y);
+                        type = game_world_getxy(GLOBALS.game, x, y);
 
                         int glyph = type->default_skin->glyph;
 
@@ -324,7 +324,7 @@ void draw_gamewin(window_t *gamewin) {
 
                         wattron(gamewin->win, COLOR_PAIR(glyph));
                         mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
-                        game_set_dirty(x, y, 0);
+                        game_set_dirty(GLOBALS.game, x, y, 0);
                         wattroff(gamewin->win, COLOR_PAIR(glyph));
                     }
                 }
@@ -336,7 +336,7 @@ void draw_gamewin(window_t *gamewin) {
         for (int y=0; y < gamewin->h; y++) {
             for (int x=0; x < gamewin->w; x++) {
 
-                type = game_world_getxy(x, y);
+                type = game_world_getxy(GLOBALS.game, x, y);
 
                 int glyph = type->default_skin->glyph;
 
@@ -348,7 +348,7 @@ void draw_gamewin(window_t *gamewin) {
             }
         }
 
-        game_flush_dirty();
+        game_flush_dirty(GLOBALS.game);
     }
 
     df->command = 0;
@@ -357,7 +357,7 @@ void draw_gamewin(window_t *gamewin) {
 }
 
 void draw_uiwin_nogui(window_t *uiwin) {
-    EntityType *e = game_world_getxy(1, 1);
+    EntityType *e = game_world_getxy(GLOBALS.game, 1, 1);
     *e;
 }
 
@@ -374,7 +374,7 @@ void draw_uiwin(window_t *uiwin) {
             abs(GLOBALS.player->vx)
             );
 
-    EntityType* entity = game_world_getxy(1, 1);
+    EntityType* entity = game_world_getxy(GLOBALS.game, 1, 1);
     mvwprintw(uiwin->win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
     mvwprintw(uiwin->win, (TIME_MSEC/100)%uiwin->h, uiwin->w/2, "!"); // draw splash icon
@@ -645,11 +645,9 @@ int UI_init(int nogui_mode) {
         .f_free = game_curseminer_free,
     };
 
-    int status = game_init(&gcfg);
-    if (status != 0) {
-        UI_exit();
-        return 0;
-    }
+    GLOBALS.game = game_init(&gcfg);
+    assert_log (GLOBALS.game != NULL,
+            "ERROR: UI failed to initialize game...");
 
     init_colors();
 

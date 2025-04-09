@@ -56,7 +56,7 @@ int game_other_init(GameContext *game, int) {
     game_create_skin(g_skins + i++, glyph++, 240, 240, 255, 64, 0, 128);
 
     for (int j = 0; j < i; j++)
-        game_create_entity_type(g_skins + j);
+        game_create_entity_type(GLOBALS.game, g_skins + j);
 
     g_game->entity_types_c = i;
 
