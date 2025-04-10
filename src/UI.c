@@ -10,6 +10,7 @@
 #include "UI.h"
 #include "core_game.h"
 #include "games/curseminer.h"
+#include "games/other.h"
 #include "input.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
@@ -635,7 +636,7 @@ int UI_init(int nogui_mode) {
     GLOBALS.view_port_maxx = gww;
     GLOBALS.view_port_maxy = gwh;
 
-    GameContextCFG gcfg = {
+    GameContextCFG gcfg_curseminer = {
         .skins_max = 32,
         .entity_types_max = 32,
         .scroll_threshold = 5,
@@ -645,7 +646,17 @@ int UI_init(int nogui_mode) {
         .f_free = game_curseminer_free,
     };
 
-    GLOBALS.game = game_init(&gcfg);
+    GameContextCFG gcfg_other = {
+        .skins_max = 32,
+        .entity_types_max = 32,
+        .scroll_threshold = 5,
+
+        .f_init = game_other_init,
+        .f_update = game_other_update,
+        .f_free = game_other_free,
+    };
+
+    GLOBALS.game = game_init(&gcfg_curseminer);
     assert_log (GLOBALS.game != NULL,
             "ERROR: UI failed to initialize game...");
 

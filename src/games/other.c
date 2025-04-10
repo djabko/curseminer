@@ -42,7 +42,7 @@ static void tick_1(Entity* e) {
 static void tick_2(Entity* e) {}
 
 int game_other_init(GameContext *game, int) {
-    g_game = GLOBALS.game;
+    g_game = game;
 
     int glyph = 0;
     int i = 0;
@@ -56,15 +56,15 @@ int game_other_init(GameContext *game, int) {
     game_create_skin(g_skins + i++, glyph++, 240, 240, 255, 64, 0, 128);
 
     for (int j = 0; j < i; j++)
-        game_create_entity_type(g_game, g_skins + j);
+        game_create_entity_type(game, g_skins + j);
 
-    g_game->entity_types_c = i;
+    game->entity_types_c = i;
 
     entity_create_controller(&g_controller_0, tick_0, NULL);
     entity_create_controller(&g_controller_1, tick_1, NULL);
     entity_create_controller(&g_controller_2, tick_2, NULL);
 
-    Entity *player = entity_spawn(game, game->world, g_game->entity_types,
+    Entity *player = entity_spawn(game, game->world, game->entity_types,
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
 
     player->controller = &g_controller_0;
