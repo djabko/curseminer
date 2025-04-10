@@ -7,181 +7,192 @@
 #include "timer.h"
 #include "entity.h"
 
-EntityController* DEFAULT_CONTROLLER = NULL;
-EntityController* KEYBOARD_CONTROLLER = NULL;
+EntityController DEFAULT_CONTROLLER;
 Entity* ENTITY_ARRAY = NULL;
 int MAX = 32;
 
-int entity_command(Entity *e, BehaviourID be) {
+static int g_behaviours_free_spots = 0;
+static behaviour_t g_behaviour_count = 0;
+static behaviour_t g_behaviour_max = 0;
+static behaviour_func_t *g_behaviours;
+
+int entity_command(Entity *e, behaviour_t be) {
+    if (be <= 0 && g_behaviour_max <= be) return -1;
+
     return qu_enqueue(e->controller->behaviour_queue, be);
 }
 
-static inline void set_entity_facing(Entity* e, int vx, int vy, EntityFacing direction) {
-    e->facing = direction;
-
+static void set_entity_velocity(Entity *e, int vx, int vy) {
     e->vx = vx;
     e->vy = vy;
 }
 
-static void tick_entity_behaviour(Entity* e) {
+behaviour_t entity_create_behaviour(behaviour_func_t func) {
+    behaviour_t be;
+
+    if (0 < g_behaviours_free_spots) {
+
+        for (be = 0; be < g_behaviour_count; be++) {
+            if (g_behaviours[be] == NULL) break;
+        }
+
+        g_behaviours_free_spots--;
+
+        if (g_behaviour_max <= be) return -1;
+
+    } else if (g_behaviour_count <= g_behaviour_max) {
+
+        g_behaviour_max = 0 < g_behaviour_max ? 2 * g_behaviour_max : 8;
+        size_t new_size = g_behaviour_max * sizeof(behaviour_func_t);
+
+        g_behaviours = realloc(g_behaviours, new_size);
+    }
+
+    g_behaviours[ g_behaviour_count ] = func;
+
+    return g_behaviour_count++;
+}
+
+void entity_process_behaviours(Entity *e) {
     Queue64* qu = e->controller->behaviour_queue;
 
     if (qu_empty(qu)) return;
 
-    int v = 1;
+    behaviour_t be = (behaviour_t) qu_dequeue(qu);
 
-    switch (qu_dequeue(qu)) {
-
-        case be_attack:
-            break;
-
-        case be_interact:
-            break;
-
-        case be_place:
-            game_world_setxy(e->x, e->y, ENTITY_STONE);
-            break;
-
-        case be_move:
-            e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
-            break;
-
-        case be_stop: 
-            e->vx = 0;
-            e->vy = 0;
-            break;
-
-        case be_face_up:
-            set_entity_facing(e, !v, -v, ENTITY_FACING_UP);
-            break;
-
-        case be_face_down:
-            set_entity_facing(e, !v, +v, ENTITY_FACING_DOWN);
-            break;
-
-        case be_face_left:
-            set_entity_facing(e, -v, !v, ENTITY_FACING_LEFT);
-            break;
-
-        case be_face_right:
-            set_entity_facing(e, +v, !v, ENTITY_FACING_RIGHT);
-            break;
-
-        case be_face_ul:
-            set_entity_facing(e, -v, -v, ENTITY_FACING_UL);
-            break;
-
-        case be_face_ur:
-            set_entity_facing(e, +v, -v, ENTITY_FACING_UR);
-            break;
-
-        case be_face_dl:
-            set_entity_facing(e, -v, +v, ENTITY_FACING_DL);
-            break;
-
-        case be_face_dr:
-            set_entity_facing(e, +v, +v, ENTITY_FACING_DR);
-            break;
-    }
+    g_behaviours[be](e);
 }
 
-static void update_entity_position(Entity *e) {
-    if (game_on_screen(e->x, e->y))
-        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, 0);
+int entity_remove_behaviour(behaviour_t be) {
+    if (g_behaviour_max <= be)
+        return -1;
+
+    g_behaviours[be] = NULL;
+    g_behaviours_free_spots++;
+
+    return 0;
+}
+
+void entity_update_position(GameContext *game, Entity *e) {
+    if (!e->moving) return;
+
+    byte_t *cache = game->cache_entity;
+
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, 0);
+
+    int v = 1;
+
+    switch (e->facing) {
+        case ENTITY_FACING_UL:
+            set_entity_velocity(e, -v, -v);
+            break;
+
+        case ENTITY_FACING_UR:
+            set_entity_velocity(e, +v, -v);
+            break;
+
+        case ENTITY_FACING_DL:
+            set_entity_velocity(e, -v, +v);
+            break;
+
+        case ENTITY_FACING_DR:
+            set_entity_velocity(e, +v, +v);
+            break;
+
+        case ENTITY_FACING_UP:
+            set_entity_velocity(e, !v, -v);
+            break;
+
+        case ENTITY_FACING_DOWN:
+            set_entity_velocity(e, !v, +v);
+            break;
+
+        case ENTITY_FACING_LEFT:
+            set_entity_velocity(e, -v, !v);
+            break;
+
+        case ENTITY_FACING_RIGHT:
+            set_entity_velocity(e, +v, !v);
+            break;
+
+        default:
+            log_debug("ERROR: Invalid direction for entity %p", e);
+    }
 
     int nx = e->x + e->vx;
     int ny = e->y + e->vy;
 
-    int id = world_getxy(GLOBALS.game->world, nx, ny);
-    id = id ? id : gamew_cache_get(GAME_ENTITY_CACHE, nx, ny);
+    int id = world_getxy(game->world, nx, ny);
+    id = id ? id : gamew_cache_get(game, cache, nx, ny);
 
     if (!id) {
         e->x += e->vx;
         e->y += e->vy;
     }
 
-    if (game_on_screen(e->x, e->y))
-        gamew_cache_set(GAME_ENTITY_CACHE, e->x, e->y, e->type->id);
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, e->type->id);
 }
 
-/* Defines default entity action for each tick
- * Current behaviour is to follow the player via find_path() if player is
- * nearby.
- */
-static void default_tick(Entity* e) {
-    Queue64* qu = e->controller->behaviour_queue;
+void default_tick(Entity* e) {
+    return;
+}
 
-    Entity *p = GLOBALS.player;
+void default_find_path(Entity* e, int x, int y) {
+    return;
+}
 
-    bool moving = e->vx != 0 || e->vy != 0;
+void entity_inventory_add(GameContext *game, Entity *e, int tid) {
+    if (!e->inventory) {
+        int count = game->entity_types_c;
 
-    if (moving) {
-        if (man_dist(e->x, e->y, p->x, p->y) > 40) {
-            entity_command(e, be_stop);
-            return;
-        }
-
-        e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
-        tick_entity_behaviour(e);
-        update_entity_position(e);
-
-    } else {
-        entity_command(e, be_move);
-        tick_entity_behaviour(e);
+        e->inventory = calloc(count, sizeof(typeof(count)));
     }
-}
-
-static void default_find_path(Entity* e, int x, int y) {
-    if (e->x == x && e->y == y) return;
-
-    const int up = (e->y > y);
-    const int down = (e->y < y);
-    const int left = (e->x > x);
-    const int right = (e->x < x);
-
-    BehaviourID be = be_stop;
     
-    if      (up && left)    be = be_face_ul;
-    else if (up && right)   be = be_face_ur;
-    else if (down && left)  be = be_face_dl;
-    else if (down && right) be = be_face_dr;
-    else if (up)            be = be_face_up;
-    else if (down)          be = be_face_down;
-    else if (left)          be = be_face_left;
-    else if (right)         be = be_face_right;
-    else log_debug(
-"ERROR: unable to execute pathfinding for entity %p(%d, %d) with respect to\
-point (%d, %d)}", e->id, e->x, e->y, x, y, be);
-
-    entity_command(e, be);
+    e->inventory[tid]++;
 }
 
-/* Defines player action for each tick */
-static void player_tick(Entity* player) {
-    tick_entity_behaviour(player);
-    update_entity_position(player);
+int entity_inventory_get(Entity *e, int tid) {
+    if (e->inventory) return *(e->inventory + tid);
+    return 0;
 }
 
-static int create_default_entity_controller() {
-    DEFAULT_CONTROLLER = calloc(2, sizeof(EntityController));
-    DEFAULT_CONTROLLER->behaviour_queue = qu_init(1);
-    DEFAULT_CONTROLLER->tick = default_tick;
-    DEFAULT_CONTROLLER->find_path = default_find_path;
+int entity_inventory_selected(Entity* e) {
+    return entity_inventory_get(e, e->inventory_index);
+}
 
-    KEYBOARD_CONTROLLER = DEFAULT_CONTROLLER + 1;
-    *KEYBOARD_CONTROLLER = *DEFAULT_CONTROLLER;
-    KEYBOARD_CONTROLLER->tick = player_tick;
+void entity_tick_abstract(GameContext *game, Entity* e) {
+
+    // Is this the right order?
+
+    e->controller->tick(e);
+
+    entity_process_behaviours(e);
+
+    entity_update_position(game, e);
+}
+
+int entity_create_controller(
+        EntityController *controller,
+        void(*f_tick)(Entity*),
+        void(*f_find_path)(Entity*,int,int)) {
+
+    controller->behaviour_queue = qu_init(1);
+    controller->tick = f_tick;
+    controller->find_path = f_find_path;
 
     return 1;
 }
 
-void entity_set_keyboard_controller(Entity* e) {
-    if (!e) return;
-    e->controller = KEYBOARD_CONTROLLER;
+int entity_init_default_controller() {
+    return entity_create_controller(&DEFAULT_CONTROLLER,
+            default_tick, default_find_path);
 }
 
+Entity* entity_spawn(GameContext *game, World* world, EntityType* type,
+        int x, int y, EntityFacing face, int num, int t) {
 
-Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing face, int num, int t) {
     if (ENTITY_ARRAY == NULL)
         ENTITY_ARRAY = calloc(world->entity_maxc, sizeof(Entity));
 
@@ -199,13 +210,16 @@ Entity* entity_spawn(World* world, EntityType* type, int x, int y, EntityFacing 
     new_entity->health = 10;
     new_entity->facing = face;
     new_entity->next_tick = TIMER_NOW_MS;
+    new_entity->moving = false;
+    new_entity->inventory = NULL;
+    new_entity->inventory_index = 0;
 
-    create_default_entity_controller();
-    new_entity->controller = DEFAULT_CONTROLLER;
+    new_entity->controller = &DEFAULT_CONTROLLER;
 
     pq_enqueue(world->entities, new_entity, TIMER_NOW_MS);
 
-    gamew_cache_set(GAME_ENTITY_CACHE, new_entity->x, new_entity->y, new_entity->type->id);
+    byte_t *cache = game->cache_entity;
+    gamew_cache_set(game, cache, new_entity->x, new_entity->y, new_entity->type->id);
 
     return new_entity;
 }
@@ -214,6 +228,7 @@ void entity_rm(World* world, Entity* entity) {
     if (world->entity_c <= 0) return;
     entity->id = -1;
     entity->type = NULL;
+    if (entity->inventory) free(entity->inventory);
     world->entity_c--;
 }
 

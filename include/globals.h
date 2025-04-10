@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 #include "input.h"
-#include "game.h"
+#include "core_game.h"
 
 typedef unsigned char byte_t;
 

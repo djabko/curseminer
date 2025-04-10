@@ -9,8 +9,9 @@ OBJDIR=./obj
 LOGSDIR=./logs
 OPT_OBJDIR=./obj_opt
 
-SRCS=$(wildcard $(SRCDIR)/*.c)
-OBJS=$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SRCS))
+SRCS=$(wildcard $(SRCDIR)/*.c) $(wildcard ./src/games/*.c)
+OBJS = $(patsubst ./src/%.c, $(OBJDIR)/%.o, $(wildcard ./src/*.c)) \
+       $(patsubst ./src/games/%.c, $(OBJDIR)/games/%.o, $(wildcard ./src/games/*.c))
 OPT_OBJS=$(patsubst $(SRCDIR)/%.c, $(OPT_OBJDIR)/%.o, $(SRCS))
 
 TARGET=$(notdir $(shell pwd))
@@ -22,7 +23,11 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CF_DEBUG) $(CF_LIBS) -o $@ $^
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+$(OBJDIR)/%.o: ./src/%.c | $(OBJDIR)
+	$(CC) $(CF_DEBUG) -I$(INCDIR) -c $< -o $@
+
+$(OBJDIR)/games/%.o: ./src/games/%.c | $(OBJDIR)
+	@mkdir -p $(dir $@)
 	$(CC) $(CF_DEBUG) -I$(INCDIR) -c $< -o $@
 
 $(OBJDIR):

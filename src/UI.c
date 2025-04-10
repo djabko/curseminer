@@ -8,7 +8,9 @@
 #include "util.h"
 #include "stack64.h"
 #include "UI.h"
-#include "game.h"
+#include "core_game.h"
+#include "games/curseminer.h"
+#include "games/other.h"
 #include "input.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
@@ -19,7 +21,7 @@ typedef void (*voidfunc) ();
 typedef struct window_t {
     WINDOW *win;
     Queue64 *draw_qu;
-    SkinTypeID color;
+    int glyph;
     event_ctx_t input_context;
 
     struct window_t *parent;
@@ -47,12 +49,46 @@ static Stack64* MENU_STACK = NULL;
 
 static milliseconds_t TIME_MSEC = 0;
 
+static bool g_glyph_init[GLYPH_MAX];
+static char g_glyph_charset_0[GLYPH_MAX];
+static char g_glyph_charset_1[GLYPH_MAX];
+static char g_glyph_charset_2[GLYPH_MAX];
+static char *g_glyph_charset = g_glyph_charset_1;
+
+// TODO glyph management system?
+Skin g_win_skin_0 =     {.glyph = GLYPH_MAX-1, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=215, .fg_g=215, .fg_b=50};
+Skin g_win_skin_1 =     {.glyph = GLYPH_MAX-2, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=80, .fg_g=240, .fg_b=220};
+Skin g_win_skin_2 =     {.glyph = GLYPH_MAX-3, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=120, .fg_g=6, .fg_b=2};
+
 static inline char sign_of_int(int x) {
     if      (x == 0) return ' ';
     else if (x < 0)  return '-';
     else if (x > 0)  return '+';
     return '\0';
 }
+
+
+/* Utility Functions */
+int COLORS_COUNT = 0;
+int new_glyph(Skin *skin) {
+    int bg = COLORS_COUNT++;
+    int fg = COLORS_COUNT++;
+    int err = 0;
+
+    err += init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
+    err += init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
+
+    err += init_pair(skin->glyph, fg, bg);
+
+    g_glyph_init[skin->glyph] = true;
+
+    log_debug("Initialized pair: %d bg(%d %d %d) fg(%d %d %d)",
+            skin->glyph, skin->bg_r, skin->bg_g, skin->bg_b,
+            skin->fg_r, skin->fg_g, skin->fg_b);
+
+    return err;
+}
+
 
 /* Input Handler Functions*/
 static double WIDGET_WIN_C = 1;
@@ -183,12 +219,16 @@ static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
 }
 
 static void box_win(window_t *window) {
-    wattron(stdscr, COLOR_PAIR(window->color));
+    wattron(stdscr, COLOR_PAIR(window->glyph));
+
     mvwprintw(stdscr, window->y-2, window->x, window->title);
+
     draw_square(stdscr,
             window->x - 1, window->y - 1,
             window->x + window->w,
             window->y + window->h);
+
+    wattroff(stdscr, COLOR_PAIR(window->glyph));
 }
 
 static void box_win_clear(window_t * window) {
@@ -243,16 +283,17 @@ static void draw_keyboard_state(WINDOW* scr, int x, int y) {
 static void draw_gamewin_nogui(window_t *gamewin) {
     for (int x=0; x <= gamewin->w; x++) {
         for (int y=0; y <= gamewin->h; y++) {
-            EntityType *e = game_world_getxy(x, y); 
+            EntityType *e = game_world_getxy(GLOBALS.game, x, y); 
+            *e;
         }
     }
 }
 
 //int SKIPPED_UPDATES = 0;
 static void draw_gamewin(window_t *gamewin) {
-    EntityType* entity;
+    EntityType* type;
 
-    DirtyFlags *df = GAME_DIRTY_FLAGS;
+    DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
 
     // No tiles to draw
     if (df->command == 0) {
@@ -277,10 +318,16 @@ static void draw_gamewin(window_t *gamewin) {
                         int x = index % maxx;
                         int y = index / maxx;
 
-                        entity = game_world_getxy(x, y);
-                        wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
-                        mvwaddch(gamewin->win, y, x, entity->skin->character);
-                        game_set_dirty(x, y, 0);
+                        type = game_world_getxy(GLOBALS.game, x, y);
+
+                        int glyph = type->default_skin->glyph;
+
+                        if (!g_glyph_init[glyph]) new_glyph(type->default_skin);
+
+                        wattron(gamewin->win, COLOR_PAIR(glyph));
+                        mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
+                        game_set_dirty(GLOBALS.game, x, y, 0);
+                        wattroff(gamewin->win, COLOR_PAIR(glyph));
                     }
                 }
             }
@@ -291,13 +338,19 @@ static void draw_gamewin(window_t *gamewin) {
         for (int y=0; y < gamewin->h; y++) {
             for (int x=0; x < gamewin->w; x++) {
 
-                entity = game_world_getxy(x, y);
-                wattron(gamewin->win, COLOR_PAIR(entity->skin->id));
-                mvwaddch(gamewin->win, y, x, entity->skin->character);
+                type = game_world_getxy(GLOBALS.game, x, y);
+
+                int glyph = type->default_skin->glyph;
+
+                if (!g_glyph_init[glyph]) new_glyph(type->default_skin);
+
+                wattron(gamewin->win, COLOR_PAIR(glyph));
+                mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
+                wattroff(gamewin->win, COLOR_PAIR(glyph));
             }
         }
 
-        game_flush_dirty();
+        game_flush_dirty(GLOBALS.game);
     }
 
     df->command = 0;
@@ -306,7 +359,8 @@ static void draw_gamewin(window_t *gamewin) {
 }
 
 static void draw_uiwin_nogui(window_t *uiwin) {
-    EntityType *e = game_world_getxy(1, 1);
+    EntityType *e = game_world_getxy(GLOBALS.game, 1, 1);
+    *e;
 }
 
 static void draw_uiwin(window_t *uiwin) {
@@ -322,7 +376,7 @@ static void draw_uiwin(window_t *uiwin) {
             abs(GLOBALS.player->vx)
             );
 
-    EntityType* entity = game_world_getxy(1, 1);
+    EntityType* entity = game_world_getxy(GLOBALS.game, 1, 1);
     mvwprintw(uiwin->win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
     mvwprintw(uiwin->win, (TIME_MSEC/100)%uiwin->h, uiwin->w/2, "!"); // draw splash icon
@@ -331,6 +385,32 @@ static void draw_uiwin(window_t *uiwin) {
 
     draw_keyboard_state(uiwin->win, (int)COLS*.5, 5);
     wnoutrefresh(uiwin->win);
+}
+
+static void draw_invwin_nogui(window_t *invwin) {}
+
+static void draw_invwin(window_t *invwin) {
+    // TODO: check if inventory changed
+
+    if (GLOBALS.player->inventory == NULL) return;
+
+    werase(invwin->win);
+
+    for (int i = 0; i <= 10; i++) {
+
+        if (i == GLOBALS.player->inventory_index)
+            wattron(invwin->win, COLOR_PAIR(0));
+        else
+            wattron(invwin->win, COLOR_PAIR(i));
+
+        mvwprintw(invwin->win, i, 1, "%d. %d (%d)",
+                i, i, GLOBALS.player->inventory[i]);
+
+        mvwprintw(stdscr, invwin->y, invwin->x+invwin->w+2, "index=%d",
+                GLOBALS.player->inventory_index);
+    }
+
+    wnoutrefresh(invwin->win);
 }
 
 static void draw_widgetwin_nogui(window_t *widgetwin) {}
@@ -398,25 +478,22 @@ static void draw_main_menu() {
 }
 
 /* Init Functions */
-static int init_colors() {
-    GameContext* game = game_get_context();
-
-    int color_id = 0;
-    for (int i=0; i<game->skins_c; i++) {
-        int bg = color_id++;
-        int fg = color_id++;
-
-        Skin* skin = game->skins + i;
-        init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
-        init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
-
-        init_pair(skin->id, fg, bg);
+int init_colors() {
+    for (int i = 0; i < GLYPH_MAX; i++) {
+        g_glyph_init[i] = false;
     }
 
-    return 1;
+    const char *s0 = " 123456789abcd";
+    const char *s1 = " *o&f.DM()-=r'";
+    const char *s2 = " @~#^*+0......";
+    for (int i = 0; i != strlen(s0); i++) g_glyph_charset_0[i] = s0[i];
+    for (int i = 0; i != strlen(s1); i++) g_glyph_charset_1[i] = s1[i];
+    for (int i = 0; i != strlen(s2); i++) g_glyph_charset_2[i] = s2[i];
+
+    return 0;
 }
 
-static int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, SkinTypeID color) {
+int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, int glyph) {
     window->win = newwin(h, w, y, x);
     window->parent = parent;
     window->draw_qu = qu_init(1);
@@ -426,7 +503,7 @@ static int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int
     window->y = y;
     window->w = w;
     window->h = h;
-    window->color = color;
+    window->glyph = glyph;
     window->hidden = 0;
     window->active = 1;
     strncpy(window->title, title, MAX_TITLE);
@@ -456,11 +533,13 @@ static int window_mgr_init(int size) {
     return WINDOW_MGR.mempool != NULL;
 }
 
-static window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, SkinTypeID color) {
+window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, Skin *skin) {
     if (WINDOW_MGR.count >= WINDOW_MGR.max) return NULL;
 
+    if (!g_glyph_init[skin->glyph]) new_glyph(skin);
+
     window_t *win = &WINDOW_MGR.mempool[ WINDOW_MGR.count++ ];
-    init_window(win, parent, ectx, x, y, w, h, title, color);
+    init_window(win, parent, ectx, x, y, w, h, title, skin->glyph);
     qu_enqueue(WINDOW_MGR.window_qu, (uint64_t) win);
 
     return win;
@@ -505,7 +584,7 @@ int UI_init(int nogui_mode) {
 
     getmaxyx(stdscr, LINES, COLS);
 
-    int gwx, gwy, gww, gwh, uwx, uwy, uww, uwh;
+    int gwx, gwy, gww, gwh, uwx, uwy, uww, uwh, iwx, iwy, iww, iwh;
     gwx = COLS  * .05 - 1;
     gwy = LINES * .08;
     gww = COLS  * .6;
@@ -516,15 +595,26 @@ int UI_init(int nogui_mode) {
     uww = COLS  * .8 - 1;
     uwh = LINES * .2 - 1;
 
-    window_t *gamewin, *uiwin;
+    iwx = gwx + gww + 2;
+    iwy = gwy;
+    iww = 10;
+    iwh = 10;
+
+    window_t *gamewin, *uiwin, *invwin;
 
     window_mgr_init(4);
-    gamewin    = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", ENTITY_PLAYER);
-    uiwin      = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", ENTITY_DIAMOND);
-    g_widgetwin  = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", ENTITY_REDORE);
+    gamewin     = window_mgr_add(NULL, E_CTX_GAME, gwx, gwy, gww, gwh, "Game", &g_win_skin_0);
+    uiwin       = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", &g_win_skin_1);
+    invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", &g_win_skin_1);
+    g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", &g_win_skin_2);
+
+    assert_log(gamewin && uiwin && invwin && g_widgetwin,
+            "Failed to initialize windows: game<%p> ui<%p> inv<%p> widget<%p>",
+            gamewin, uiwin, invwin, g_widgetwin);
 
     window_insert_draw_func(gamewin,        nogui_mode ? draw_gamewin_nogui     : draw_gamewin);
     window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);
+    window_insert_draw_func(invwin,         nogui_mode ? draw_invwin_nogui      : draw_invwin);
     window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
     window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
 
@@ -546,19 +636,37 @@ int UI_init(int nogui_mode) {
     GLOBALS.view_port_y = gwy;
     GLOBALS.view_port_maxx = gww;
     GLOBALS.view_port_maxy = gwh;
-    log_debug("maxx = %d", GLOBALS.view_port_maxx);
 
-    int status = game_init();
-    if (status != 0) {
-        UI_exit();
-        return 0;
-    }
+    GameContextCFG gcfg_curseminer = {
+        .skins_max = 32,
+        .entity_types_max = 32,
+        .scroll_threshold = 5,
+
+        .f_init = game_curseminer_init,
+        .f_update = game_curseminer_update,
+        .f_free = game_curseminer_free,
+    };
+
+    GameContextCFG gcfg_other = {
+        .skins_max = 32,
+        .entity_types_max = 32,
+        .scroll_threshold = 5,
+
+        .f_init = game_other_init,
+        .f_update = game_other_update,
+        .f_free = game_other_free,
+    };
+
+    GLOBALS.game = game_init(&gcfg_curseminer);
+    assert_log (GLOBALS.game != NULL,
+            "ERROR: UI failed to initialize game...");
 
     init_colors();
 
     // These functions require colors initialized
     box_win(gamewin);
     box_win(uiwin);
+    box_win(invwin);
     g_widgetwin->active = 0;
 
     wnoutrefresh(stdscr);

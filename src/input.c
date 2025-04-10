@@ -34,7 +34,8 @@ KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
 
 
 #define NCURSES_KBMAP_MAX 256
-#define NCURSES_MSMAP_MAX BUTTON4_TRIPLE_CLICKED
+#define NCURSES_MSMAP_MAX BUTTON_SHIFT
+
 static event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
 static InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
 static timer_t g_input_timer = 0;

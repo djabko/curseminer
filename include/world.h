@@ -1,7 +1,9 @@
 #ifndef WORLD_HEADER
 #define WORLD_HEADER
 
-#include "game.h"
+#include <stdbool.h>
+
+#include "core_game.h"
 #include "timer.h"
 
 typedef struct EntityType EntityType;
@@ -12,7 +14,9 @@ typedef struct Entity {
     EntityType* type;
     EntityController* controller;
     milliseconds_t next_tick;
-    int id, x, y, vx, vy, speed, health, facing;
+    int id, x, y, vx, vy, speed, health, facing, inventory_index;
+    int *inventory;
+    bool moving;
 } Entity;
 
 typedef enum ChunkType {
@@ -24,6 +28,18 @@ typedef enum ChunkType {
     CHUNK_TYPE_REDORE,
     CHUNK_TYPE_MINE,
 } ChunkType;
+
+typedef enum {
+    ENTITY_AIR,
+    ENTITY_STONE,
+    ENTITY_GOLD,
+    ENTITY_DIAMOND,
+    ENTITY_IRON,
+    ENTITY_REDORE,
+    ENTITY_PLAYER,
+    ENTITY_CHASER,
+    ENTITY_END,
+} EntityTypeID;
 
 typedef struct Chunk {
     char *data;
