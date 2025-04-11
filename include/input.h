@@ -8,7 +8,9 @@
 #include "timer.h"
 
 typedef enum {
-    GAME_FRONTEND_NCURSES
+    GAME_FRONTEND_HEADLESS,
+    GAME_FRONTEND_NCURSES,
+    GAME_FRONTEND_SDL2,
 } game_frontent_t;
 
 typedef enum {
