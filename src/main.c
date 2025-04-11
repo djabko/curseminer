@@ -6,6 +6,7 @@
 #include <files.h>
 #include <timer.h>
 #include <UI.h>
+#include <GUI.h>
 
 #define MIN_ARGS 0
 #define UPDATE_RATE 120 // times per second
@@ -23,6 +24,7 @@ RunQueue* g_runqueue = NULL;
 
 static void init(int nogui_mode) {
     input_init(GAME_FRONTEND_NCURSES);
+    input_init(GAME_FRONTEND_SDL2);
     timer_init(UPDATE_RATE);
 
     g_runqueue_list = scheduler_init();
@@ -31,7 +33,8 @@ static void init(int nogui_mode) {
     assert_log(g_runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    UI_init(nogui_mode);
+    //UI_init(nogui_mode);
+    GUI_init("Curseminer!");
 
     log_debug("Initialized...\n");
 }
@@ -39,7 +42,8 @@ static void init(int nogui_mode) {
 static int exit_state() {
     log_debug("Exiting...");
 
-    UI_exit();
+    //UI_exit();
+    GUI_exit();
     game_free(GLOBALS.game);
     scheduler_free();
 
@@ -59,6 +63,14 @@ static int job_ui (Task* task, Stack64* stack) {
 
     tk_sleep(task, 1000 / SCREEN_REFRESH_RATE);
 
+    return 0;
+}
+
+static int job_gui(Task *task, Stack64 *stack) {
+    GUI_loop();
+
+    log_debug("update");
+    tk_sleep(task, 500);
     return 0;
 }
 
@@ -88,7 +100,8 @@ int main(int argc, const char** argv) {
 
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
-    schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
+    //schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
+    schedule_cb(g_runqueue, 0, 0, job_gui, NULL, cb_exit);
     schedule_cb(g_runqueue, 0, 0, game_update, gst, cb_exit);
 
     schedule_run(g_runqueue_list);

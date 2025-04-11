@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "ncurses.h"
+#include "SDL_events.h"
 #include "globals.h"
 #include "entity.h"
 #include "scheduler.h"
@@ -31,7 +32,6 @@ typedef struct {
 #define KDS_MAX 3
 KeyDownState KEY_DOWN_STATES_ARRAY[KDS_MAX];
 KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
-
 
 #define NCURSES_KBMAP_MAX 256
 #define NCURSES_MSMAP_MAX BUTTON_SHIFT
@@ -238,6 +238,35 @@ static int input_init_ncurses() {
 
 #undef KDS_MAX
 
+#define MAX_MAPPING 256
+static event_t g_sdl2_mapping_kb[ MAX_MAPPING ];
+
+static void init_SDL2_keys() {
+    g_sdl2_mapping_kb[SDL_QUIT] = E_KB_ESC;
+}
+
+static int handle_event_SDL2(void *userdata, SDL_Event *event) {
+    bool keydown = event->type == SDL_KEYDOWN;
+    bool keyup = event->type == SDL_KEYUP;
+
+    InputEvent ie;
+
+    if (keydown || keyup) {
+        if (keydown) ie.state = ES_DOWN;
+        else ie.state = ES_UP;
+    } 
+
+    return 0;
+}
+
+static int input_init_SDL2() {
+    SDL_AddEventWatch(handle_event_SDL2, NULL);
+
+    return 0;
+}
+
+#undef MAX_MAPPING
+
 
 /* Generic Functions */
 int input_register_event(event_t id, event_ctx_t ctx, void (*func)(InputEvent*)) {
@@ -257,9 +286,15 @@ void input_init(game_frontent_t frontend) {
 
     switch (frontend) {
 
+        case GAME_FRONTEND_HEADLESS:
+            break;
+
         case GAME_FRONTEND_NCURSES:
             input_init_ncurses();
             break;
+
+        case GAME_FRONTEND_SDL2:
+            input_init_SDL2();
 
         default:
             log_debug("ERROR: invalid input frontend provided: %d", frontend);
