@@ -147,7 +147,7 @@ void game_flush_dirty(GameContext *game) {
     df->command = -1;
 }
 
-void game_create_skin(Skin *skin, int id,
+void game_create_skin(GameContext *game, Skin *skin, int id,
         color_t bg_r, color_t bg_g, color_t bg_b,
         color_t fg_r, color_t fg_g, color_t fg_b) {
 
@@ -159,6 +159,8 @@ void game_create_skin(Skin *skin, int id,
     skin->fg_r = fg_r;
     skin->fg_g = fg_g;
     skin->fg_b = fg_b;
+
+    game->skins_c++;
 }
 
 EntityType* game_create_entity_type(GameContext *game, Skin* skin) {
@@ -212,7 +214,7 @@ GameContext *game_init(GameContextCFG *cfg) {
     game->scroll_threshold = cfg->scroll_threshold;
     game->f_init = cfg->f_init;
     game->f_update = cfg->f_update;
-    game-> f_free = cfg->f_free;
+    game->f_free = cfg->f_free;
 
     game->skins_c = 0;
     game->entity_types_c = 0;
