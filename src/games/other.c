@@ -47,13 +47,13 @@ int game_other_init(GameContext *game, int) {
     int glyph = 0;
     int i = 0;
 
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 255, 255);
-    game_create_skin(g_skins + i++, glyph++, 0, 32, 64, 0, 192, 255);
-    game_create_skin(g_skins + i++, glyph++, 16, 32, 0, 128, 255, 0);
-    game_create_skin(g_skins + i++, glyph++, 24, 0, 0, 255, 32, 0);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 24, 160, 160, 255);
-    game_create_skin(g_skins + i++, glyph++, 8, 8, 8, 255, 208, 128);
-    game_create_skin(g_skins + i++, glyph++, 240, 240, 255, 64, 0, 128);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 255, 255);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 32, 64, 0, 192, 255);
+    game_create_skin(game, g_skins + i++, glyph++, 16, 32, 0, 128, 255, 0);
+    game_create_skin(game, g_skins + i++, glyph++, 24, 0, 0, 255, 32, 0);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 24, 160, 160, 255);
+    game_create_skin(game, g_skins + i++, glyph++, 8, 8, 8, 255, 208, 128);
+    game_create_skin(game, g_skins + i++, glyph++, 240, 240, 255, 64, 0, 128);
 
     for (int j = 0; j < i; j++)
         game_create_entity_type(game, g_skins + j);

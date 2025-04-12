@@ -254,6 +254,8 @@ static int handle_event_SDL2(void *userdata, SDL_Event *event) {
     if (keydown || keyup) {
         if (keydown) ie.state = ES_DOWN;
         else ie.state = ES_UP;
+
+        log_debug("EVENT: %d", event->key.keysym);
     } 
 
     return 0;

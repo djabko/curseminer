@@ -275,15 +275,15 @@ int game_curseminer_init(GameContext *game, int) {
     int glyph = 0;
     int i = 0;
 
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 255, 255);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0,  80, 240, 220);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120,   6,   2);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 215, 215,  50);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0,  42, 133,  57);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 31, 255);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0,  80, 240, 220);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120,   6,   2);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 215, 215,  50);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0,  42, 133,  57);
 
     for (i = 0; i < g_skin_end; i++)
         g_etypes[i] = game_create_entity_type(g_game, g_skins + i);

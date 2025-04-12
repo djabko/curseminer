@@ -69,7 +69,6 @@ static int job_ui (Task* task, Stack64* stack) {
 static int job_gui(Task *task, Stack64 *stack) {
     GUI_loop();
 
-    log_debug("update");
     tk_sleep(task, 500);
     return 0;
 }
