@@ -578,11 +578,14 @@ int UI_init(int nogui_mode) {
 
         ESCDELAY = 0;
 
+        getmaxyx(stdscr, LINES, COLS);
+
+    } else {
+        COLS = 100;
+        LINES = 100;
     }
 
     st_push(MENU_STACK, (uint64_t) draw_main_menu);
-
-    getmaxyx(stdscr, LINES, COLS);
 
     int gwx, gwy, gww, gwh, uwx, uwy, uww, uwh, iwx, iwy, iww, iwh;
     gwx = COLS  * .05 - 1;
@@ -616,7 +619,7 @@ int UI_init(int nogui_mode) {
     window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);
     window_insert_draw_func(invwin,         nogui_mode ? draw_invwin_nogui      : draw_invwin);
     window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
-    window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
+    window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_invwin_nogui      : draw_widgetwin_perlin_noise);
 
     input_register_event(E_KB_G, E_CTX_GAME, ui_input_widget_toggle);
     input_register_event(E_KB_G, E_CTX_NOISE, ui_input_widget_toggle);
@@ -661,15 +664,18 @@ int UI_init(int nogui_mode) {
     assert_log (GLOBALS.game != NULL,
             "ERROR: UI failed to initialize game...");
 
-    init_colors();
-
-    // These functions require colors initialized
-    box_win(gamewin);
-    box_win(uiwin);
-    box_win(invwin);
     g_widgetwin->active = 0;
 
-    wnoutrefresh(stdscr);
+    if (!nogui_mode) {
+        init_colors();
+
+        // These functions require colors initialized
+        box_win(gamewin);
+        box_win(uiwin);
+        box_win(invwin);
+
+        wnoutrefresh(stdscr);
+    }
 
     LATTICE1D = noise_init(100, 1, 100, smoothstep);
     return 1;
