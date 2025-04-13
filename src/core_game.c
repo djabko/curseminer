@@ -191,8 +191,6 @@ int game_update(Task* task, Stack64* stack) {
         }
     }
 
-
-
     game->f_update();
 
     tk_sleep(task, 1000 / GAME_REFRESH_RATE);

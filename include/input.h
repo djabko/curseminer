@@ -99,5 +99,6 @@ typedef struct {
 void input_init(game_frontent_t);
 int input_register_event(event_t, event_ctx_t, void (*)(InputEvent*));
 void print_ncurses_mapping(const char* tag);
+int input_SDL2_poll();
 
 #endif

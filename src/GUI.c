@@ -10,8 +10,9 @@
 
 static SDL_Window *g_window;
 static SDL_Renderer *g_renderer;
-static int g_tile_w = 100;
-static int g_tile_h = 100;
+static SDL_Texture* g_canvas;
+static int g_tile_w = 20;
+static int g_tile_h = 20;
 static int g_tile_maxx = 0;
 static int g_tile_maxy = 0;
 
@@ -38,7 +39,12 @@ int GUI_init(const char *title) {
 
     assert_SDL(g_window, "Failed to create SDL2 window\t");
     
-    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
+    int renderer_flags = SDL_RENDERER_ACCELERATED;
+
+    g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
+
+    g_canvas = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET, width, height);
 
     SDL_SetRenderDrawColor(g_renderer, 0xff, 0xff, 0xff, 0xff);
     SDL_RenderClear(g_renderer);
@@ -83,10 +89,19 @@ void draw_tile(EntityType *type, SDL_Rect *rect) {
     Skin *skin = type->default_skin;
 
     SDL_SetRenderDrawColor(g_renderer, skin->fg_r, skin->fg_g, skin->fg_b, 0xff);
+
     SDL_RenderFillRect(g_renderer, rect);
 }
 
+void flush_screen() {
+    SDL_SetRenderTarget(g_renderer, NULL);
+    SDL_RenderCopy(g_renderer, g_canvas, NULL, NULL);
+    SDL_RenderPresent(g_renderer);
+}
+
 void draw_game() {
+    SDL_SetRenderTarget(g_renderer, g_canvas);
+
     SDL_Rect rect = {.x = 0, .y = 0, .w = g_tile_w, .h = g_tile_h};
     EntityType* type;
     DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
@@ -126,8 +141,10 @@ void draw_game() {
             }
         }
 
+
     // Update all tiles
     } else if (df->command == -1) {
+        SDL_RenderClear(g_renderer);
 
         for (int y = 0; y < g_tile_maxy; y++) {
             rect.y = y * g_tile_h;
@@ -145,25 +162,13 @@ void draw_game() {
         game_flush_dirty(GLOBALS.game);
     }
 
+    flush_screen();
     df->command = 0;
 }
 
 int GUI_loop() {
-    SDL_Event ev;
-    SDL_PollEvent(&ev);
-
-    if (ev.type == SDL_QUIT) exit(0);
-    else if (ev.type == SDL_KEYUP) {
-        if (ev.key.keysym.sym == SDLK_q || ev.key.keysym.sym == SDLK_ESCAPE)
-            exit(0);
-    }
-
-    SDL_SetRenderDrawColor(g_renderer, 0xff, 0xff, 0xff, 0xff);
-    SDL_RenderClear(g_renderer);
-
+    input_SDL2_poll();
     draw_game();
-
-    SDL_RenderPresent(g_renderer);
 }
 
 int GUI_exit() {

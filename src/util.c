@@ -49,7 +49,8 @@ NoiseLattice *noise_init(int count, int dimensions, int length, double (*smoothi
     NoiseLattice *noise = calloc(sizeof(NoiseLattice) + sizeof(Vec2) * count, 1);
     Vec2 *gradients = (Vec2*) (noise+1);
 
-    srand(TIMER_NOW.tv_usec);
+    milliseconds_t seed = TIMER_NOW.tv_usec;
+    srand(seed);
     for (int i=0; i<count; i++) {
         int r;
         double random;
