@@ -50,6 +50,8 @@ NoiseLattice *noise_init(int count, int dimensions, int length, double (*smoothi
     Vec2 *gradients = (Vec2*) (noise+1);
 
     milliseconds_t seed = TIMER_NOW.tv_usec;
+    seed = 259219;
+    log_debug("Noise Lattice Seed: %lu", seed);
     srand(seed);
     for (int i=0; i<count; i++) {
         int r;

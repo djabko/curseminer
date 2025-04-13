@@ -240,35 +240,25 @@ static int input_init_ncurses() {
 
 #define MAX_MAPPING 256
 static event_t g_sdl2_mapping_kb[ MAX_MAPPING ];
+static event_t g_sdl2_mapping_ms[ MAX_MAPPING ];
 
 static void init_SDL2_keys() {
     g_sdl2_mapping_kb[SDL_QUIT] = E_KB_ESC;
 
     for (int i = SDLK_a; i <= SDLK_z; i++)
         g_sdl2_mapping_kb[i] = i - SDLK_a + E_KB_A;
+
+    g_sdl2_mapping_ms[SDL_BUTTON_LEFT] = E_MS_LMB;
+    g_sdl2_mapping_ms[SDL_BUTTON_MIDDLE] = E_MS_MMB;
+    g_sdl2_mapping_ms[SDL_BUTTON_RIGHT] = E_MS_RMB;
 }
 
 static int handle_event_SDL2(void *userdata, SDL_Event *event) {
-    bool keydown = event->type == SDL_KEYDOWN;
     bool keyup = event->type == SDL_KEYUP;
+    bool keydown = event->type == SDL_KEYDOWN;
+    bool mouseup = event->type == SDL_MOUSEBUTTONDOWN;
+    bool mousedown = event->type == SDL_MOUSEBUTTONUP;
 
-    InputEvent ie;
-
-    if (keydown || keyup) {
-        //log_debug("EVENT: %d", event->key.keysym);
-    } 
-
-    return 0;
-}
-
-static int input_init_SDL2() {
-    //SDL_AddEventWatch(handle_event_SDL2, NULL);
-    init_SDL2_keys();
-
-    return 0;
-}
-
-int input_SDL2_poll() {
     static InputEvent ie = {
             .id = E_NULL,
             .type = E_TYPE_KB,
@@ -276,34 +266,53 @@ int input_SDL2_poll() {
             .mods = E_NOMOD,
     };
 
-    SDL_Event ev;
-    SDL_PollEvent(&ev);
+    SDL_Keycode sym = event->key.keysym.sym;
+    event_ctx_t ctx = GLOBALS.input_context;
 
-    SDL_Keycode sym = ev.key.keysym.sym;
+    if (event->type == SDL_QUIT) exit(0);
 
-    bool keyup = ev.type == SDL_KEYUP;
-    bool keydown = ev.type == SDL_KEYDOWN;
-
-    if (ev.type == SDL_QUIT) exit(0);
-    else if (keyup) {
-        if (sym == SDLK_q || sym == SDLK_ESCAPE)
-            exit(0);
-    }
-    
-    if (keyup || keydown) {
+    else if (keyup || keydown) {
         ie.type = E_TYPE_KB;
         ie.state = keyup ? ES_UP : ES_DOWN;
 
         if (SDLK_a <= sym && sym <= SDLK_z) {
             ie.id = g_sdl2_mapping_kb[sym];
 
-            event_ctx_t ctx = GLOBALS.input_context;
             g_mapper_ctx_array[ctx][ie.id](&ie);
 
         } else if (sym == SDLK_RSHIFT || sym == SDLK_LSHIFT) {
             ie.mods = keydown ? E_MOD_0 : E_NOMOD;
         }
+
+    } else if (mouseup || mousedown) {
+        uint8_t mbtn = event->button.button;
+
+        ie.type = E_TYPE_MS;
+        ie.state = mouseup ? ES_UP : ES_DOWN;
+
+        if (SDL_BUTTON_LEFT <= mbtn && mbtn <= SDL_BUTTON_RIGHT) {
+            ie.id = g_sdl2_mapping_ms[mbtn];
+        }
+
+        g_mapper_ctx_array[ctx][ie.id](&ie);
     }
+
+    return 0;
+}
+
+static int input_init_SDL2() {
+    SDL_AddEventWatch(handle_event_SDL2, NULL);
+    init_SDL2_keys();
+
+    return 0;
+}
+
+int input_SDL2_poll() {
+    SDL_Event ev;
+    SDL_PollEvent(&ev);
+
+    if (ev.type == SDL_QUIT)
+        scheduler_kill_all_tasks();
 
     return 0;
 }
@@ -319,7 +328,7 @@ int input_register_event(event_t id, event_ctx_t ctx, void (*func)(InputEvent*))
     return 1;
 }
 
-void input_init(game_frontent_t frontend) {
+void input_init(game_frontend_t frontend) {
 
     for (int i = E_CTX_0; i < E_CTX_END; i++) {
         for (int j = E_NULL; j < E_END; j++) {
@@ -338,6 +347,7 @@ void input_init(game_frontent_t frontend) {
 
         case GAME_FRONTEND_SDL2:
             input_init_SDL2();
+            break;
 
         default:
             log_debug("ERROR: invalid input frontend provided: %d", frontend);

@@ -18,23 +18,31 @@ struct Globals GLOBALS = {
     .input_context = E_CTX_0,
 };
 
-ll_head* g_runqueue_list = NULL;
-RunQueue* g_runqueue = NULL;
+static ll_head* g_runqueue_list = NULL;
+static RunQueue* g_runqueue = NULL;
+static game_frontend_t g_frontend;
 
 
-static void init(int nogui_mode) {
+static void init(game_frontend_t frontend) {
     input_init(GAME_FRONTEND_NCURSES);
     input_init(GAME_FRONTEND_SDL2);
     timer_init(UPDATE_RATE);
 
     g_runqueue_list = scheduler_init();
     g_runqueue = scheduler_new_rq(g_runqueue_list);
+    g_frontend = frontend;
 
     assert_log(g_runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    //UI_init(nogui_mode);
-    GUI_init("Curseminer!");
+    if (frontend == GAME_FRONTEND_HEADLESS)
+        UI_init(1);
+
+    else if (frontend == GAME_FRONTEND_NCURSES)
+        UI_init(0);
+
+    else if (frontend == GAME_FRONTEND_SDL2)
+        GUI_init("Curseminer!");
 
     log_debug("Initialized...\n");
 }
@@ -42,8 +50,11 @@ static void init(int nogui_mode) {
 static int exit_state() {
     log_debug("Exiting...");
 
-    //UI_exit();
-    GUI_exit();
+    if (g_frontend == GAME_FRONTEND_SDL2)
+        GUI_exit();
+    else
+        UI_exit();
+
     game_free(GLOBALS.game);
     scheduler_free();
 
@@ -73,6 +84,10 @@ static int job_gui(Task *task, Stack64 *stack) {
     return 0;
 }
 
+static int job_gui_poll_input(Task *task, Stack64 *stack) {
+    input_SDL2_poll();
+}
+
 static void cb_exit(Task* task) {
     scheduler_kill_all_tasks();
 }
@@ -85,13 +100,25 @@ int main(int argc, const char** argv) {
     if (argc < MIN_ARGS+1) return -1;
 
     const char *nogui_string = "-nogui";
-    int nogui_mode = 0;
+    const char *tui_string = "-tui";
+    const char *gui_string = "-gui";
+    int frontend = GAME_FRONTEND_SDL2;
 
-    for (int i=1; i<argc; i++)
-        if (1 < argc)
-            if (0 == strncmp(argv[i], nogui_string, 7)) nogui_mode = 1;
+    for (int i=1; i<argc; i++) {
+        if (1 < argc) {
+            if (0 == strncmp(argv[i], nogui_string, 7)) {
+                frontend = GAME_FRONTEND_HEADLESS;
 
-    init(nogui_mode);
+            } else if (0 == strncmp(argv[i], tui_string, 7)) {
+                frontend = GAME_FRONTEND_NCURSES;
+
+            } else if (0 == strncmp(argv[i], gui_string, 7)) {
+                frontend = GAME_FRONTEND_SDL2;
+            }
+        }
+    }
+
+    init(frontend);
 
     input_register_event(E_KB_Q, E_CTX_GAME, main_event_handler);
     input_register_event(E_KB_Q, E_CTX_NOISE, main_event_handler);
@@ -99,8 +126,14 @@ int main(int argc, const char** argv) {
 
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
-    //schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
-    schedule_cb(g_runqueue, 0, 0, job_gui, NULL, cb_exit);
+
+    if (g_frontend == GAME_FRONTEND_SDL2) {
+        schedule_cb(g_runqueue, 0, 0, job_gui, NULL, cb_exit);
+        schedule_cb(g_runqueue, 0, 0, job_gui_poll_input, NULL, cb_exit);
+    } else {
+        schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
+    }
+
     schedule_cb(g_runqueue, 0, 0, game_update, gst, cb_exit);
 
     schedule_run(g_runqueue_list);
