@@ -132,6 +132,9 @@ void game_set_dirty(GameContext *game, int x, int y, int v) {
 
 void game_flush_dirty(GameContext *game) {
     DirtyFlags *df = game->cache_dirty_flags;
+
+    if (df->command == -1) return;
+
     byte_t* groups = df->groups;
     size_t s = df->stride;
     size_t gu = df->groups_used;

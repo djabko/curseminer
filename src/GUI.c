@@ -13,13 +13,50 @@ static SDL_Renderer *g_renderer;
 static SDL_Texture* g_canvas;
 static int g_tile_w = 20;
 static int g_tile_h = 20;
-static int g_tile_maxx = 0;
-static int g_tile_maxy = 0;
+static int g_tile_maxx;
+static int g_tile_maxy;
 
-GameContext *g_game;
+GameContext *g_game = NULL;
 
 static void assert_SDL(bool condition, const char *msg) {
     assert_log(condition, "%sSDL2 Error: '%s'", msg, SDL_GetError());
+}
+
+static void recalculate_tile_size(int size) {
+    SDL_DisplayMode display_mode;
+    SDL_GetCurrentDisplayMode(0, &display_mode);
+
+    int width = display_mode.w;
+    int height = display_mode.h;
+
+    g_tile_w = size;
+    g_tile_h = size;
+
+    g_tile_maxx = width / size;
+    g_tile_maxy = height / size;
+    GLOBALS.view_port_maxx = g_tile_maxx;
+    GLOBALS.view_port_maxy = g_tile_maxy;
+
+    if (g_game) {
+        flush_game_entity_cache(g_game);
+        flush_world_entity_cache(g_game);
+        game_flush_dirty(g_game);
+    }
+}
+
+static void intr_zoom_out(InputEvent *ie) {
+    if (ie->state == ES_DOWN) {
+        int size = g_tile_w - 1;
+        if (size >= 20)
+            recalculate_tile_size(size);
+    }
+}
+
+static void intr_zoom_in(InputEvent *ie) {
+    if (ie->state == ES_DOWN) {
+        int size = g_tile_w + 1;
+        recalculate_tile_size(size);
+    }
 }
 
 int GUI_init(const char *title) {
@@ -27,35 +64,7 @@ int GUI_init(const char *title) {
 
     assert_SDL(0 == err, "Failed to initialize SDL2\t");
 
-    SDL_DisplayMode display_mode;
-    SDL_GetCurrentDisplayMode(0, &display_mode);
-
-    int width = display_mode.w;
-    int height = display_mode.h;
-
-    g_window = SDL_CreateWindow(title,
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            width, height, SDL_WINDOW_SHOWN);
-
-    assert_SDL(g_window, "Failed to create SDL2 window\t");
-    
-    int renderer_flags = SDL_RENDERER_ACCELERATED;
-
-    g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
-
-    g_canvas = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA8888,
-        SDL_TEXTUREACCESS_TARGET, width, height);
-
-    SDL_SetRenderDrawColor(g_renderer, 0xff, 0xff, 0xff, 0xff);
-    SDL_RenderClear(g_renderer);
-    SDL_RenderPresent(g_renderer);
-
-    assert_SDL(g_renderer, "Failed to create SDL2 renderer\t");
-
-    g_tile_maxx = width / g_tile_w;
-    g_tile_maxy = height / g_tile_h;
-    GLOBALS.view_port_maxx = g_tile_maxx;
-    GLOBALS.view_port_maxy = g_tile_maxy;
+    recalculate_tile_size(g_tile_w);
 
     GameContextCFG gcfg_curseminer = {
         .skins_max = 32,
@@ -83,6 +92,32 @@ int GUI_init(const char *title) {
 
     assert_log(GLOBALS.game != NULL,
             "ERROR: GUI failed to initialize game...");
+
+    recalculate_tile_size(g_tile_w);
+
+    SDL_DisplayMode display_mode;
+    SDL_GetCurrentDisplayMode(0, &display_mode);
+    g_window = SDL_CreateWindow(title,
+            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+            display_mode.w, display_mode.h, SDL_WINDOW_SHOWN);
+
+    assert_SDL(g_window, "Failed to create SDL2 window\t");
+    
+    int renderer_flags = SDL_RENDERER_ACCELERATED;
+
+    g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
+
+    g_canvas = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET, display_mode.w, display_mode.h);
+
+    SDL_SetRenderDrawColor(g_renderer, 0xff, 0xff, 0xff, 0xff);
+    SDL_RenderClear(g_renderer);
+    SDL_RenderPresent(g_renderer);
+
+    assert_SDL(g_renderer, "Failed to create SDL2 renderer\t");
+
+    input_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
+    input_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
 }
 
 void draw_tile(EntityType *type, SDL_Rect *rect) {
@@ -154,12 +189,10 @@ void draw_game() {
 
                 type = game_world_getxy(GLOBALS.game, x, y);
 
-                game_set_dirty(GLOBALS.game, rect.x, rect.y, 0);
+                game_set_dirty(GLOBALS.game, x, y, 0);
                 draw_tile(type, &rect);
             }
         }
-
-        game_flush_dirty(GLOBALS.game);
     }
 
     flush_screen();
@@ -167,7 +200,6 @@ void draw_game() {
 }
 
 int GUI_loop() {
-    input_SDL2_poll();
     draw_game();
 }
 

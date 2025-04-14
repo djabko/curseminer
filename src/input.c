@@ -34,7 +34,7 @@ KeyDownState KEY_DOWN_STATES_ARRAY[KDS_MAX];
 KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
 
 #define NCURSES_KBMAP_MAX 256
-#define NCURSES_MSMAP_MAX BUTTON_SHIFT
+#define NCURSES_MSMAP_MAX 2048
 
 static event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
 static InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
@@ -55,6 +55,8 @@ static void init_keys_ncurses() {
     g_ncurses_mapping_kb[ KEY_DOWN ] = E_KB_DOWN;
     g_ncurses_mapping_kb[ KEY_LEFT ] = E_KB_LEFT;
     g_ncurses_mapping_kb[ KEY_RIGHT ] = E_KB_RIGHT;
+
+    log_debug("Macros: %d - %d", BUTTON1_PRESSED, BUTTON3_PRESSED);
 
     g_ncurses_mapping_ms[ BUTTON1_PRESSED ].id = E_MS_LMB;
     g_ncurses_mapping_ms[ BUTTON1_PRESSED ].state = ES_DOWN;
