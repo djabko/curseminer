@@ -80,12 +80,22 @@ static int job_ui (Task* task, Stack64* stack) {
 static int job_gui(Task *task, Stack64 *stack) {
     GUI_loop();
 
-    tk_sleep(task, 500);
+    tk_sleep(task, 1000 / SCREEN_REFRESH_RATE);
     return 0;
 }
 
+static unsigned long TRACK = 0;
 static int job_gui_poll_input(Task *task, Stack64 *stack) {
     input_SDL2_poll();
+}
+
+static milliseconds_t LAST_SYNC_MS;
+static int job_gui_poll_input_track(Task *task, Stack64 *stack) {
+    log_debug("Input polls: %lu, time since last sync: %lu", TRACK, TIMER_NOW_MS - LAST_SYNC_MS);
+    LAST_SYNC_MS = TIMER_NOW_MS;
+    TRACK = 0;
+
+    tk_sleep(task, 1000);
 }
 
 static void cb_exit(Task* task) {
