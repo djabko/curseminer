@@ -42,7 +42,7 @@ static void init(game_frontend_t frontend) {
         UI_init(0);
 
     else if (frontend == GAME_FRONTEND_SDL2)
-        GUI_init("Curseminer!");
+        GUI_init("Curseminer!", "assets/spritesheets/tiles.png");
 
     log_debug("Initialized...\n");
 }

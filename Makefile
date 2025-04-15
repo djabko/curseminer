@@ -1,7 +1,7 @@
 CC=gcc
 CF_DEBUG=-Wall -g -DDEBUG
 CF_OPTIM=-Ofast
-CF_LIBS=-lncurses -lm -ldl -lpthread -lSDL2
+CF_LIBS=-lncurses -lm -ldl -lpthread -lSDL2 -lSDL2_image
 SDL2_CFLAGS := $(shell sdl2-config --cflags)
 SDL2_LIBS := $(shell sdl2-config --libs)
 
