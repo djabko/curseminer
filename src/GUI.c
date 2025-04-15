@@ -1,6 +1,7 @@
 #include <stdbool.h>
 
 #include "SDL.h"
+#include <SDL2/SDL_image.h>
 
 #include "globals.h"
 #include "GUI.h"
@@ -10,11 +11,16 @@
 
 static SDL_Window *g_window;
 static SDL_Renderer *g_renderer;
+static SDL_Surface* g_surface;
 static SDL_Texture* g_canvas;
+static SDL_Texture* g_spritesheet;
 static int g_tile_w = 20;
 static int g_tile_h = 20;
 static int g_tile_maxx;
 static int g_tile_maxy;
+static int g_sprite_size = 32;
+static int g_sprite_offset = 5;
+void (*draw_tile_f)(EntityType*, SDL_Rect*);
 
 GameContext *g_game = NULL;
 
@@ -59,11 +65,44 @@ static void intr_zoom_in(InputEvent *ie) {
     }
 }
 
-int GUI_init(const char *title) {
+int select_sprite(SDL_Rect *rect, int row, int col) {
+    if (!rect) return -1;
+
+    rect->x = col * g_sprite_size + g_sprite_offset;
+    rect->y = row * g_sprite_size + g_sprite_offset;
+    rect->w = g_sprite_size;
+    rect->h = g_sprite_size;
+
+    return 0;
+}
+
+void draw_tile_rect(EntityType *type, SDL_Rect *rect) {
+    Skin *skin = type->default_skin;
+
+    SDL_SetRenderDrawColor(g_renderer, skin->fg_r, skin->fg_g, skin->fg_b, 0xff);
+
+    SDL_RenderFillRect(g_renderer, rect);
+}
+
+void draw_tile_sprite(EntityType *type, SDL_Rect *dst) {
+    Skin *skin = type->default_skin;
+
+    if (skin->glyph < 1) return draw_tile_rect(type, dst);
+
+    SDL_Rect src;
+    select_sprite(&src, skin->glyph, 0);
+
+    SDL_RenderCopy(g_renderer, g_spritesheet, &src, dst);
+}
+
+int GUI_init(const char *title, const char *spritesheet_path) {
+
+    // 1. Init SDL2
     int err = SDL_Init(SDL_INIT_VIDEO);
 
     assert_SDL(0 == err, "Failed to initialize SDL2\t");
 
+    // 2. Init game
     recalculate_tile_size(g_tile_w);
 
     GameContextCFG gcfg_curseminer = {
@@ -95,6 +134,7 @@ int GUI_init(const char *title) {
 
     recalculate_tile_size(g_tile_w);
 
+    // 3. Init window
     SDL_DisplayMode display_mode;
     SDL_GetCurrentDisplayMode(0, &display_mode);
     g_window = SDL_CreateWindow(title,
@@ -103,6 +143,7 @@ int GUI_init(const char *title) {
 
     assert_SDL(g_window, "Failed to create SDL2 window\t");
     
+    // 4. Init renderer
     int renderer_flags = SDL_RENDERER_ACCELERATED;
 
     g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
@@ -116,16 +157,25 @@ int GUI_init(const char *title) {
 
     assert_SDL(g_renderer, "Failed to create SDL2 renderer\t");
 
+    // 5. Init spritesheet
+    if (spritesheet_path) {
+        g_surface = IMG_Load(spritesheet_path);
+
+        assert_SDL(g_surface != NULL, NULL);
+
+        g_spritesheet = SDL_CreateTextureFromSurface(g_renderer, g_surface);
+
+        SDL_FreeSurface(g_surface);
+
+        assert_SDL(g_spritesheet != NULL, NULL);
+
+        draw_tile_f = draw_tile_sprite;
+
+    } else draw_tile_f = draw_tile_rect;
+
+    // 6. Register interrupts
     input_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
     input_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
-}
-
-void draw_tile(EntityType *type, SDL_Rect *rect) {
-    Skin *skin = type->default_skin;
-
-    SDL_SetRenderDrawColor(g_renderer, skin->fg_r, skin->fg_g, skin->fg_b, 0xff);
-
-    SDL_RenderFillRect(g_renderer, rect);
 }
 
 void flush_screen() {
@@ -170,7 +220,7 @@ void draw_game() {
                         rect.x = x * g_tile_w;
                         rect.y = y * g_tile_h;
 
-                        draw_tile(type, &rect);
+                        draw_tile_f(type, &rect);
                     }
                 }
             }
@@ -190,7 +240,7 @@ void draw_game() {
                 type = game_world_getxy(GLOBALS.game, x, y);
 
                 game_set_dirty(GLOBALS.game, x, y, 0);
-                draw_tile(type, &rect);
+                draw_tile_f(type, &rect);
             }
         }
     }
