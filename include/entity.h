@@ -28,6 +28,7 @@ typedef struct EntityController {
 } EntityController;
 
 behaviour_t entity_create_behaviour(behaviour_func_t func);
+int entity_clear_behaviours(Entity *e);
 void entity_process_behaviours(Entity *e);
 
 int entity_init_default_controller();

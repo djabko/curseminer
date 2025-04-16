@@ -54,7 +54,8 @@ typedef unsigned char byte_t;
 #define E_CTX_CLOCK E_CTX_2
 
 struct Globals{
-    int view_port_x, view_port_y, view_port_maxx, view_port_maxy;
+    int view_port_x, view_port_y, view_port_maxx, view_port_maxy,
+        tile_w, tile_h;
     Entity* player;
     GameContext* game;
     event_ctx_t input_context;

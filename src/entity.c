@@ -63,6 +63,10 @@ void entity_process_behaviours(Entity *e) {
     g_behaviours[be](e);
 }
 
+int entity_clear_behaviours(Entity *e) {
+    return qu_clear(e->controller->behaviour_queue);
+}
+
 int entity_remove_behaviour(behaviour_t be) {
     if (g_behaviour_max <= be)
         return -1;
@@ -74,7 +78,7 @@ int entity_remove_behaviour(behaviour_t be) {
 }
 
 void entity_update_position(GameContext *game, Entity *e) {
-    if (!e->moving) return;
+    if (!e->moving || e->moved) return;
 
     byte_t *cache = game->cache_entity;
 
@@ -127,12 +131,14 @@ void entity_update_position(GameContext *game, Entity *e) {
     id = id ? id : gamew_cache_get(game, cache, nx, ny);
 
     if (!id) {
-        e->x += e->vx;
-        e->y += e->vy;
+        e->x = nx;
+        e->y = ny;
     }
 
     if (game_on_screen(game, e->x, e->y))
         gamew_cache_set(game, cache, e->x, e->y, e->type->id);
+
+    e->moved = true;
 }
 
 void default_tick(Entity* e) {
@@ -163,8 +169,9 @@ int entity_inventory_selected(Entity* e) {
 }
 
 void entity_tick_abstract(GameContext *game, Entity* e) {
-
     // Is this the right order?
+
+    e->moved = false;
 
     e->controller->tick(e);
 
@@ -211,6 +218,7 @@ Entity* entity_spawn(GameContext *game, World* world, EntityType* type,
     new_entity->facing = face;
     new_entity->next_tick = TIMER_NOW_MS;
     new_entity->moving = false;
+    new_entity->moved = false;
     new_entity->inventory = NULL;
     new_entity->inventory_index = 0;
 

@@ -23,7 +23,9 @@ static RunQueue* g_runqueue = NULL;
 static game_frontend_t g_frontend;
 
 
-static void init(game_frontend_t frontend) {
+static void init(game_frontend_t frontend, const char *title,
+        const char *spritesheet_path) {
+
     input_init(GAME_FRONTEND_NCURSES);
     input_init(GAME_FRONTEND_SDL2);
     timer_init(UPDATE_RATE);
@@ -42,7 +44,7 @@ static void init(game_frontend_t frontend) {
         UI_init(0);
 
     else if (frontend == GAME_FRONTEND_SDL2)
-        GUI_init("Curseminer!", "assets/spritesheets/tiles.png");
+        GUI_init(title, spritesheet_path);
 
     log_debug("Initialized...\n");
 }
@@ -109,6 +111,10 @@ static void main_event_handler(InputEvent *ev) {
 int main(int argc, const char** argv) {
     if (argc < MIN_ARGS+1) return -1;
 
+    const char *title, *spritesheet;
+    title = "Curseminer!";
+    spritesheet = "assets/spritesheets/tiles.png";
+
     const char *nogui_string = "-nogui";
     const char *tui_string = "-tui";
     const char *gui_string = "-gui";
@@ -128,7 +134,7 @@ int main(int argc, const char** argv) {
         }
     }
 
-    init(frontend);
+    init(frontend, title, spritesheet);
 
     input_register_event(E_KB_Q, E_CTX_GAME, main_event_handler);
     input_register_event(E_KB_Q, E_CTX_NOISE, main_event_handler);

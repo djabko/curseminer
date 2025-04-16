@@ -224,20 +224,17 @@ static void be_face_dr_f (Entity *e) {
  */
 static void chaser_tick(Entity* e) {
     Entity *p = GLOBALS.player;
-
     int radius = 40;
-
     bool is_in_radius = man_dist(e->x, e->y, p->x, p->y) <= radius;
-    if (!is_in_radius && e->moving) {
-        entity_command(e, be_stop);
 
-    } else if (is_in_radius && !e->moving) {
+    //entity_clear_behaviours(e);
+    e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+
+    if (is_in_radius && !e->moving) {
         entity_command(e, be_move);
-    }
 
-    if (is_in_radius) {
-        e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
-        entity_update_position(g_game, e);
+    } else if (!is_in_radius && e->moving) {
+        entity_command(e, be_stop);
     }
 }
 
@@ -265,7 +262,9 @@ static void chaser_find_path(Entity *e, int x, int y) {
     entity_command(e, be);
 }
 
-static void player_tick(Entity *player) {}
+static void player_tick(Entity *player) {
+    entity_update_position(g_game, player);
+}
 
 static void player_path_find(Entity *player, int x, int y) {}
 

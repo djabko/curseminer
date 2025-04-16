@@ -16,7 +16,7 @@ typedef struct Entity {
     milliseconds_t next_tick;
     int id, x, y, vx, vy, speed, health, facing, inventory_index;
     int *inventory;
-    bool moving;
+    bool moving, moved;
 } Entity;
 
 typedef enum ChunkType {

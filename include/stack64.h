@@ -37,6 +37,7 @@ uint64_t qu_next(Queue64*);
 int qu_empty(Queue64*);
 int qu_full(Queue64*);
 void qu_print(Queue64*);
+int qu_clear(Queue64*);
 
 #define qu_foreach(qu, type, e)                                             \
     int __ITERATOR_1804289383 = 1;                                          \

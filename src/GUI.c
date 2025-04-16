@@ -43,6 +43,9 @@ static void recalculate_tile_size(int size) {
     GLOBALS.view_port_maxx = g_tile_maxx;
     GLOBALS.view_port_maxy = g_tile_maxy;
 
+    GLOBALS.tile_w = g_tile_w;
+    GLOBALS.tile_h = g_tile_h;
+
     if (g_game) {
         flush_game_entity_cache(g_game);
         flush_world_entity_cache(g_game);
