@@ -639,6 +639,8 @@ int UI_init(int nogui_mode) {
     GLOBALS.view_port_y = gwy;
     GLOBALS.view_port_maxx = gww;
     GLOBALS.view_port_maxy = gwh;
+    GLOBALS.tile_w = 1;
+    GLOBALS.tile_h = 1;
 
     GameContextCFG gcfg_curseminer = {
         .skins_max = 32,

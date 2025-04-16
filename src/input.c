@@ -41,6 +41,17 @@ static InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
 static timer_t g_input_timer = 0;
 static Queue64 *g_queued_kdown = NULL;
 
+bool mouse_pos_to_ie(InputEvent *ie, uint8_t x, uint8_t y, uint8_t z, uint8_t r) {
+    if (!ie) return -1;
+
+    static int bits = 16;
+
+    ie->data = (x << (bits * 0)) + (y << (bits * 1))
+             + (z << (bits * 2)) + (z << (bits * 3));
+
+    return 0;
+}
+
 static void init_keys_ncurses() {
     for (int i = 0; i < NCURSES_KBMAP_MAX; i++) 
         g_ncurses_mapping_kb[i] = E_NULL;
@@ -97,12 +108,8 @@ static void map_event_ncurses(InputEvent *ev, int key) {
         if (getmouse(&mouse) != OK) log_debug("ERROR GETTING MOUSE EVENT!");
 
         *ev = g_ncurses_mapping_ms[mouse.bstate];
-        uint16_t x = mouse.x;
-        uint16_t y = mouse.y;
-        uint16_t z = mouse.z;
 
-        int bits = 16;
-        ev->data = (x << (bits * 0)) + (y << (bits * 1)) + (z << (bits * 2));
+        mouse_pos_to_ie(ev, mouse.x, mouse.y, mouse.z, 0);
 
     } else {
         if ('A' <= key && key <= 'Z') {
@@ -293,10 +300,19 @@ static int handle_event_SDL2(void *userdata, SDL_Event *event) {
         ie.state = mouseup ? ES_UP : ES_DOWN;
 
         if (SDL_BUTTON_LEFT <= mbtn && mbtn <= SDL_BUTTON_RIGHT) {
-            ie.id = g_sdl2_mapping_ms[mbtn];
-        }
+            int x, y;
 
-        g_mapper_ctx_array[ctx][ie.id](&ie);
+            SDL_GetMouseState(&x, &y);
+
+            x /= GLOBALS.tile_w;
+            y /= GLOBALS.tile_h;
+
+            mouse_pos_to_ie(&ie, x, y, 0, 0);
+
+            ie.id = g_sdl2_mapping_ms[mbtn];
+
+            g_mapper_ctx_array[ctx][ie.id](&ie);
+        }
     }
 
     return 0;

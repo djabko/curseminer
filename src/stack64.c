@@ -154,6 +154,17 @@ int qu_full(Queue64* qu) {
     return qu->count >= qu->capacity;
 }
 
+int qu_clear(Queue64 *qu) {
+    int i = 0;
+
+    while (!qu_empty(qu)) {
+        i++;
+        qu_dequeue(qu);
+    }
+
+    return i;
+}
+
 void qu_print(Queue64* qu) {
     if (qu->count < 1) log_debug("<qu_empty>");
     for (int i = 0; i<qu->count; i++) {
