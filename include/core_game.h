@@ -1,6 +1,8 @@
 #ifndef GAME_HEADER
 #define GAME_HEADER
 
+#include <stdbool.h>
+
 #include "stack64.h"
 #include "scheduler.h"
 #include "input.h"
@@ -28,7 +30,7 @@ typedef enum {
 typedef struct DirtyFlags {
     byte_t *groups, *flags;
     size_t stride, groups_used;
-    int64_t command, extra, extra2, extra3;
+    int64_t command, group_segments, extra2, extra3;
 } DirtyFlags;
 
 typedef struct Skin {
@@ -88,6 +90,7 @@ void game_set_dirty(GameContext*, int, int, int);
 void game_flush_dirty(GameContext*);
 void flush_game_entity_cache(GameContext*);
 void flush_world_entity_cache(GameContext*);
+bool game_resize_caches(GameContext*);
 
 
 /* Game Interface */

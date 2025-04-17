@@ -46,7 +46,15 @@ static void recalculate_tile_size(int size) {
     GLOBALS.tile_w = g_tile_w;
     GLOBALS.tile_h = g_tile_h;
 
+    // TODO: rename group_segments to groups
     if (g_game) {
+        size_t tiles = g_tile_maxx * g_tile_maxy;
+        DirtyFlags *df = g_game->cache_dirty_flags;
+        int groups = df->group_segments * df->stride;
+
+        if (groups < tiles)
+            game_resize_caches(g_game);
+
         flush_game_entity_cache(g_game);
         flush_world_entity_cache(g_game);
         game_flush_dirty(g_game);
@@ -56,8 +64,7 @@ static void recalculate_tile_size(int size) {
 static void intr_zoom_out(InputEvent *ie) {
     if (ie->state == ES_DOWN) {
         int size = g_tile_w - 1;
-        if (size >= 20)
-            recalculate_tile_size(size);
+        recalculate_tile_size(size);
     }
 }
 
