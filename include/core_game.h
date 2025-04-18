@@ -30,7 +30,7 @@ typedef enum {
 typedef struct DirtyFlags {
     byte_t *groups, *flags;
     size_t stride, groups_used;
-    int64_t command, group_segments, extra2, extra3;
+    int64_t command, groups_available, extra2, extra3;
 } DirtyFlags;
 
 typedef struct Skin {

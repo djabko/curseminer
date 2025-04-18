@@ -19,7 +19,7 @@ static int g_tile_h = 20;
 static int g_tile_maxx;
 static int g_tile_maxy;
 static int g_sprite_size = 32;
-static int g_sprite_offset = 5;
+static int g_sprite_offset = 0;
 void (*draw_tile_f)(EntityType*, SDL_Rect*);
 
 GameContext *g_game = NULL;
@@ -49,10 +49,10 @@ static void recalculate_tile_size(int size) {
     // TODO: rename group_segments to groups
     if (g_game) {
         size_t tiles = g_tile_maxx * g_tile_maxy;
+        log_debug("Resized to %d tiles on screen", tiles);
         DirtyFlags *df = g_game->cache_dirty_flags;
-        int groups = df->group_segments * df->stride;
 
-        if (groups < tiles)
+        if (df->groups_available < tiles)
             game_resize_caches(g_game);
 
         flush_game_entity_cache(g_game);
@@ -100,7 +100,7 @@ void draw_tile_sprite(EntityType *type, SDL_Rect *dst) {
     if (skin->glyph < 1) return draw_tile_rect(type, dst);
 
     SDL_Rect src;
-    select_sprite(&src, skin->glyph, 0);
+    select_sprite(&src, skin->glyph - 1, 0);
 
     SDL_RenderCopy(g_renderer, g_spritesheet, &src, dst);
 }
