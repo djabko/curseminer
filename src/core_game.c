@@ -73,7 +73,6 @@ void flush_world_entity_cache(GameContext *game) {
             int _y = y + game->world_view_y;
             int tid = world_getxy(game->world, _x, _y);
 
-            log_debug("Setting (%d, %d) in world cache", x, y);
             game->cache_world[y * GLOBALS.view_port_maxx + x] = tid;
         }
     }
@@ -106,7 +105,7 @@ void game_resize_dirty_flags(GameContext *game, size_t tiles_on_screen) {
     static size_t s = 64;
 
     DirtyFlags *df = game->cache_dirty_flags;
-    int groups = s;
+    uint64_t groups = s;
 
     while (groups < tiles_on_screen) groups += s;
 
@@ -122,7 +121,7 @@ void game_resize_dirty_flags(GameContext *game, size_t tiles_on_screen) {
 
     df->flags = (byte_t*) (ptr + s * groups);
     df->stride = s;
-    df->group_segments = groups / s;
+    df->groups_available = groups;
     df->groups_used = (tiles_on_screen + s - 1) / s;
     df->command = 0;
 
@@ -135,7 +134,6 @@ bool game_resize_caches(GameContext *game) {
     size_t tiles_on_screen = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy;
     tiles_on_screen = ((tiles_on_screen + 1) * s) / s;
 
-    log_debug("Allocating %lu cache", tiles_on_screen);
     game->cache_world = realloc(game->cache_world, tiles_on_screen);
     game->cache_entity = realloc(game->cache_entity, tiles_on_screen);
     game_resize_dirty_flags(game, tiles_on_screen);
@@ -255,7 +253,6 @@ GameContext *game_init(GameContextCFG *cfg) {
     entity_init_default_controller();
 
     size_t stride = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy;
-    log_debug("size: (%d, %d) = %d", GLOBALS.view_port_maxx, GLOBALS.view_port_maxy, stride);
     game_resize_caches(game);
     flush_world_entity_cache(game);
     game_flush_dirty(game);

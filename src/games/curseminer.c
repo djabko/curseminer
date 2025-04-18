@@ -274,7 +274,7 @@ int game_curseminer_init(GameContext *game, int) {
     int glyph = 0;
     int i = 0;
 
-    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 56, 56, 56);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 5, 5, 5);
     game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
     game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
     game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0,  80, 240, 220);
