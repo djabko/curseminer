@@ -18,7 +18,6 @@ struct Globals GLOBALS = {
     .input_context = E_CTX_0,
 };
 
-static ll_head* g_runqueue_list = NULL;
 static RunQueue* g_runqueue = NULL;
 static game_frontend_t g_frontend;
 
@@ -30,11 +29,11 @@ static void init(game_frontend_t frontend, const char *title,
     input_init(GAME_FRONTEND_SDL2);
     timer_init(UPDATE_RATE);
 
-    g_runqueue_list = scheduler_init();
-    g_runqueue = scheduler_new_rq(g_runqueue_list);
+    GLOBALS.runqueue_list = scheduler_init();
+    g_runqueue = scheduler_new_rq(GLOBALS.runqueue_list);
     g_frontend = frontend;
 
-    assert_log(g_runqueue_list && g_runqueue,
+    assert_log(GLOBALS.runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
     if (frontend == GAME_FRONTEND_HEADLESS)
@@ -134,6 +133,9 @@ int main(int argc, const char** argv) {
         }
     }
 
+    if (!access(spritesheet, F_OK) == 0)
+        spritesheet = NULL;
+
     init(frontend, title, spritesheet);
 
     input_register_event(E_KB_Q, E_CTX_GAME, main_event_handler);
@@ -152,7 +154,7 @@ int main(int argc, const char** argv) {
 
     schedule_cb(g_runqueue, 0, 0, game_update, gst, cb_exit);
 
-    schedule_run(g_runqueue_list);
+    schedule_run(GLOBALS.runqueue_list);
 
     return exit_state();
 }

@@ -1,6 +1,8 @@
 #ifndef GUI_HEADER
 #define GUI_HEADER
 
+#include "scheduler.h"
+
 #define SPRITE_MAX 256
 
 int GUI_init(const char*, const char*);

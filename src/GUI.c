@@ -9,11 +9,10 @@
 #include "games/curseminer.h"
 #include "games/other.h"
 
+static RunQueue *g_runqueue;
 static SDL_Window *g_window;
 static SDL_Renderer *g_renderer;
 static SDL_Surface* g_surface;
-static SDL_Texture* g_canvas;
-static SDL_Texture* g_spritesheet;
 static int g_tile_w = 20;
 static int g_tile_h = 20;
 static int g_tile_maxx;
@@ -24,8 +23,27 @@ void (*draw_tile_f)(EntityType*, SDL_Rect*);
 
 GameContext *g_game = NULL;
 
+typedef struct Texture {
+    SDL_Texture *obj;
+    const Uint32 format;
+    const int access, w, h;
+} Texture;
+
+static Texture g_canvas;
+static Texture g_spritesheet;
+
 static void assert_SDL(bool condition, const char *msg) {
     assert_log(condition, "%sSDL2 Error: '%s'", msg, SDL_GetError());
+}
+
+static int texture_init(Texture *t, SDL_Texture *obj) {
+    int ret = SDL_QueryTexture(obj, &t->format, &t->access, &t->w, &t->h);
+
+    assert_SDL(obj != NULL, NULL);
+
+    t->obj = obj;
+
+    return ret;
 }
 
 static void recalculate_tile_size(int size) {
@@ -49,7 +67,6 @@ static void recalculate_tile_size(int size) {
     // TODO: rename group_segments to groups
     if (g_game) {
         size_t tiles = g_tile_maxx * g_tile_maxy;
-        log_debug("Resized to %d tiles on screen", tiles);
         DirtyFlags *df = g_game->cache_dirty_flags;
 
         if (df->groups_available < tiles)
@@ -94,18 +111,27 @@ void draw_tile_rect(EntityType *type, SDL_Rect *rect) {
     SDL_RenderFillRect(g_renderer, rect);
 }
 
+static int g_sprite_frame = 0;
 void draw_tile_sprite(EntityType *type, SDL_Rect *dst) {
     Skin *skin = type->default_skin;
 
     if (skin->glyph < 1) return draw_tile_rect(type, dst);
 
     SDL_Rect src;
-    select_sprite(&src, skin->glyph - 1, 0);
+    select_sprite(&src, skin->glyph - 1, g_sprite_frame);
 
-    SDL_RenderCopy(g_renderer, g_spritesheet, &src, dst);
+    SDL_RenderCopy(g_renderer, g_spritesheet.obj, &src, dst);
+}
+
+static int job_animate(Task* task, Stack64* st) {
+    g_sprite_frame = (g_sprite_frame + 1) % (g_spritesheet.w / g_sprite_size);
+
+    game_flush_dirty(g_game);
+    tk_sleep(task, 200);
 }
 
 int GUI_init(const char *title, const char *spritesheet_path) {
+    SDL_Texture *tmp;
 
     // 1. Init SDL2
     int err = SDL_Init(SDL_INIT_VIDEO);
@@ -158,8 +184,10 @@ int GUI_init(const char *title, const char *spritesheet_path) {
 
     g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
 
-    g_canvas = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA8888,
+    tmp = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA8888,
         SDL_TEXTUREACCESS_TARGET, display_mode.w, display_mode.h);
+
+    texture_init(&g_canvas, tmp);
 
     SDL_SetRenderDrawColor(g_renderer, 0xff, 0xff, 0xff, 0xff);
     SDL_RenderClear(g_renderer);
@@ -173,11 +201,11 @@ int GUI_init(const char *title, const char *spritesheet_path) {
 
         assert_SDL(g_surface != NULL, NULL);
 
-        g_spritesheet = SDL_CreateTextureFromSurface(g_renderer, g_surface);
+        tmp = SDL_CreateTextureFromSurface(g_renderer, g_surface);
+
+        texture_init(&g_spritesheet, tmp);
 
         SDL_FreeSurface(g_surface);
-
-        assert_SDL(g_spritesheet != NULL, NULL);
 
         draw_tile_f = draw_tile_sprite;
 
@@ -186,16 +214,21 @@ int GUI_init(const char *title, const char *spritesheet_path) {
     // 6. Register interrupts
     input_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
     input_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
+
+    if (1 < g_spritesheet.w / g_sprite_size) {
+        g_runqueue = scheduler_new_rq(GLOBALS.runqueue_list);
+        schedule(g_runqueue, 0, 0, job_animate, NULL);
+    }
 }
 
 void flush_screen() {
     SDL_SetRenderTarget(g_renderer, NULL);
-    SDL_RenderCopy(g_renderer, g_canvas, NULL, NULL);
+    SDL_RenderCopy(g_renderer, g_canvas.obj, NULL, NULL);
     SDL_RenderPresent(g_renderer);
 }
 
 void draw_game() {
-    SDL_SetRenderTarget(g_renderer, g_canvas);
+    SDL_SetRenderTarget(g_renderer, g_canvas.obj);
 
     SDL_Rect rect = {.x = 0, .y = 0, .w = g_tile_w, .h = g_tile_h};
     EntityType* type;
