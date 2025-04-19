@@ -5,13 +5,21 @@
 #include <scheduler.h>
 #include <files.h>
 #include <timer.h>
-#include <UI.h>
-#include <GUI.h>
+#include <frontends/headless.h>
+#include <frontends/ncurses.h>
+#include <frontends/sdl2.h>
 
 #define MIN_ARGS 0
 #define UPDATE_RATE 120 // times per second
 #define SCREEN_REFRESH_RATE 20 // times per second
 #define KEYBOARD_EMPTY_RATE 1000000 / 2
+
+typedef enum {
+    FRONTEND_HEADLESS,
+    FRONTEND_NCURSES,
+    FRONTEND_SDL2,
+    FRONTEND_END,
+} frontend_t;
 
 struct Globals GLOBALS = {
     .player = NULL,
@@ -19,31 +27,44 @@ struct Globals GLOBALS = {
 };
 
 static RunQueue* g_runqueue = NULL;
-static game_frontend_t g_frontend;
 
-
-static void init(game_frontend_t frontend, const char *title,
-        const char *spritesheet_path) {
-
-    input_init(GAME_FRONTEND_NCURSES);
-    input_init(GAME_FRONTEND_SDL2);
+static void init(frontend_t frontend, const char *title) {
     timer_init(UPDATE_RATE);
 
     GLOBALS.runqueue_list = scheduler_init();
     g_runqueue = scheduler_new_rq(GLOBALS.runqueue_list);
-    g_frontend = frontend;
+    GLOBALS.runqueue = g_runqueue;
 
     assert_log(GLOBALS.runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    if (frontend == GAME_FRONTEND_HEADLESS)
-        UI_init(1);
+    int (*fuii)(const char*);
+    void (*fuie)();
+    int (*fini)();
+    void (*fine)();
 
-    else if (frontend == GAME_FRONTEND_NCURSES)
-        UI_init(0);
+    if (frontend == FRONTEND_NCURSES) {
+        fuii = frontend_ncurses_ui_init;
+        fuie = frontend_ncurses_ui_exit;
+        fini = frontend_ncurses_input_init;
+        fine = frontend_ncurses_input_exit;
 
-    else if (frontend == GAME_FRONTEND_SDL2)
-        GUI_init(title, spritesheet_path);
+    } else if (frontend == FRONTEND_SDL2) {
+        fuii = frontend_sdl2_ui_init;
+        fuie = frontend_sdl2_ui_exit;
+        fini = frontend_sdl2_input_init;
+        fine = frontend_sdl2_input_exit;
+
+    } else {
+        fuii = frontend_headless_ui_init;
+        fuie = frontend_headless_ui_exit;
+        fini = frontend_headless_input_init;
+        fine = frontend_headless_input_exit;
+    }
+
+    frontend_register_ui(fuii, fuie);
+    frontend_register_input(fini, fine);
+    frontend_init(title);
 
     log_debug("Initialized...\n");
 }
@@ -51,10 +72,7 @@ static void init(game_frontend_t frontend, const char *title,
 static int exit_state() {
     log_debug("Exiting...");
 
-    if (g_frontend == GAME_FRONTEND_SDL2)
-        GUI_exit();
-    else
-        UI_exit();
+    frontend_exit();
 
     game_free(GLOBALS.game);
     scheduler_free();
@@ -62,6 +80,7 @@ static int exit_state() {
     return 0;
 }
 
+/*
 static int job_ui (Task* task, Stack64* stack) {
     milliseconds_t sec = TIMER_NOW.tv_sec;
     milliseconds_t msec = TIMER_NOW.tv_usec / 1000;
@@ -98,6 +117,7 @@ static int job_gui_poll_input_track(Task *task, Stack64 *stack) {
 
     tk_sleep(task, 1000);
 }
+*/
 
 static void cb_exit(Task* task) {
     scheduler_kill_all_tasks();
@@ -110,49 +130,36 @@ static void main_event_handler(InputEvent *ev) {
 int main(int argc, const char** argv) {
     if (argc < MIN_ARGS+1) return -1;
 
-    const char *title, *spritesheet;
-    title = "Curseminer!";
-    spritesheet = "assets/spritesheets/tiles.gif";
-
     const char *nogui_string = "-nogui";
     const char *tui_string = "-tui";
     const char *gui_string = "-gui";
-    int frontend = GAME_FRONTEND_SDL2;
+    const char *title = "Curseminer!";
+    int frontend = FRONTEND_SDL2;
 
     for (int i=1; i<argc; i++) {
         if (1 < argc) {
             if (0 == strncmp(argv[i], nogui_string, 7)) {
-                frontend = GAME_FRONTEND_HEADLESS;
+                frontend = FRONTEND_HEADLESS;
 
             } else if (0 == strncmp(argv[i], tui_string, 7)) {
-                frontend = GAME_FRONTEND_NCURSES;
+                frontend = FRONTEND_NCURSES;
 
             } else if (0 == strncmp(argv[i], gui_string, 7)) {
-                frontend = GAME_FRONTEND_SDL2;
+                frontend = FRONTEND_SDL2;
             }
         }
     }
 
-    if (!access(spritesheet, F_OK) == 0)
-        spritesheet = NULL;
-
-    init(frontend, title, spritesheet);
-
-    input_register_event(E_KB_Q, E_CTX_GAME, main_event_handler);
-    input_register_event(E_KB_Q, E_CTX_NOISE, main_event_handler);
-    input_register_event(E_KB_Q, E_CTX_CLOCK, main_event_handler);
+    init(frontend, title);
 
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
 
-    if (g_frontend == GAME_FRONTEND_SDL2) {
-        schedule_cb(g_runqueue, 0, 0, job_gui, NULL, cb_exit);
-        schedule_cb(g_runqueue, 0, 0, job_gui_poll_input, NULL, cb_exit);
-    } else {
-        schedule_cb(g_runqueue, 0, 0, job_ui, NULL, cb_exit);
-    }
-
     schedule_cb(g_runqueue, 0, 0, game_update, gst, cb_exit);
+
+    frontend_register_event(E_KB_Q, E_CTX_GAME, main_event_handler);
+    frontend_register_event(E_KB_Q, E_CTX_NOISE, main_event_handler);
+    frontend_register_event(E_KB_Q, E_CTX_CLOCK, main_event_handler);
 
     schedule_run(GLOBALS.runqueue_list);
 

@@ -271,6 +271,8 @@ static void player_path_find(Entity *player, int x, int y) {}
 int game_curseminer_init(GameContext *game, int) {
     g_game = game;
 
+    game_set_glyphset("tiles.gif");
+
     int glyph = 0;
     int i = 0;
 
@@ -311,20 +313,20 @@ int game_curseminer_init(GameContext *game, int) {
     player->controller = &g_player_controller;
 
 
-    input_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
-    input_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
-    input_register_event(E_KB_RIGHT,E_CTX_GAME, game_input_move_right);
-    input_register_event(E_KB_W,    E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_A,    E_CTX_GAME, game_input_move_left);
-    input_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
-    input_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
-    input_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
-    input_register_event(E_KB_E,    E_CTX_GAME, game_input_inventory_up);
-    input_register_event(E_KB_R,    E_CTX_GAME, game_input_inventory_down);
-    input_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
-    input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
-    input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
+    frontend_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
+    frontend_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
+    frontend_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
+    frontend_register_event(E_KB_RIGHT,E_CTX_GAME, game_input_move_right);
+    frontend_register_event(E_KB_W,    E_CTX_GAME, game_input_move_up);
+    frontend_register_event(E_KB_A,    E_CTX_GAME, game_input_move_left);
+    frontend_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
+    frontend_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
+    frontend_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
+    frontend_register_event(E_KB_E,    E_CTX_GAME, game_input_inventory_up);
+    frontend_register_event(E_KB_R,    E_CTX_GAME, game_input_inventory_down);
+    frontend_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
+    frontend_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
+    frontend_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
 
     GLOBALS.player = player;
 

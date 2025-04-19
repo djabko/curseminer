@@ -3,7 +3,7 @@
 
 #include <unistd.h>
 
-#include "input.h"
+#include "frontend.h"
 #include "core_game.h"
 
 typedef unsigned char byte_t;
@@ -59,6 +59,8 @@ struct Globals {
     Entity* player;
     GameContext* game;
     event_ctx_t input_context;
+
+    RunQueue* runqueue;
     ll_head* runqueue_list;
 };
 

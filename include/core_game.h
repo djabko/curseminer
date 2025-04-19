@@ -5,7 +5,7 @@
 
 #include "stack64.h"
 #include "scheduler.h"
-#include "input.h"
+#include "frontend.h"
 #include "world.h"
 
 #define GAME_REFRESH_RATE 20
@@ -55,7 +55,7 @@ typedef struct GameContext {
     World *world;
 
     int world_view_x, world_view_y, skins_c, skins_max, entity_types_c,
-        entity_types_max, scroll_threshold;
+        entity_types_max, scroll_threshold, glyphset_key;
 
     EntityType *entity_types;
     Skin *skins;
@@ -103,6 +103,7 @@ EntityType *game_cache_getxy(GameContext*, int i);
 int game_world_setxy(GameContext*, int x, int y, entity_id_t);
 int game_cache_setxy(GameContext*, int i, entity_id_t);
 
+bool game_set_glyphset(const char*);
 void game_create_skin(GameContext*, Skin*, int id, color_t, color_t, color_t,
         color_t, color_t, color_t);
 EntityType *game_create_entity_type(GameContext*, Skin*);

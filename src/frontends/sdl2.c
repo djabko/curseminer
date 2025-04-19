@@ -7,10 +7,14 @@
 #include <stb_image.h>
 
 #include "globals.h"
-#include "GUI.h"
 #include "core_game.h"
 #include "games/curseminer.h"
 #include "games/other.h"
+#include "frontends/sdl2.h"
+#include "scheduler.h"
+
+#define SPRITE_MAX 256
+#define REFRESH_RATE 20
 
 typedef const Uint32 bitmask_sdl;
 
@@ -32,6 +36,8 @@ typedef const Uint32 bitmask_sdl;
 
 #define NAME_MAX 64
 
+#define g_spritesheet_path "assets/spritesheets/tiles.gif"
+
 typedef enum file_format_t {
     FILE_FORMAT_INVALID = -1,
     FILE_FORMAT_PNG,
@@ -48,10 +54,11 @@ static int g_tile_maxx;
 static int g_tile_maxy;
 static int g_sprite_size = 32;
 static int g_sprite_offset = 0;
-void (*draw_tile_f)(EntityType*, SDL_Rect*);
+static void (*draw_tile_f)(EntityType*, SDL_Rect*);
+static HashTable *g_glyphsets;
 
 typedef struct Spritesheet {
-    const char *name;
+    const char name[NAME_MAX];
     SDL_Texture **frames;
     int width, height, layers, stride;
     milliseconds_t delay;
@@ -81,7 +88,9 @@ static void assert_SDL(bool condition, const char *msg) {
 }
 
 static file_format_t check_file_format(const char *path) {
-    if (path) {
+    bool exists = 0 == access(path, R_OK) != 0;
+
+    if (exists) {
         FILE *f = fopen(path, "rb");
 
         static byte_t buf[] = {0, 0, 0, 0, 0};
@@ -111,7 +120,7 @@ static void load_gif(const char *filename, GIF *gif) {
     size_t r = fread(buf, 1, size, f);
 
     assert_log(r == size,
-            "Error: Failed to read file '%s', %d bytes returned", filename, r);
+            "Error: Failed to read file '%s', %lu bytes returned", filename, r);
 
     gif->name = filename;
     gif->data = stbi_load_gif_from_memory(buf, size, &gif->delays,
@@ -128,18 +137,19 @@ static Spritesheet *spritesheet_alloc(const char *name, int width, int height, i
     const size_t alloc_size =
         sizeof(Spritesheet) + layers * sizeof(SDL_Texture*);
 
-    Spritesheet *sp = calloc(alloc_size, layers);
-    sp->name = name;
+    Spritesheet *sp = calloc(alloc_size, 1);
+
+    assert_log(sp != NULL,
+            "Error: failed to allocate %lu for spritesheet '%s'",
+            alloc_size, name);
+
+    strncpy(sp->name, name, NAME_MAX);
     sp->frames = (SDL_Texture**) (sp + 1);
     sp->width = width;
     sp->height = height;
     sp->layers = layers;
     sp->stride = stride;
     sp->delay = delay;
-
-    assert_log(sp != NULL,
-            "Error: failed to allocate %lu for spritesheet '%s'",
-            alloc_size * layers, name);
 
     return sp;
 }
@@ -157,6 +167,8 @@ static SDL_Texture *spritesheet_init_frame(Spritesheet *sp, void *img_data,
 
     assert_log(frame != NULL,
             "Failed to initialize SDL_Texture '%s'", sp->name);
+
+    g_glyphsets = ht_init(1);
 
     return frame;
 }
@@ -276,107 +288,8 @@ static int job_animate(Task* task, Stack64* st) {
 
     game_flush_dirty(g_game);
     tk_sleep(task, g_spritesheet->delay);
-}
 
-int GUI_init(const char *title, const char *spritesheet_path) {
-    SDL_Texture *tmp;
-
-    // 1. Init SDL2
-    int err = SDL_Init(SDL_INIT_VIDEO);
-
-    assert_SDL(0 == err, "Failed to initialize SDL2\t");
-
-    // 2. Init game
-    recalculate_tile_size(g_tile_w);
-
-    GameContextCFG gcfg_curseminer = {
-        .skins_max = 32,
-        .entity_types_max = 32,
-        .scroll_threshold = 5,
-
-        .f_init = game_curseminer_init,
-        .f_update = game_curseminer_update,
-        .f_free = game_curseminer_free,
-    };
-
-    GameContextCFG gcfg_other = {
-        .skins_max = 32,
-        .entity_types_max = 32,
-        .scroll_threshold = 5,
-
-        .f_init = game_other_init,
-        .f_update = game_other_update,
-        .f_free = game_other_free,
-    };
-
-    g_game = game_init(&gcfg_curseminer);
-
-    GLOBALS.game = g_game;
-
-    assert_log(GLOBALS.game != NULL,
-            "ERROR: GUI failed to initialize game...");
-
-    recalculate_tile_size(g_tile_w);
-
-    // 3. Init window
-    SDL_DisplayMode display_mode;
-    SDL_GetCurrentDisplayMode(0, &display_mode);
-    g_window = SDL_CreateWindow(title,
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            display_mode.w, display_mode.h, SDL_WINDOW_SHOWN);
-
-    assert_SDL(g_window, "Failed to create SDL2 window\t");
-    
-    // 4. Init renderer
-    int renderer_flags = SDL_RENDERER_ACCELERATED;
-
-    g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
-
-    assert_SDL(g_renderer, "Failed to create SDL2 renderer\t");
-
-    g_canvas = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA8888,
-        SDL_TEXTUREACCESS_TARGET, display_mode.w, display_mode.h);
-
-    assert_SDL(g_canvas != NULL, "Failed to create SDL main canvas texture");
-
-    SDL_SetRenderDrawColor(g_renderer, 0xff, 0xff, 0xff, 0xff);
-    SDL_RenderClear(g_renderer);
-    SDL_RenderPresent(g_renderer);
-
-    // 5. Init spritesheet
-    g_spritesheet = NULL;
-    file_format_t ff = check_file_format(spritesheet_path);
-
-    if (ff == FILE_FORMAT_PNG || ff == FILE_FORMAT_JPEG) {
-        PNG png;
-        png.name = spritesheet_path;
-        png.data = stbi_load(spritesheet_path, &png.width, &png.height, &png.stride, 0);
-        g_spritesheet = spritesheet_from_png(&png);
-
-    } else if (ff == FILE_FORMAT_GIF) {
-        GIF gif;
-        load_gif(spritesheet_path, &gif);
-        g_spritesheet = spritesheet_from_gif(&gif);
-    }
-
-    if (g_spritesheet) {
-        draw_tile_f = draw_tile_sprite;
-
-        log_debug("Found %dx%d spritesheet '%s' with %d layers!",
-                g_spritesheet->width, g_spritesheet->height,
-                g_spritesheet->name, g_spritesheet->layers);
-
-        // Create runqueue for idle sprite animations
-        if (1 < g_spritesheet->layers) {
-            g_runqueue = scheduler_new_rq(GLOBALS.runqueue_list);
-            schedule(g_runqueue, 0, 0, job_animate, NULL);
-        }
-
-    } else draw_tile_f = draw_tile_rect;
-
-    // 6. Register interrupts
-    input_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
-    input_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
+    return 0;
 }
 
 void flush_screen() {
@@ -450,13 +363,218 @@ void draw_game() {
     df->command = 0;
 }
 
-int GUI_loop() {
-    draw_game();
+
+
+
+/* Input Handling */
+
+#define MAX_MAPPING 256
+static event_t g_sdl2_mapping_kb[ MAX_MAPPING ];
+static event_t g_sdl2_mapping_ms[ MAX_MAPPING ];
+
+static void init_SDL2_keys() {
+    g_sdl2_mapping_kb[SDL_QUIT] = E_KB_ESC;
+
+    for (int i = SDLK_a; i <= SDLK_z; i++)
+        g_sdl2_mapping_kb[i] = i - SDLK_a + E_KB_A;
+
+    g_sdl2_mapping_ms[SDL_BUTTON_LEFT] = E_MS_LMB;
+    g_sdl2_mapping_ms[SDL_BUTTON_MIDDLE] = E_MS_MMB;
+    g_sdl2_mapping_ms[SDL_BUTTON_RIGHT] = E_MS_RMB;
 }
 
-int GUI_exit() {
+static int handle_event_SDL2(void *userdata, SDL_Event *event) {
+    bool keyup = event->type == SDL_KEYUP;
+    bool keydown = event->type == SDL_KEYDOWN;
+    bool mouseup = event->type == SDL_MOUSEBUTTONDOWN;
+    bool mousedown = event->type == SDL_MOUSEBUTTONUP;
+
+    static InputEvent ie = {
+            .id = E_NULL,
+            .type = E_TYPE_KB,
+            .state = ES_UP,
+            .mods = E_NOMOD,
+    };
+
+    SDL_Keycode sym = event->key.keysym.sym;
+    event_ctx_t ctx = GLOBALS.input_context;
+
+    if (event->type == SDL_QUIT) exit(0);
+
+    else if (keyup || keydown) {
+        ie.type = E_TYPE_KB;
+        ie.state = keyup ? ES_UP : ES_DOWN;
+
+        if (SDLK_a <= sym && sym <= SDLK_z) {
+            ie.id = g_sdl2_mapping_kb[sym];
+
+            frontend_dispatch_event(ctx, &ie);
+
+        } else if (sym == SDLK_RSHIFT || sym == SDLK_LSHIFT) {
+            ie.mods = keydown ? E_MOD_0 : E_NOMOD;
+        }
+
+    } else if (mouseup || mousedown) {
+        uint8_t mbtn = event->button.button;
+
+        ie.type = E_TYPE_MS;
+        ie.state = mouseup ? ES_UP : ES_DOWN;
+
+        if (SDL_BUTTON_LEFT <= mbtn && mbtn <= SDL_BUTTON_RIGHT) {
+            int x, y;
+
+            SDL_GetMouseState(&x, &y);
+
+            x /= GLOBALS.tile_w;
+            y /= GLOBALS.tile_h;
+
+            frontend_pack_event(&ie, x, y, 0, 0);
+
+            ie.id = g_sdl2_mapping_ms[mbtn];
+
+            frontend_dispatch_event(ctx, &ie);
+        }
+    }
+
+    return 0;
+}
+
+int job_poll(Task *task, Stack64 *st) {
+    SDL_Event ev;
+    SDL_PollEvent(&ev);
+
+    if (ev.type == SDL_QUIT)
+        scheduler_kill_all_tasks();
+
+    return 0;
+}
+
+static int job_loop(Task *task, Stack64 *st) {
+    draw_game();
+    tk_sleep(task, 1000 / REFRESH_RATE);
+    return 0;
+}
+
+
+/* External APIs */
+int frontend_sdl2_ui_init(const char *title) {
+
+    // 1. Init SDL2
+    int err = SDL_Init(SDL_INIT_VIDEO);
+
+    assert_SDL(0 == err, "Failed to initialize SDL2\t");
+
+    // 2. Init game
+    recalculate_tile_size(g_tile_w);
+
+    GameContextCFG gcfg_curseminer = {
+        .skins_max = 32,
+        .entity_types_max = 32,
+        .scroll_threshold = 5,
+
+        .f_init = game_curseminer_init,
+        .f_update = game_curseminer_update,
+        .f_free = game_curseminer_free,
+    };
+
+    /*
+    GameContextCFG gcfg_other = {
+        .skins_max = 32,
+        .entity_types_max = 32,
+        .scroll_threshold = 5,
+
+        .f_init = game_other_init,
+        .f_update = game_other_update,
+        .f_free = game_other_free,
+    };
+    */
+
+    g_game = game_init(&gcfg_curseminer);
+
+    GLOBALS.game = g_game;
+
+    assert_log(GLOBALS.game != NULL,
+            "ERROR: GUI failed to initialize game...");
+
+    recalculate_tile_size(g_tile_w);
+
+    // 3. Init window
+    SDL_DisplayMode display_mode;
+    SDL_GetCurrentDisplayMode(0, &display_mode);
+    g_window = SDL_CreateWindow(title,
+            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+            display_mode.w, display_mode.h, SDL_WINDOW_SHOWN);
+
+    assert_SDL(g_window, "Failed to create SDL2 window\t");
+    
+    // 4. Init renderer
+    int renderer_flags = SDL_RENDERER_ACCELERATED;
+
+    g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
+
+    assert_SDL(g_renderer, "Failed to create SDL2 renderer\t");
+
+    g_canvas = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET, display_mode.w, display_mode.h);
+
+    assert_SDL(g_canvas != NULL, "Failed to create SDL main canvas texture");
+
+    SDL_SetRenderDrawColor(g_renderer, 0xff, 0xff, 0xff, 0xff);
+    SDL_RenderClear(g_renderer);
+    SDL_RenderPresent(g_renderer);
+
+    // 5. Init spritesheet
+    g_spritesheet = NULL;
+    file_format_t ff = check_file_format(g_spritesheet_path);
+
+    if (ff == FILE_FORMAT_PNG || ff == FILE_FORMAT_JPEG) {
+        PNG png;
+        png.name = g_spritesheet_path;
+        png.data = stbi_load(g_spritesheet_path, &png.width, &png.height, &png.stride, 0);
+        g_spritesheet = spritesheet_from_png(&png);
+
+    } else if (ff == FILE_FORMAT_GIF) {
+        GIF gif;
+        load_gif(g_spritesheet_path, &gif);
+        g_spritesheet = spritesheet_from_gif(&gif);
+    }
+
+    if (g_spritesheet) {
+        draw_tile_f = draw_tile_sprite;
+
+        log_debug("Found %dx%d spritesheet '%s' with %d layers!",
+                g_spritesheet->width, g_spritesheet->height,
+                g_spritesheet->name, g_spritesheet->layers);
+
+        // Create runqueue for idle sprite animations
+        if (1 < g_spritesheet->layers) {
+            schedule(GLOBALS.runqueue, 0, 0, job_animate, NULL);
+        }
+
+    } else draw_tile_f = draw_tile_rect;
+
+    schedule(GLOBALS.runqueue, 0, 0, job_loop, NULL);
+    schedule(GLOBALS.runqueue, 0, 0, job_poll, NULL);
+
+    // 6. Register interrupts
+    frontend_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
+    frontend_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
+
+    return 0;
+}
+
+void frontend_sdl2_ui_exit() {
     if (g_spritesheet) free(g_spritesheet);
     SDL_DestroyRenderer(g_renderer);
     SDL_DestroyWindow(g_window);
     SDL_Quit();
 }
+
+int frontend_sdl2_input_init() {
+    SDL_AddEventWatch(handle_event_SDL2, NULL);
+    init_SDL2_keys();
+
+    return 0;
+}
+
+void frontend_sdl2_input_exit() {}

@@ -11,9 +11,10 @@ OBJDIR=./obj
 LOGSDIR=./logs
 OPT_OBJDIR=./obj_opt
 
-SRCS=$(wildcard $(SRCDIR)/*.c) $(wildcard ./src/games/*.c)
+SRCS=$(wildcard $(SRCDIR)/*.c) $(wildcard ./src/games/*.c) $(wildcard ./src/frontends/*.c)
 OBJS = $(patsubst ./src/%.c, $(OBJDIR)/%.o, $(wildcard ./src/*.c)) \
-       $(patsubst ./src/games/%.c, $(OBJDIR)/games/%.o, $(wildcard ./src/games/*.c))
+       $(patsubst ./src/games/%.c, $(OBJDIR)/games/%.o, $(wildcard ./src/games/*.c)) \
+       $(patsubst ./src/frontends/%.c, $(OBJDIR)/frontends/%.o, $(wildcard ./src/frontends/*.c))
 OPT_OBJS=$(patsubst $(SRCDIR)/%.c, $(OPT_OBJDIR)/%.o, $(SRCS))
 
 TARGET=$(notdir $(shell pwd))
@@ -26,11 +27,15 @@ $(TARGET): $(OBJS)
 	$(CC) $(CF_DEBUG) $(SDL2_CFLAGS) $(CF_LIBS) -o $@ $^
 
 $(OBJDIR)/%.o: ./src/%.c | $(OBJDIR)
-	$(CC) $(CF_DEBUG) $(SDL2_CFLAGS) $(F_INC) -c $< -o $@
+	$(CC) $(CF_DEBUG) $(F_INC) -c $< -o $@
 
 $(OBJDIR)/games/%.o: ./src/games/%.c | $(OBJDIR)
 	@mkdir -p $(dir $@)
 	$(CC) $(CF_DEBUG) $(F_INC) -c $< -o $@
+
+$(OBJDIR)/frontends/%.o: ./src/frontends/%.c | $(OBJDIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(CF_DEBUG) $(F_INC) $(SDL2_CFLAGS) -c $< -o $@
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
@@ -49,3 +54,7 @@ $(OPT_OBJDIR):
 clean:
 	rm -f $(TARGET) $(OPT_TARGET) $(OBJS) $(LOGSDIR)/error.dump vgcore.* error.dump gmon.out
 	rm -rf $(OBJDIR) $(OPT_OBJDIR)
+
+print:
+	echo PRINTING INFO
+	echo $(info SRCS: $(SRCS))

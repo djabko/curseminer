@@ -1,4 +1,9 @@
 #include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <time.h>
 #include <math.h>
 #include <string.h>
 
@@ -7,14 +12,17 @@
 #include "globals.h"
 #include "util.h"
 #include "stack64.h"
-#include "UI.h"
 #include "core_game.h"
+#include "frontends/ncurses.h"
 #include "games/curseminer.h"
 #include "games/other.h"
-#include "input.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
 #define MAX_TITLE 32
+#define GLYPH_MAX 256
+#define REFRESH_RATE 120
+
+/* Drawing */
 
 typedef void (*voidfunc) ();
 
@@ -97,8 +105,6 @@ static int WIDGET_WIN_R = 10;
 
 static void ui_input_widget_toggle(InputEvent *ie) {
     if (ie->state == ES_UP) {
-
-        UI_toggle_widgetwin();
         
         GLOBALS.input_context =
             GLOBALS.input_context == E_CTX_GAME ? E_CTX_NOISE : E_CTX_GAME;
@@ -188,14 +194,6 @@ static void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y
     }
 }
 
-static void draw_header() {
-    for (int i=0; i<COLS; i++)
-        mvaddch(1, i, '=');
-
-    for (int i=0; i<COLS; i++)
-        mvaddch(3, i, '=');
-}
-
 static void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
         chtype l1, chtype l2, chtype l3, chtype l4,
         chtype c1, chtype c2, chtype c3, chtype c4) {
@@ -280,15 +278,6 @@ static void draw_keyboard_state(WINDOW* scr, int x, int y) {
 
 }
 
-static void draw_gamewin_nogui(window_t *gamewin) {
-    for (int x=0; x <= gamewin->w; x++) {
-        for (int y=0; y <= gamewin->h; y++) {
-            EntityType *e = game_world_getxy(GLOBALS.game, x, y); 
-            *e;
-        }
-    }
-}
-
 //int SKIPPED_UPDATES = 0;
 static void draw_gamewin(window_t *gamewin) {
     EntityType* type;
@@ -358,11 +347,6 @@ static void draw_gamewin(window_t *gamewin) {
     wnoutrefresh(gamewin->win);
 }
 
-static void draw_uiwin_nogui(window_t *uiwin) {
-    EntityType *e = game_world_getxy(GLOBALS.game, 1, 1);
-    *e;
-}
-
 static void draw_uiwin(window_t *uiwin) {
     werase(uiwin->win);
 
@@ -386,8 +370,6 @@ static void draw_uiwin(window_t *uiwin) {
     draw_keyboard_state(uiwin->win, (int)COLS*.5, 5);
     wnoutrefresh(uiwin->win);
 }
-
-static void draw_invwin_nogui(window_t *invwin) {}
 
 static void draw_invwin(window_t *invwin) {
     // TODO: check if inventory changed
@@ -413,8 +395,6 @@ static void draw_invwin(window_t *invwin) {
     wnoutrefresh(invwin->win);
 }
 
-static void draw_widgetwin_nogui(window_t *widgetwin) {}
-
 static void draw_widgetwin_rt_clock(window_t *widgetwin) {
     werase(widgetwin->win);
 
@@ -429,7 +409,7 @@ static void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseL
 
     double c = WIDGET_WIN_C;
     double o = WIDGET_WIN_O;
-    double rescale_factor = 1;
+    //double rescale_factor = 1;
     double frequency = 1;
     double amplitude = 1;
     double octaves = 1;
@@ -557,33 +537,241 @@ static void window_mgr_free() {
 
 
 /* Public functions used by other components */
-void UI_update_time(milliseconds_t msec) {
-    TIME_MSEC = msec;
+void UI_show_window(window_t *win) {
+    win->active = 1;
+    if (win->parent) win->parent->active = 0;
+
+    box_win(win);
 }
 
-int UI_init(int nogui_mode) {
-    MENU_STACK = st_init(16);
+void UI_hide_window(window_t *win) {
+    box_win_clear(win);
 
-    if (!nogui_mode) {
-        initscr();
-        start_color();
-        raw();
-        cbreak();
-        noecho();
-        curs_set(0);
-        nodelay(stdscr, 1);
-        keypad(stdscr, TRUE);
-        mouseinterval(0);
-        mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);
+    if (win->parent) win->parent->active = 1;
+    win->active = 0;
 
-        ESCDELAY = 0;
+    box_win(win);
+}
 
-        getmaxyx(stdscr, LINES, COLS);
+void UI_toggle_widgetwin() {
+    if (g_widgetwin->active) UI_hide_window(g_widgetwin);
+    else UI_show_window(g_widgetwin);
+}
+
+int job_loop(Task *task, Stack64 *st) {
+    if (st_peek(MENU_STACK) == -1) return -1;
+    voidfunc draw_func = (voidfunc) st_peek(MENU_STACK);
+    draw_func();
+
+    doupdate();
+
+    tk_sleep(task, REFRESH_RATE / 1000);
+
+    return 0;
+}
+
+
+
+/* Input Handling*/
+
+#define msec_to_nsec(ms) ms * 1000000
+#define g_keyup_delay 250
+
+typedef struct {
+    event_t id;
+    milliseconds_t last_pressed;
+} KeyDownState;
+
+#define KDS_MAX 3
+KeyDownState KEY_DOWN_STATES_ARRAY[KDS_MAX];
+KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
+
+#define NCURSES_KBMAP_MAX 256
+#define NCURSES_MSMAP_MAX 2048
+
+static event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
+static InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
+static timer_t g_input_timer = 0;
+static Queue64 *g_queued_kdown = NULL;
+
+static void init_keys_ncurses() {
+    for (int i = 0; i < NCURSES_KBMAP_MAX; i++) 
+        g_ncurses_mapping_kb[i] = E_NULL;
+
+    for (int i = 0; i < NCURSES_MSMAP_MAX; i++) 
+        g_ncurses_mapping_ms[i] = (InputEvent){0, 0, 0, 0, 0};
+
+    for (int c = 'a'; c <= 'z'; c++)
+        g_ncurses_mapping_kb[c] = E_KB_A + c - 'a';
+
+    g_ncurses_mapping_kb[ KEY_UP ] = E_KB_UP;
+    g_ncurses_mapping_kb[ KEY_DOWN ] = E_KB_DOWN;
+    g_ncurses_mapping_kb[ KEY_LEFT ] = E_KB_LEFT;
+    g_ncurses_mapping_kb[ KEY_RIGHT ] = E_KB_RIGHT;
+
+    g_ncurses_mapping_ms[ BUTTON1_PRESSED ].id = E_MS_LMB;
+    g_ncurses_mapping_ms[ BUTTON1_PRESSED ].state = ES_DOWN;
+    g_ncurses_mapping_ms[ BUTTON1_PRESSED ].mods = E_NOMOD;
+
+    g_ncurses_mapping_ms[ BUTTON2_PRESSED ].id = E_MS_MMB;
+    g_ncurses_mapping_ms[ BUTTON2_PRESSED ].state = ES_DOWN;
+    g_ncurses_mapping_ms[ BUTTON2_PRESSED ].mods = E_NOMOD;
+
+    g_ncurses_mapping_ms[ BUTTON3_PRESSED ].id = E_MS_RMB;
+    g_ncurses_mapping_ms[ BUTTON3_PRESSED ].state = ES_DOWN;
+    g_ncurses_mapping_ms[ BUTTON3_PRESSED ].mods = E_NOMOD;
+
+    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].id = E_MS_LMB;
+    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].state = ES_UP;
+    g_ncurses_mapping_ms[ BUTTON1_RELEASED ].mods = E_NOMOD;
+
+    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].id = E_MS_MMB;
+    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].state = ES_UP;
+    g_ncurses_mapping_ms[ BUTTON2_RELEASED ].mods = E_NOMOD;
+
+    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].id = E_MS_RMB;
+    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].state = ES_UP;
+    g_ncurses_mapping_ms[ BUTTON3_RELEASED ].mods = E_NOMOD;
+
+    int states[] = {BUTTON1_PRESSED, BUTTON2_PRESSED, BUTTON3_PRESSED,
+        BUTTON1_RELEASED, BUTTON2_RELEASED, BUTTON3_RELEASED, -1};
+
+    for (int *p=states; *p != -1; p++) {
+        g_ncurses_mapping_ms[*p].type = E_TYPE_MS;
+    }
+}
+
+static void map_event_ncurses(InputEvent *ev, int key) {
+
+    if (key == KEY_MOUSE) {
+        MEVENT mouse;
+        if (getmouse(&mouse) != OK) log_debug("ERROR GETTING MOUSE EVENT!");
+
+        *ev = g_ncurses_mapping_ms[mouse.bstate];
+
+        frontend_pack_event(ev, mouse.x, mouse.y, mouse.z, 0);
 
     } else {
-        COLS = 100;
-        LINES = 100;
+        if ('A' <= key && key <= 'Z') {
+            ev->mods |= 1U << (E_MOD_0 - 1);
+            key += ' ';
+        } else
+            ev->mods = E_NOMOD;
+
+        ev->id = g_ncurses_mapping_kb[key];
+        ev->type = E_TYPE_KB;
     }
+
+}
+
+static void handle_kdown_ncurses(int signo) {
+    InputEvent ev;
+
+    int key = getch();
+
+    if (key == -1) return;
+
+    event_ctx_t ctx = GLOBALS.input_context;
+    map_event_ncurses(&ev, key);
+
+    if (ev.type == E_TYPE_KB) {
+
+        ev.state = ES_DOWN;
+
+        // Reset keyup timer
+        struct itimerspec its = {0};
+
+        its.it_value.tv_nsec = msec_to_nsec(g_keyup_delay);
+
+        timer_settime(g_input_timer, 0, &its, NULL);
+
+        /* Process all pending ES_UP events and ensure there is space for
+           this event. */
+        if (!qu_empty(g_queued_kdown)) {
+
+            for (int i = 0; i < g_queued_kdown->count; i++) {
+
+                KeyDownState *kds = (KeyDownState*) qu_next(g_queued_kdown);
+
+                bool is_expired = TIMER_NOW_MS >= kds->last_pressed + g_keyup_delay;
+                bool is_kds_full = KDS_MAX <= g_queued_kdown->count + 1;
+
+                if (is_expired || is_kds_full) {
+                    kds = (KeyDownState*) qu_dequeue(g_queued_kdown);
+                    NEXT_AVAILABLE_KDS--;
+
+                    i--;
+
+                    InputEvent ev_up = {
+                        .id = kds->id,
+                        .type = E_TYPE_KB,
+                        .state = ES_UP,
+                        .mods = ev.mods,
+                    };
+
+                    frontend_dispatch_event(ctx, &ev_up);
+                }
+            }
+        }
+
+        KeyDownState new_kds = {.id = ev.id, .last_pressed = TIMER_NOW_MS};
+        KeyDownState *p = KEY_DOWN_STATES_ARRAY;
+        int c = g_queued_kdown->count;
+
+        /* If this event is already in the KDS array just update it with the
+           new KeyDownState.last_pressed value. */
+        if      (0 < c && new_kds.id == p[0].id) p[0] = new_kds;
+        else if (1 < c && new_kds.id == p[1].id) p[1] = new_kds;
+        else if (2 < c && new_kds.id == p[2].id) p[2] = new_kds;
+        else {
+            p = NEXT_AVAILABLE_KDS++;
+            *p = new_kds;
+            qu_enqueue(g_queued_kdown, (uint64_t) p);
+        }
+    }
+
+    frontend_dispatch_event(ctx, &ev);
+}
+
+static void handle_kup_ncurses(int signo) {
+    event_ctx_t ctx = GLOBALS.input_context;
+
+    while (!qu_empty(g_queued_kdown)) {
+        KeyDownState *kds = (KeyDownState*) qu_dequeue(g_queued_kdown);
+
+        InputEvent ev_up = {
+            .id = kds->id,
+            .type = E_TYPE_KB,
+            .state = ES_UP,
+            .mods = E_NOMOD,
+        };
+
+        frontend_dispatch_event(ctx, &ev_up);
+
+        NEXT_AVAILABLE_KDS--;
+    }
+}
+
+
+
+/* External APIs */
+int frontend_ncurses_ui_init(const char *title) {
+    MENU_STACK = st_init(16);
+
+    initscr();
+    start_color();
+    raw();
+    cbreak();
+    noecho();
+    curs_set(0);
+    nodelay(stdscr, 1);
+    keypad(stdscr, TRUE);
+    mouseinterval(0);
+    mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);
+
+    ESCDELAY = 0;
+
+    getmaxyx(stdscr, LINES, COLS);
 
     st_push(MENU_STACK, (uint64_t) draw_main_menu);
 
@@ -615,25 +803,25 @@ int UI_init(int nogui_mode) {
             "Failed to initialize windows: game<%p> ui<%p> inv<%p> widget<%p>",
             gamewin, uiwin, invwin, g_widgetwin);
 
-    window_insert_draw_func(gamewin,        nogui_mode ? draw_gamewin_nogui     : draw_gamewin);
-    window_insert_draw_func(uiwin,          nogui_mode ? draw_uiwin_nogui       : draw_uiwin);
-    window_insert_draw_func(invwin,         nogui_mode ? draw_invwin_nogui      : draw_invwin);
-    window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_widgetwin_nogui   : draw_widgetwin_rt_clock);
-    window_insert_draw_func(g_widgetwin,    nogui_mode ? draw_invwin_nogui      : draw_widgetwin_perlin_noise);
+    window_insert_draw_func(gamewin,        draw_gamewin);
+    window_insert_draw_func(uiwin,          draw_uiwin);
+    window_insert_draw_func(invwin,         draw_invwin);
+    window_insert_draw_func(g_widgetwin,    draw_widgetwin_rt_clock);
+    window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
 
-    input_register_event(E_KB_G, E_CTX_GAME, ui_input_widget_toggle);
-    input_register_event(E_KB_G, E_CTX_NOISE, ui_input_widget_toggle);
-    input_register_event(E_KB_G, E_CTX_CLOCK, ui_input_widget_toggle);
+    frontend_register_event(E_KB_G, E_CTX_GAME, ui_input_widget_toggle);
+    frontend_register_event(E_KB_G, E_CTX_NOISE, ui_input_widget_toggle);
+    frontend_register_event(E_KB_G, E_CTX_CLOCK, ui_input_widget_toggle);
 
-    input_register_event(E_KB_W, E_CTX_NOISE, ui_input_noise_zoomin);
-    input_register_event(E_KB_S, E_CTX_NOISE, ui_input_noise_zoomout);
-    input_register_event(E_KB_A, E_CTX_NOISE, ui_input_noise_movel);
-    input_register_event(E_KB_D, E_CTX_NOISE, ui_input_noise_mover);
+    frontend_register_event(E_KB_W, E_CTX_NOISE, ui_input_noise_zoomin);
+    frontend_register_event(E_KB_S, E_CTX_NOISE, ui_input_noise_zoomout);
+    frontend_register_event(E_KB_A, E_CTX_NOISE, ui_input_noise_movel);
+    frontend_register_event(E_KB_D, E_CTX_NOISE, ui_input_noise_mover);
 
-    input_register_event(E_KB_W, E_CTX_CLOCK, ui_input_clock_zoomin);
-    input_register_event(E_KB_S, E_CTX_CLOCK, ui_input_clock_zoomout);
-    input_register_event(E_KB_A, E_CTX_CLOCK, ui_input_clock_move);
-    input_register_event(E_KB_D, E_CTX_CLOCK, ui_input_clock_move);
+    frontend_register_event(E_KB_W, E_CTX_CLOCK, ui_input_clock_zoomin);
+    frontend_register_event(E_KB_S, E_CTX_CLOCK, ui_input_clock_zoomout);
+    frontend_register_event(E_KB_A, E_CTX_CLOCK, ui_input_clock_move);
+    frontend_register_event(E_KB_D, E_CTX_CLOCK, ui_input_clock_move);
 
     GLOBALS.view_port_x = gwx;
     GLOBALS.view_port_y = gwy;
@@ -652,6 +840,7 @@ int UI_init(int nogui_mode) {
         .f_free = game_curseminer_free,
     };
 
+    /*
     GameContextCFG gcfg_other = {
         .skins_max = 32,
         .entity_types_max = 32,
@@ -661,6 +850,7 @@ int UI_init(int nogui_mode) {
         .f_update = game_other_update,
         .f_free = game_other_free,
     };
+    */
 
     GLOBALS.game = game_init(&gcfg_curseminer);
     assert_log (GLOBALS.game != NULL,
@@ -668,55 +858,58 @@ int UI_init(int nogui_mode) {
 
     g_widgetwin->active = 0;
 
-    if (!nogui_mode) {
-        init_colors();
+    init_colors();
 
-        // These functions require colors initialized
-        box_win(gamewin);
-        box_win(uiwin);
-        box_win(invwin);
+    box_win(gamewin);
+    box_win(uiwin);
+    box_win(invwin);
 
-        wnoutrefresh(stdscr);
-    }
+    wnoutrefresh(stdscr);
+
+    schedule(GLOBALS.runqueue, 0, 0, job_loop, NULL);
 
     LATTICE1D = noise_init(100, 1, 100, smoothstep);
+
     return 1;
 }
 
-int UI_loop() {
-    if (st_peek(MENU_STACK) == -1) return -1;
-    voidfunc draw_func = (voidfunc) st_peek(MENU_STACK);
-    draw_func();
-
-    doupdate();
-    return 0;
-}
-
-int UI_exit() {
+void frontend_ncurses_ui_exit() {
     window_mgr_free();
     endwin();
     free(MENU_STACK);
+}
+
+int frontend_ncurses_input_init() {
+    
+    /* 1. Initialized data structures */
+    init_keys_ncurses();
+    g_queued_kdown = qu_init(1);
+
+    struct sigevent se = {
+        .sigev_notify = SIGEV_SIGNAL,
+        .sigev_signo = SIGALRM,
+    };
+
+    struct sigaction sa;
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+
+    /* 2. Create timer to simulate ES_KEYUP events using SIGALRM interrupt */
+    timer_create(CLOCK_MONOTONIC, &se, &g_input_timer);
+
+    sa.sa_handler = handle_kup_ncurses;
+    sigaction(SIGALRM, &sa, NULL);
+
+    /* 3. Register SIGIO interrupt to trigger when input is available on stdin
+     *    and process it in handle_kdown_ncurses */
+    sa.sa_handler = handle_kdown_ncurses;
+    sigaction(SIGIO, &sa, NULL);
+
+    int flags = fcntl(STDIN_FILENO, F_GETFL);
+    fcntl(STDIN_FILENO, F_SETFL, flags | O_ASYNC);
+    fcntl(STDIN_FILENO, F_SETOWN, getpid());
+
     return 1;
 }
 
-void UI_show_window(window_t *win) {
-    win->active = 1;
-    if (win->parent) win->parent->active = 0;
-
-    box_win(win);
-}
-
-void UI_hide_window(window_t *win) {
-    box_win_clear(win);
-
-    if (win->parent) win->parent->active = 1;
-    win->active = 0;
-
-    box_win(win);
-}
-
-void UI_toggle_widgetwin() {
-    if (g_widgetwin->active) UI_hide_window(g_widgetwin);
-    else UI_show_window(g_widgetwin);
-}
-
+void frontend_ncurses_input_exit() {}

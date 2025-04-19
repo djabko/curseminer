@@ -9,8 +9,6 @@
 
 #define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 16
 
-static int ITERATOR = 0;
-
 /* Global Variables
  * Initialized in world_init() 
  */

@@ -178,7 +178,7 @@ void tk_sleep(Task* task, milliseconds_t ms) {
     if (ms < 1) return;
 
     if (task->flags & RQ_FLAG_SLEEPING)
-        log_debug("Warning: putting already sleeping task %p to sleep");
+        log_debug("Warning: putting already sleeping task %p to sleep", task);
 
     task->next_run = TIMER_NOW_MS + ms;
 

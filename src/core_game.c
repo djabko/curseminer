@@ -9,8 +9,6 @@
 #include "world.h"
 #include "entity.h"
 #include "stack64.h"
-#include "games/curseminer.h"
-#include "games/other.h"
 
 int world_from_mouse_xy(InputEvent *ie, int *world_x, int *world_y) {
     uint16_t x = ie->data >> 16 * 0;
@@ -140,6 +138,8 @@ bool game_resize_caches(GameContext *game) {
 
     memset(game->cache_world, 0, tiles_on_screen);
     memset(game->cache_entity, 0, tiles_on_screen);
+
+    return true;
 }
 
 void game_set_dirty(GameContext *game, int x, int y, int v) {
@@ -174,6 +174,10 @@ void game_flush_dirty(GameContext *game) {
     }
 
     df->command = -1;
+}
+
+bool game_set_glyphset(const char* name) {
+    return false;
 }
 
 void game_create_skin(GameContext *game, Skin *skin, int id,
@@ -241,6 +245,7 @@ GameContext *game_init(GameContextCFG *cfg) {
     game->f_update = cfg->f_update;
     game->f_free = cfg->f_free;
 
+    game->glyphset_key = 0;
     game->skins_c = 0;
     game->entity_types_c = 0;
     game->skins = calloc(game->skins_max, sizeof(Skin));
@@ -252,7 +257,6 @@ GameContext *game_init(GameContextCFG *cfg) {
 
     entity_init_default_controller();
 
-    size_t stride = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy;
     game_resize_caches(game);
     flush_world_entity_cache(game);
     game_flush_dirty(game);

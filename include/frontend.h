@@ -4,14 +4,9 @@
 #define ASCII_ESC 27
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "timer.h"
-
-typedef enum {
-    GAME_FRONTEND_HEADLESS,
-    GAME_FRONTEND_NCURSES,
-    GAME_FRONTEND_SDL2,
-} game_frontend_t;
 
 typedef enum {
     E_TYPE_NULL,
@@ -89,6 +84,14 @@ typedef enum {
 } event_ctx_t;
 
 typedef struct {
+    int (*f_ui_init)();
+    void (*f_ui_exit)();
+
+    int (*f_input_init)();
+    void (*f_input_exit)();
+} Frontend;
+
+typedef struct {
     event_t id;
     event_type_t type;
     event_state_t state;
@@ -96,9 +99,13 @@ typedef struct {
     uint64_t data;
 } InputEvent;
 
-void input_init(game_frontend_t);
-int input_register_event(event_t, event_ctx_t, void (*)(InputEvent*));
-void print_ncurses_mapping(const char* tag);
-int input_SDL2_poll();
+bool frontend_pack_event(InputEvent*, uint8_t, uint8_t, uint8_t, uint8_t);
+int frontend_init(const char* title);
+bool frontend_register_ui(int(*f_init)(const char*), void(*f_exit)());
+bool frontend_register_input(int(*f_init)(const char*), void(*f_exit)());
+void frontend_exit();
+
+int frontend_register_event(event_t, event_ctx_t, void (*)(InputEvent*));
+void frontend_dispatch_event(event_ctx_t, InputEvent*);
 
 #endif

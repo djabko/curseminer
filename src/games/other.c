@@ -69,7 +69,7 @@ int game_other_init(GameContext *game, int) {
 
     player->controller = &g_controller_0;
 
-    input_register_event(E_MS_LMB, E_CTX_GAME, handler);
+    frontend_register_event(E_MS_LMB, E_CTX_GAME, handler);
 
     GLOBALS.player = player;
 
