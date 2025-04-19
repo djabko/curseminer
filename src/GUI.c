@@ -1,13 +1,30 @@
 #include <stdbool.h>
 
-#include "SDL.h"
+#include <SDL.h>
 #include <SDL2/SDL_image.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include "globals.h"
 #include "GUI.h"
 #include "core_game.h"
 #include "games/curseminer.h"
 #include "games/other.h"
+
+typedef const Uint32 bitmask_sdl;
+
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+#define g_bmr 0xff000000
+#define g_bmg 0x00ff0000
+#define g_bmb 0x0000ff00
+#define g_bma 0x000000ff
+#else
+#define g_bmr 0x000000ff
+#define g_bmg 0x0000ff00
+#define g_bmb 0x00ff0000
+#define g_bma 0xff000000
+#endif
 
 static RunQueue *g_runqueue;
 static SDL_Window *g_window;
@@ -21,19 +38,62 @@ static int g_sprite_size = 32;
 static int g_sprite_offset = 0;
 void (*draw_tile_f)(EntityType*, SDL_Rect*);
 
-GameContext *g_game = NULL;
-
 typedef struct Texture {
     SDL_Texture *obj;
     const Uint32 format;
     const int access, w, h;
 } Texture;
 
+typedef struct PNG {
+    const char name[64];
+    void *data;
+    int width, height, stride;
+} PNG;
+
+typedef struct GIF {
+    const char name[64];
+    void *data;
+    int x, y, z, comp, stride;
+    int *delays;
+} GIF;
+
+GameContext *g_game = NULL;
+GIF *g_gif = NULL;
 static Texture g_canvas;
 static Texture g_spritesheet;
 
 static void assert_SDL(bool condition, const char *msg) {
     assert_log(condition, "%sSDL2 Error: '%s'", msg, SDL_GetError());
+}
+
+static void load_gif(const char *filename, GIF *gif) {
+    size_t size;
+    FILE *f = fopen(filename, "rb");
+
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    assert_log(0 < size, "Error: File '%s' is empty", filename);
+
+    void *buf = malloc(size);
+
+    size_t r = fread(buf, 1, size, f);
+
+    assert_log(r == size,
+            "Error: Failed to open file '%s', %d bytes returned", filename, r);
+
+    static const int bits = 4;
+    
+    void *data = stbi_load_gif_from_memory(buf, size, &gif->delays,
+            &gif->x, &gif->y, &gif->z, &gif->comp, bits);
+
+    assert_log(data, "Error: Failed to load '%s' as GIF", filename);
+
+    gif->stride = bits;
+    gif->data = data;
+
+    free(buf);
 }
 
 static int texture_init(Texture *t, SDL_Texture *obj) {
@@ -197,7 +257,19 @@ int GUI_init(const char *title, const char *spritesheet_path) {
 
     // 5. Init spritesheet
     if (spritesheet_path) {
-        g_surface = IMG_Load(spritesheet_path);
+        /*
+        PNG png;
+        png.data = stbi_load(spritesheet_path, &png.width, &png.height, &png.stride, 0);
+        */
+
+        g_gif = malloc(sizeof(GIF));
+
+        load_gif(spritesheet_path, g_gif);
+
+        int pitch = g_gif->x * g_gif->stride;
+
+        g_surface = SDL_CreateRGBSurfaceFrom(g_gif->data, g_gif->x, g_gif->y,
+                g_gif->stride * 8, pitch, g_bmr, g_bmg, g_bmb, g_bma);
 
         assert_SDL(g_surface != NULL, NULL);
 
@@ -297,6 +369,7 @@ int GUI_loop() {
 }
 
 int GUI_exit() {
+    free(g_gif);
     SDL_DestroyRenderer(g_renderer);
     SDL_DestroyWindow(g_window);
     SDL_Quit();

@@ -112,7 +112,7 @@ int main(int argc, const char** argv) {
 
     const char *title, *spritesheet;
     title = "Curseminer!";
-    spritesheet = "assets/spritesheets/tiles.png";
+    spritesheet = "assets/spritesheets/tiles.gif";
 
     const char *nogui_string = "-nogui";
     const char *tui_string = "-tui";

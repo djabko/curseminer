@@ -1,12 +1,12 @@
 CC=gcc
 CF_DEBUG=-Wall -g -DDEBUG
 CF_OPTIM=-Ofast
-CF_LIBS=-lncurses -lm -ldl -lpthread -lSDL2 -lSDL2_image
+CF_LIBS=-lncurses -lm -ldl -lpthread -lSDL2
 SDL2_CFLAGS := $(shell sdl2-config --cflags)
 SDL2_LIBS := $(shell sdl2-config --libs)
 
 SRCDIR=./src
-INCDIR=./include
+F_INC=-I./include -I./vendor
 OBJDIR=./obj
 LOGSDIR=./logs
 OPT_OBJDIR=./obj_opt
@@ -26,11 +26,11 @@ $(TARGET): $(OBJS)
 	$(CC) $(CF_DEBUG) $(SDL2_CFLAGS) $(CF_LIBS) -o $@ $^
 
 $(OBJDIR)/%.o: ./src/%.c | $(OBJDIR)
-	$(CC) $(CF_DEBUG) $(SDL2_CFLAGS) -I$(INCDIR) -c $< -o $@
+	$(CC) $(CF_DEBUG) $(SDL2_CFLAGS) $(F_INC) -c $< -o $@
 
 $(OBJDIR)/games/%.o: ./src/games/%.c | $(OBJDIR)
 	@mkdir -p $(dir $@)
-	$(CC) $(CF_DEBUG) -I$(INCDIR) -c $< -o $@
+	$(CC) $(CF_DEBUG) $(F_INC) -c $< -o $@
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
@@ -41,7 +41,7 @@ $(OPT_TARGET): $(OPT_OBJS)
 	$(CC) $(CF_OPTIM) $(SDL2_CFLAGS) $(CF_LIBS) -o $@ $^
 
 $(OPT_OBJDIR)/%.o: $(SRCDIR)/%.c | $(OPT_OBJDIR)
-	$(CC) $(CF_OPTIM) $(SDL2_CFLAGS) -I$(INCDIR) -c $< -o $@
+	$(CC) $(CF_OPTIM) $(SDL2_CFLAGS) $(F_INC) -c $< -o $@
 
 $(OPT_OBJDIR):
 	mkdir -p $(OPT_OBJDIR)
