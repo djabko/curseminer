@@ -1,13 +1,15 @@
-#include "stdio.h"
-#include "string.h"
+#include <stdio.h>
+#include <string.h>
 
-#include <globals.h>
-#include <scheduler.h>
-#include <files.h>
-#include <timer.h>
-#include <frontends/headless.h>
-#include <frontends/ncurses.h>
-#include <frontends/sdl2.h>
+#include "globals.h"
+#include "scheduler.h"
+#include "files.h"
+#include "timer.h"
+#include "games/curseminer.h"
+#include "games/other.h"
+#include "frontends/headless.h"
+#include "frontends/ncurses.h"
+#include "frontends/sdl2.h"
 
 #define MIN_ARGS 0
 #define UPDATE_RATE 120 // times per second
@@ -150,8 +152,19 @@ int main(int argc, const char** argv) {
         }
     }
 
+    GameContextCFG gcfg_curseminer = {
+        .skins_max = 32,
+        .entity_types_max = 32,
+        .scroll_threshold = 5,
+
+        .f_init = game_curseminer_init,
+        .f_update = game_curseminer_update,
+        .f_free = game_curseminer_free,
+    };
+
     init(frontend, title);
 
+    GLOBALS.game = game_init(&gcfg_curseminer);
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
 

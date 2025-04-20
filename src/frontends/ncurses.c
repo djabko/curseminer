@@ -837,32 +837,6 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     GLOBALS.tile_w = 1;
     GLOBALS.tile_h = 1;
 
-    GameContextCFG gcfg_curseminer = {
-        .skins_max = 32,
-        .entity_types_max = 32,
-        .scroll_threshold = 5,
-
-        .f_init = game_curseminer_init,
-        .f_update = game_curseminer_update,
-        .f_free = game_curseminer_free,
-    };
-
-    /*
-    GameContextCFG gcfg_other = {
-        .skins_max = 32,
-        .entity_types_max = 32,
-        .scroll_threshold = 5,
-
-        .f_init = game_other_init,
-        .f_update = game_other_update,
-        .f_free = game_other_free,
-    };
-    */
-
-    GLOBALS.game = game_init(&gcfg_curseminer);
-    assert_log (GLOBALS.game != NULL,
-            "ERROR: UI failed to initialize game...");
-
     g_widgetwin->active = 0;
 
     init_colors();

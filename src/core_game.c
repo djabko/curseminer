@@ -262,6 +262,9 @@ GameContext *game_init(GameContextCFG *cfg) {
 
     game->f_init(game, 0);
 
+    assert_log (game != NULL,
+            "ERROR: UI failed to initialize game...");
+
     return game;
 }
 

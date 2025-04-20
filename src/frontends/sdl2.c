@@ -8,8 +8,6 @@
 
 #include "globals.h"
 #include "core_game.h"
-#include "games/curseminer.h"
-#include "games/other.h"
 #include "frontend.h"
 #include "frontends/sdl2.h"
 #include "scheduler.h"
@@ -88,7 +86,7 @@ static void assert_SDL(bool condition, const char *msg) {
 }
 
 static file_format_t check_file_format(const char *path) {
-    bool exists = 0 == access(path, R_OK) != 0;
+    bool exists = 0 == access(path, R_OK);
 
     if (exists) {
         FILE *f = fopen(path, "rb");
@@ -97,9 +95,9 @@ static file_format_t check_file_format(const char *path) {
 
         fread(buf, 1, 4, f);
 
-        if      (0 == strcmp(buf, MAGIC_PNG )) return FILE_FORMAT_PNG;
-        else if (0 == strcmp(buf, MAGIC_GIF )) return FILE_FORMAT_GIF;
-        else if (0 == strcmp(buf, MAGIC_JPEG)) return FILE_FORMAT_JPEG;
+        if      (0 == memcmp(buf, MAGIC_PNG,  4)) return FILE_FORMAT_PNG;
+        else if (0 == memcmp(buf, MAGIC_GIF,  4)) return FILE_FORMAT_GIF;
+        else if (0 == memcmp(buf, MAGIC_JPEG, 4)) return FILE_FORMAT_JPEG;
     }
     
     return FILE_FORMAT_INVALID;
@@ -308,17 +306,6 @@ void draw_tile_sprite(EntityType *type, SDL_Rect *dst) {
     SDL_RenderCopy(g_renderer, frame, &src, dst);
 }
 
-static int job_animate(Task* task, Stack64* st) {
-    if (g_spritesheet->layers <= 1) return 0;
-
-    g_sprite_frame = (g_sprite_frame + 1) % (g_spritesheet->layers);
-
-    game_flush_dirty(g_game);
-    tk_sleep(task, g_spritesheet->delay);
-
-    return 0;
-}
-
 void flush_screen() {
     SDL_SetRenderTarget(g_renderer, NULL);
     SDL_RenderCopy(g_renderer, g_canvas, NULL, NULL);
@@ -465,22 +452,6 @@ static int handle_event_SDL2(void *userdata, SDL_Event *event) {
     return 0;
 }
 
-int job_poll(Task *task, Stack64 *st) {
-    SDL_Event ev;
-    SDL_PollEvent(&ev);
-
-    if (ev.type == SDL_QUIT)
-        scheduler_kill_all_tasks();
-
-    return 0;
-}
-
-static int job_loop(Task *task, Stack64 *st) {
-    draw_game();
-    tk_sleep(task, 1000 / REFRESH_RATE);
-    return 0;
-}
-
 static bool set_glyphset(const char *name) {
     int len = strlen(SPRITES_PATH) + strlen(name) + 1;
     char path[len];
@@ -508,29 +479,59 @@ static bool set_glyphset(const char *name) {
 
 
 
+/* Scheduler Jobs */
+static int job_animate(Task *task, Stack64 *st) {
+    if (g_spritesheet->layers <= 1) return 0;
+
+    g_sprite_frame = (g_sprite_frame + 1) % (g_spritesheet->layers);
+
+    game_flush_dirty(g_game);
+    tk_sleep(task, g_spritesheet->delay);
+
+    return 0;
+}
+
+int job_poll(Task *task, Stack64 *st) {
+    SDL_Event ev;
+    SDL_PollEvent(&ev);
+
+    if (ev.type == SDL_QUIT)
+        scheduler_kill_all_tasks();
+
+    return 0;
+}
+
+static int job_loop(Task *task, Stack64 *st) {
+    draw_game();
+    tk_sleep(task, 1000 / REFRESH_RATE);
+    return 0;
+}
+
+static int job_wait_for_game(Task *task, Stack64 *st) {
+    if (!GLOBALS.game) tk_sleep(task, 1000);
+
+    else {
+        g_game = GLOBALS.game;
+        schedule(GLOBALS.runqueue, 0, 0, job_loop, NULL);
+        schedule(GLOBALS.runqueue, 0, 0, job_poll, NULL);
+        schedule(GLOBALS.runqueue, 0, 0, job_animate, NULL);
+        tk_kill(task);
+    }
+
+    return 0;
+}
+
+
+
 /* External APIs */
 int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
     fr->f_set_glyphset = set_glyphset;
 
     // 1. Init SDL2
     int err = SDL_Init(SDL_INIT_VIDEO);
-
     assert_SDL(0 == err, "Failed to initialize SDL2\t");
 
-    // 2. Init game
-    recalculate_tile_size(g_tile_w);
-
-    GameContextCFG gcfg_curseminer = {
-        .skins_max = 32,
-        .entity_types_max = 32,
-        .scroll_threshold = 5,
-
-        .f_init = game_curseminer_init,
-        .f_update = game_curseminer_update,
-        .f_free = game_curseminer_free,
-    };
-
-    // 3. Init window
+    // 2. Init window
     SDL_DisplayMode display_mode;
     SDL_GetCurrentDisplayMode(0, &display_mode);
     g_window = SDL_CreateWindow(title,
@@ -539,7 +540,7 @@ int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
 
     assert_SDL(g_window, "Failed to create SDL2 window\t");
     
-    // 4. Init renderer
+    // 3. Init renderer
     int renderer_flags = SDL_RENDERER_ACCELERATED;
 
     g_renderer = SDL_CreateRenderer(g_window, -1, renderer_flags);
@@ -551,19 +552,12 @@ int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
 
     assert_SDL(g_canvas != NULL, "Failed to create SDL main canvas texture");
 
-    // 5. Init game, draw func, tasks and interrupts
+    // 4. Init draw func, tasks and interrupts
     draw_tile_f = draw_tile_rect;
-    g_game = game_init(&gcfg_curseminer);
-    GLOBALS.game = g_game;
-
-    assert_log(GLOBALS.game != NULL,
-            "ERROR: GUI failed to initialize game...");
 
     recalculate_tile_size(g_tile_w);
 
-    schedule(GLOBALS.runqueue, 0, 0, job_loop, NULL);
-    schedule(GLOBALS.runqueue, 0, 0, job_poll, NULL);
-    schedule(GLOBALS.runqueue, 0, 0, job_animate, NULL);
+    schedule(GLOBALS.runqueue, 0, 0, job_wait_for_game, NULL);
 
     frontend_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
     frontend_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
