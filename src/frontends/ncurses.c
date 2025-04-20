@@ -7,12 +7,13 @@
 #include <math.h>
 #include <string.h>
 
-#include "ncurses.h"
+#include <ncurses.h>
 
 #include "globals.h"
 #include "util.h"
 #include "stack64.h"
 #include "core_game.h"
+#include "frontend.h"
 #include "frontends/ncurses.h"
 #include "games/curseminer.h"
 #include "games/other.h"
@@ -752,10 +753,16 @@ static void handle_kup_ncurses(int signo) {
     }
 }
 
+static bool set_glyphset(const char *name) {
+    return false;
+}
+
 
 
 /* External APIs */
-int frontend_ncurses_ui_init(const char *title) {
+int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
+    fr->f_set_glyphset = set_glyphset;
+
     MENU_STACK = st_init(16);
 
     initscr();
@@ -873,13 +880,13 @@ int frontend_ncurses_ui_init(const char *title) {
     return 1;
 }
 
-void frontend_ncurses_ui_exit() {
+void frontend_ncurses_ui_exit(Frontend* fr) {
     window_mgr_free();
     endwin();
     free(MENU_STACK);
 }
 
-int frontend_ncurses_input_init() {
+int frontend_ncurses_input_init(Frontend* fr, const char*) {
     
     /* 1. Initialized data structures */
     init_keys_ncurses();
@@ -912,4 +919,4 @@ int frontend_ncurses_input_init() {
     return 1;
 }
 
-void frontend_ncurses_input_exit() {}
+void frontend_ncurses_input_exit(Frontend* fr) {}

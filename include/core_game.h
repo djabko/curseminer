@@ -55,7 +55,7 @@ typedef struct GameContext {
     World *world;
 
     int world_view_x, world_view_y, skins_c, skins_max, entity_types_c,
-        entity_types_max, scroll_threshold, glyphset_key;
+        entity_types_max, scroll_threshold;
 
     EntityType *entity_types;
     Skin *skins;

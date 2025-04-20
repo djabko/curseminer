@@ -177,7 +177,7 @@ void game_flush_dirty(GameContext *game) {
 }
 
 bool game_set_glyphset(const char* name) {
-    return false;
+    return frontend_set_glyphset(name);
 }
 
 void game_create_skin(GameContext *game, Skin *skin, int id,
@@ -245,7 +245,6 @@ GameContext *game_init(GameContextCFG *cfg) {
     game->f_update = cfg->f_update;
     game->f_free = cfg->f_free;
 
-    game->glyphset_key = 0;
     game->skins_c = 0;
     game->entity_types_c = 0;
     game->skins = calloc(game->skins_max, sizeof(Skin));

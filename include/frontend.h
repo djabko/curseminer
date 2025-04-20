@@ -89,6 +89,8 @@ typedef struct {
 
     int (*f_input_init)();
     void (*f_input_exit)();
+
+    bool (*f_set_glyphset)(const char*);
 } Frontend;
 
 typedef struct {
@@ -99,10 +101,16 @@ typedef struct {
     uint64_t data;
 } InputEvent;
 
+typedef int (*frontend_init_t)(Frontend*, const char*);
+typedef void (*frontend_exit_t)(Frontend*);
+
 bool frontend_pack_event(InputEvent*, uint8_t, uint8_t, uint8_t, uint8_t);
+bool frontend_set_glyphset(const char*);
+
+int frontend_register_ui(frontend_init_t, frontend_exit_t);
+int frontend_register_input(frontend_init_t, frontend_exit_t);
+
 int frontend_init(const char* title);
-bool frontend_register_ui(int(*f_init)(const char*), void(*f_exit)());
-bool frontend_register_input(int(*f_init)(const char*), void(*f_exit)());
 void frontend_exit();
 
 int frontend_register_event(event_t, event_ctx_t, void (*)(InputEvent*));

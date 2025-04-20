@@ -38,10 +38,10 @@ static void init(frontend_t frontend, const char *title) {
     assert_log(GLOBALS.runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    int (*fuii)(const char*);
-    void (*fuie)();
-    int (*fini)();
-    void (*fine)();
+    frontend_init_t fuii;
+    frontend_exit_t fuie;
+    frontend_init_t fini;
+    frontend_exit_t fine;
 
     if (frontend == FRONTEND_NCURSES) {
         fuii = frontend_ncurses_ui_init;

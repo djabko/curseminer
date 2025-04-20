@@ -4,7 +4,7 @@
 #include "scheduler.h"
 #include "frontend.h"
 
-static Frontend g_frontend;
+Frontend g_frontend;
 
 static void (*g_mapper_ctx_array[E_CTX_END][E_END])(InputEvent*);
 
@@ -33,7 +33,7 @@ int frontend_register_event(
     return 0;
 }
 
-bool frontend_register_ui(int(*f_init)(const char*), void(*f_exit)()) {
+int frontend_register_ui(frontend_init_t f_init, frontend_exit_t f_exit) {
     if (!f_init || !f_exit) return false;
 
     g_frontend.f_ui_init = f_init;
@@ -42,7 +42,11 @@ bool frontend_register_ui(int(*f_init)(const char*), void(*f_exit)()) {
     return true;
 }
 
-bool frontend_register_input(int(*f_init)(const char*), void(*f_exit)()) {
+bool frontend_set_glyphset(const char *name) {
+    return g_frontend.f_set_glyphset(name);
+}
+
+int frontend_register_input(frontend_init_t f_init, frontend_exit_t f_exit) {
     if (!f_init || !f_exit) return false;
 
     g_frontend.f_input_init = f_init;
@@ -63,13 +67,13 @@ int frontend_init(const char *title) {
         }
     }
 
-    g_frontend.f_ui_init(title);
-    g_frontend.f_input_init();
+    g_frontend.f_ui_init(&g_frontend, title);
+    g_frontend.f_input_init(&g_frontend);
 
     return true;
 }
 
 void frontend_exit() {
-    g_frontend.f_ui_exit();
-    g_frontend.f_input_exit();
+    g_frontend.f_ui_exit(&g_frontend);
+    g_frontend.f_input_exit(&g_frontend);
 }

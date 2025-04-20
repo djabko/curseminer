@@ -1,11 +1,13 @@
 #ifndef FRONTEND_SDL2_HEADER
 #define FRONTEND_SDL2_HEADER
 
-int frontend_sdl2_ui_init(const char*);
-int frontend_sdl2_ui_loop();
-void frontend_sdl2_ui_exit();
+#define SPRITES_PATH "assets/spritesheets/"
 
-int frontend_sdl2_input_init();
-void frontend_sdl2_input_exit();
+int frontend_sdl2_ui_init(Frontend*, const char*);
+int frontend_sdl2_ui_loop(Frontend*);
+void frontend_sdl2_ui_exit(Frontend*);
+
+int frontend_sdl2_input_init(Frontend*, const char*);
+void frontend_sdl2_input_exit(Frontend*);
 
 #endif

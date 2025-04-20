@@ -271,7 +271,8 @@ static void player_path_find(Entity *player, int x, int y) {}
 int game_curseminer_init(GameContext *game, int) {
     g_game = game;
 
-    game_set_glyphset("tiles.gif");
+    game_set_glyphset("tiles_02.gif");
+    game_set_glyphset("tiles_00.png");
 
     int glyph = 0;
     int i = 0;
