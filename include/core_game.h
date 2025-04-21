@@ -103,7 +103,7 @@ EntityType *game_cache_getxy(GameContext*, int i);
 int game_world_setxy(GameContext*, int x, int y, entity_id_t);
 int game_cache_setxy(GameContext*, int i, entity_id_t);
 
-bool game_set_glyphset(const char*);
+bool game_set_glyphset(GameContext*, const char*);
 void game_create_skin(GameContext*, Skin*, int id, color_t, color_t, color_t,
         color_t, color_t, color_t);
 EntityType *game_create_entity_type(GameContext*, Skin*);

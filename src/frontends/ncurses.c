@@ -19,9 +19,17 @@
 #include "games/other.h"
 
 #define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
-#define MAX_TITLE 32
+#define NAME_MAX 64
 #define GLYPH_MAX 256
 #define REFRESH_RATE 120
+
+// TODO: Read from file or define via function
+#define GLYPHSET_00_NAME    "tiles_00"
+#define GLYPHSET_01_NAME    "tiles_01"
+#define GLYPHSET_02_NAME    "tiles_02"
+#define GLYPHSET_00         " *o&f.DM()-=r'"
+#define GLYPHSET_01         " 123456789abcd"
+#define GLYPHSET_02         " @~#^*+-0=xryz"
 
 /* Drawing */
 
@@ -37,7 +45,7 @@ typedef struct window_t {
     void (*draw_func)(struct window_t*);
 
     int x, y, w, h;
-    char title[MAX_TITLE];
+    char title[NAME_MAX];
     int active, hidden;
 } window_t;
 
@@ -47,24 +55,17 @@ typedef struct {
     window_t *mempool;
 } windowmgr_t;
 
-int LINES = 0;
-int COLS = 0;
-
+int LINES;
+int COLS;
 static window_t *g_widgetwin;
-static windowmgr_t WINDOW_MGR = {};
+static windowmgr_t WINDOW_MGR;
 static NoiseLattice *LATTICE1D;
-
-static Stack64* MENU_STACK = NULL;
-
-static milliseconds_t TIME_MSEC = 0;
-
+static Stack64* MENU_STACK;
+static milliseconds_t TIME_MSEC;
 static bool g_glyph_init[GLYPH_MAX];
-static char g_glyph_charset_0[GLYPH_MAX];
-static char g_glyph_charset_1[GLYPH_MAX];
-static char g_glyph_charset_2[GLYPH_MAX];
-static char *g_glyph_charset = g_glyph_charset_1;
+static char *g_glyph_charset;
+HashTable *g_glyph_charsets;
 
-// TODO glyph management system?
 Skin g_win_skin_0 =     {.glyph = GLYPH_MAX-1, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=215, .fg_g=215, .fg_b=50};
 Skin g_win_skin_1 =     {.glyph = GLYPH_MAX-2, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=80, .fg_g=240, .fg_b=220};
 Skin g_win_skin_2 =     {.glyph = GLYPH_MAX-3, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=120, .fg_g=6, .fg_b=2};
@@ -78,6 +79,14 @@ static inline char sign_of_int(int x) {
 
 
 /* Utility Functions */
+#define assert_ncurses(condition, ...)      \
+    if (!(condition)) {                     \
+        _log_debug("ERROR: ");              \
+        log_debug(__VA_ARGS__);             \
+        frontend_ncurses_exit(-1);          \
+    }
+
+
 int COLORS_COUNT = 0;
 int new_glyph(Skin *skin) {
     int bg = COLORS_COUNT++;
@@ -459,19 +468,21 @@ static void draw_main_menu() {
 }
 
 /* Init Functions */
-int init_colors() {
+static int init_colors() {
     for (int i = 0; i < GLYPH_MAX; i++) {
         g_glyph_init[i] = false;
     }
 
-    const char *s0 = " 123456789abcd";
-    const char *s1 = " *o&f.DM()-=r'";
-    const char *s2 = " @~#^*+0......";
-    for (int i = 0; i != strlen(s0); i++) g_glyph_charset_0[i] = s0[i];
-    for (int i = 0; i != strlen(s1); i++) g_glyph_charset_1[i] = s1[i];
-    for (int i = 0; i != strlen(s2); i++) g_glyph_charset_2[i] = s2[i];
-
     return 0;
+}
+
+static int init_glyphsets() {
+    g_glyph_charsets = ht_init(1);
+
+    log_debug("Inserting %s with key=%lu", GLYPHSET_00_NAME, ht_hash(GLYPHSET_00_NAME));
+    ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_00_NAME), (uint64_t) GLYPHSET_00);
+    ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_01_NAME), (uint64_t) GLYPHSET_01);
+    ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_02_NAME), (uint64_t) GLYPHSET_02);
 }
 
 int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, int glyph) {
@@ -487,7 +498,7 @@ int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int
     window->glyph = glyph;
     window->hidden = 0;
     window->active = 1;
-    strncpy(window->title, title, MAX_TITLE);
+    strncpy(window->title, title, NAME_MAX);
 
     return NULL < (void*) window->win;
 }
@@ -526,7 +537,14 @@ window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w
     return win;
 }
 
-static void window_mgr_free() {
+void window_mgr_redraw_visible() {
+    qu_foreach(WINDOW_MGR.window_qu, window_t*, w) {
+        if (w->active && !w->hidden)
+            box_win(w);
+    }
+}
+
+void window_mgr_free() {
     qu_foreach(WINDOW_MGR.window_qu, window_t*, win) {
         free_window(win);
     }
@@ -534,6 +552,12 @@ static void window_mgr_free() {
     free(WINDOW_MGR.window_qu);
     free(WINDOW_MGR.mempool);
     memset(&WINDOW_MGR, 0, sizeof(WINDOW_MGR));
+}
+
+void frontend_ncurses_exit() {
+    window_mgr_free();
+    endwin();
+    free(MENU_STACK);
 }
 
 
@@ -587,11 +611,13 @@ typedef struct {
 KeyDownState KEY_DOWN_STATES_ARRAY[KDS_MAX];
 KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
 
-#define NCURSES_KBMAP_MAX 256
+#define NCURSES_KBMAP_MAX 512
 #define NCURSES_MSMAP_MAX 2048
 
 static event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
 static InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
+static event_t g_ncurses_mapping_fn[ NCURSES_KBMAP_MAX ];
+
 static timer_t g_input_timer = 0;
 static Queue64 *g_queued_kdown = NULL;
 
@@ -604,6 +630,10 @@ static void init_keys_ncurses() {
 
     for (int c = 'a'; c <= 'z'; c++)
         g_ncurses_mapping_kb[c] = E_KB_A + c - 'a';
+
+    for (int i = 1; i <= 12; i++) {
+        g_ncurses_mapping_kb[KEY_F(i)] = E_KB_F1 + i - 1;
+    }
 
     g_ncurses_mapping_kb[ KEY_UP ] = E_KB_UP;
     g_ncurses_mapping_kb[ KEY_DOWN ] = E_KB_DOWN;
@@ -753,7 +783,50 @@ static void handle_kup_ncurses(int signo) {
     }
 }
 
+static int charset_normalize_name(char *dst, const char *src, char target) {
+    int len = strlen(src);
+    len = NAME_MAX < len ? NAME_MAX : len;
+    
+    int i = len - 1;
+    for (; 0 <= i; i--) {
+        if (src[i] == target) break;
+    }
+
+    strncpy(dst, src, i - 1);
+    dst[i] = '\0';
+
+    return i;
+}
+
 static bool set_glyphset(const char *name) {
+    char buf[NAME_MAX];
+    unsigned long key = ht_hash(name);
+    uint64_t result = ht_lookup(g_glyph_charsets, key);
+
+    if (result == -1)  {
+        log_debug("Failed to find charset: %s", name);
+        strncpy(buf, name, NAME_MAX);
+        charset_normalize_name(buf, name, '.');
+
+        name = buf;
+        key = ht_hash(name);
+        result = ht_lookup(g_glyph_charsets, key);
+    }
+
+    if (result != -1) {
+        g_glyph_charset = (const char*) result;
+
+        // Don't reset g_win_skin_2 or the others
+        for (int i = 0; i < GLYPH_MAX - 3; i++)
+            g_glyph_init[i] = false;
+
+        clear();
+        window_mgr_redraw_visible();
+
+        return true;
+    }
+
+    log_debug("Failed to find charset: %s", name);
     return false;
 }
 
@@ -806,7 +879,7 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", &g_win_skin_1);
     g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", &g_win_skin_2);
 
-    assert_log(gamewin && uiwin && invwin && g_widgetwin,
+    assert_ncurses(gamewin && uiwin && invwin && g_widgetwin,
             "Failed to initialize windows: game<%p> ui<%p> inv<%p> widget<%p>",
             gamewin, uiwin, invwin, g_widgetwin);
 
@@ -840,6 +913,7 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     g_widgetwin->active = 0;
 
     init_colors();
+    init_glyphsets();
 
     box_win(gamewin);
     box_win(uiwin);
@@ -855,9 +929,7 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
 }
 
 void frontend_ncurses_ui_exit(Frontend* fr) {
-    window_mgr_free();
-    endwin();
-    free(MENU_STACK);
+    frontend_ncurses_exit();
 }
 
 int frontend_ncurses_input_init(Frontend* fr, const char*) {
@@ -889,6 +961,9 @@ int frontend_ncurses_input_init(Frontend* fr, const char*) {
     int flags = fcntl(STDIN_FILENO, F_GETFL);
     fcntl(STDIN_FILENO, F_SETFL, flags | O_ASYNC);
     fcntl(STDIN_FILENO, F_SETOWN, getpid());
+
+
+    set_glyphset(GLYPHSET_00_NAME);
 
     return 1;
 }

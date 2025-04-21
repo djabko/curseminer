@@ -79,6 +79,18 @@ static void game_input_place_tile(InputEvent *ie) {
         qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
 }
 
+void game_input_set_glyphset_01(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_00.png");
+}
+
+void game_input_set_glyphset_02(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_01.png");
+}
+
+void game_input_set_glyphset_03(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_02.gif");
+}
+
 static void chaser_tick(Entity*);
 static void chaser_find_path(Entity *e, int x, int y);
 static void game_input_spawn_chaser(InputEvent *ie) {
@@ -271,8 +283,8 @@ static void player_path_find(Entity *player, int x, int y) {}
 int game_curseminer_init(GameContext *game, int) {
     g_game = game;
 
-    game_set_glyphset("tiles_02.gif");
-    game_set_glyphset("tiles_00.png");
+    game_set_glyphset(game, "tiles_02.gif");
+    game_set_glyphset(game, "tiles_00.png");
 
     int glyph = 0;
     int i = 0;
@@ -328,6 +340,9 @@ int game_curseminer_init(GameContext *game, int) {
     frontend_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
     frontend_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
     frontend_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
+    frontend_register_event(E_KB_F1, E_CTX_GAME, game_input_set_glyphset_01);
+    frontend_register_event(E_KB_F2, E_CTX_GAME, game_input_set_glyphset_02);
+    frontend_register_event(E_KB_F3, E_CTX_GAME, game_input_set_glyphset_03);
 
     GLOBALS.player = player;
 

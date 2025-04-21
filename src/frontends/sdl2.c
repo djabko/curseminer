@@ -423,6 +423,11 @@ static int handle_event_SDL2(void *userdata, SDL_Event *event) {
 
             frontend_dispatch_event(ctx, &ie);
 
+        } else if (SDLK_F1 <= sym && sym <= SDLK_F12) {
+            ie.id = E_KB_F1 + sym - SDLK_F1;
+
+            frontend_dispatch_event(ctx, &ie);
+
         } else if (sym == SDLK_RSHIFT || sym == SDLK_LSHIFT) {
             ie.mods = keydown ? E_MOD_0 : E_NOMOD;
         }
@@ -459,9 +464,8 @@ static bool set_glyphset(const char *name) {
     strcpy(path, SPRITES_PATH);
     strcat(path, name);
 
-    log_debug("Requesting '%s'", path);
     Spritesheet *ss = load_spritesheet_from_file(g_renderer, path);
-
+    
     if (ss == NULL) return false;
 
     if (g_spritesheet) {
@@ -472,6 +476,7 @@ static bool set_glyphset(const char *name) {
     }
 
     g_spritesheet = ss;
+    g_sprite_frame = 0;
     draw_tile_f = draw_tile_sprite;
 
     return true;

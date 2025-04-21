@@ -176,8 +176,14 @@ void game_flush_dirty(GameContext *game) {
     df->command = -1;
 }
 
-bool game_set_glyphset(const char* name) {
-    return frontend_set_glyphset(name);
+bool game_set_glyphset(GameContext *game, const char* name) {
+    bool res = frontend_set_glyphset(name);
+
+    flush_game_entity_cache(game);
+    flush_world_entity_cache(game);
+    game_flush_dirty(game);
+
+    return res;
 }
 
 void game_create_skin(GameContext *game, Skin *skin, int id,
