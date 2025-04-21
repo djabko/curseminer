@@ -402,6 +402,8 @@ static int handle_event_SDL2(void *userdata, SDL_Event *event) {
     bool mouseup = event->type == SDL_MOUSEBUTTONDOWN;
     bool mousedown = event->type == SDL_MOUSEBUTTONUP;
 
+    if ((keyup || keydown) && event->key.repeat) return 0;
+
     static InputEvent ie = {
             .id = E_NULL,
             .type = E_TYPE_KB,
@@ -498,7 +500,8 @@ static int job_animate(Task *task, Stack64 *st) {
 
 int job_poll(Task *task, Stack64 *st) {
     SDL_Event ev;
-    SDL_PollEvent(&ev);
+
+    while (SDL_PollEvent(&ev)) {}
 
     if (ev.type == SDL_QUIT)
         scheduler_kill_all_tasks();

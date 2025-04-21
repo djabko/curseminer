@@ -44,6 +44,7 @@ static bool g_player_moving_up = false;
 static bool g_player_moving_down = false;
 static bool g_player_moving_left = false;
 static bool g_player_moving_right = false;
+static bool g_player_moving_keyup = false;
 static bool g_player_crouching = false;
 
 static void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_kd_reset) {
@@ -51,7 +52,8 @@ static void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_k
         *on_kd_true = true;
         *on_kd_reset = false;
 
-    } else *on_kd_true = false;
+    } else if (ie->state == ES_UP)
+         *on_kd_true = false;
 
     g_player_crouching = ie->mods && E_MOD_CROUCHING;
 
@@ -192,6 +194,8 @@ static void be_move_one_f(Entity *e) {
 
 static void be_move_f(Entity *e) {
     e->moving = true;
+
+    if (e == GLOBALS.player) g_player_moving_changed = true;
 }
 
 static void be_stop_f(Entity *e) {
@@ -365,7 +369,7 @@ int game_curseminer_update() {
     byte_t bottomb = plr->y >= wvy + mxy - sth;
 
     if (leftb || topb || rightb || bottomb || g_player_moving_changed) {
-        
+
         // Check for screen scrolling
         if      (leftb)      game->world_view_x--;
         else if (rightb)     game->world_view_x++;
@@ -384,27 +388,31 @@ int game_curseminer_update() {
             bool left = g_player_moving_left;
             bool right = g_player_moving_right;
 
-            if (up || down || left || right) {
+            log_debug("Player state (%s): %d %d %d %d %d", player->moving ? "moving" : "stoppd",
+                    g_player_moving_changed, up, down, left, right);
 
-                if      (up && left)    entity_command(player, be_face_ul);
-                else if (up && right)   entity_command(player, be_face_ur);
-                else if (down && left)  entity_command(player, be_face_dl);
-                else if (down && right) entity_command(player, be_face_dr);
-                else if (up)            entity_command(player, be_face_up);
-                else if (down)          entity_command(player, be_face_down);
-                else if (left)          entity_command(player, be_face_left);
-                else if (right)         entity_command(player, be_face_right);
+            if (up || down || left || right) {
+                behaviour_t be;
+
+                if      (up && left)    be = be_face_ul;
+                else if (up && right)   be = be_face_ur;
+                else if (down && left)  be = be_face_dl;
+                else if (down && right) be = be_face_dr;
+                else if (up)            be = be_face_up;
+                else if (down)          be = be_face_down;
+                else if (left)          be = be_face_left;
+                else if (right)         be = be_face_right;
+
+                entity_command(player, be);
 
                 if (!player->moving) {
-
                     if (g_player_crouching)
                         entity_command(player, be_move_one);
                     else 
                         entity_command(player, be_move);
                 }
 
-
-            } else if (player->moving)
+            } else if (player->moving || g_player_moving_keyup)
                 entity_command(player, be_stop);
 
             g_player_moving_changed = false;
