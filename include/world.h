@@ -9,9 +9,18 @@
 typedef struct EntityType EntityType;
 typedef struct EntityController EntityController;
 
-// TODO: move to entity.h
+typedef struct Skin {
+    uint16_t glyph, rotation;
+    uint8_t offset_x, offset_y;
+    bool flip_x, flip_y;
+
+    uint8_t bg_r, bg_g, bg_b, bg_a,
+            fg_r, fg_g, fg_b, fg_a;
+} Skin;
+
 typedef struct Entity {
     EntityType* type;
+    Skin skin;
     EntityController* controller;
     milliseconds_t next_tick;
     int id, x, y, vx, vy, speed, health, facing, inventory_index;

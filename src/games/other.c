@@ -49,6 +49,8 @@ static void tick_1(Entity* e) {
     }
     */
 
+    e->skin.rotation += 20;
+
     entity_update_position(g_game, e);
 }
 

@@ -124,10 +124,10 @@ static void game_input_break_tile_mouse(InputEvent *ie) {
 
         if (world_from_mouse_xy(ie, &x, &y) != 0) return;
 
-        EntityType *id = game_world_getxy(g_game, x, y);
+        EntityType *tid = game_world_getxy_type(g_game, x, y);
         int d = man_dist(GLOBALS.player->x, GLOBALS.player->y, x, y);
 
-        bool is_tile_exists = id != E_TYPE_NULL;
+        bool is_tile_exists = tid != E_TYPE_NULL;
         bool is_player_close = d < TILE_BREAK_DISTANCE;
 
         if (is_tile_exists && is_player_close)
@@ -204,34 +204,42 @@ static void be_stop_f(Entity *e) {
 
 static void be_face_up_f (Entity *e) {
     e->facing = ENTITY_FACING_UP;
+    e->skin.rotation = 0;
 }
 
 static void be_face_down_f (Entity *e) {
     e->facing = ENTITY_FACING_DOWN;
+    e->skin.rotation = 180;
 }
 
 static void be_face_left_f (Entity *e) {
     e->facing = ENTITY_FACING_LEFT;
+    e->skin.rotation = 270;
 }
 
 static void be_face_right_f (Entity *e) {
     e->facing = ENTITY_FACING_RIGHT;
+    e->skin.rotation = 90;
 }
 
 static void be_face_ul_f (Entity *e) {
     e->facing = ENTITY_FACING_UL;
+    e->skin.rotation = 45;
 }
 
 static void be_face_ur_f (Entity *e) {
     e->facing = ENTITY_FACING_UR;
+    e->skin.rotation = 270 + 45;
 }
 
 static void be_face_dl_f (Entity *e) {
     e->facing = ENTITY_FACING_DL;
+    e->skin.rotation = 180 + 45;
 }
 
 static void be_face_dr_f (Entity *e) {
     e->facing = ENTITY_FACING_DR;
+    e->skin.rotation = 90 + 45;
 }
 
 /* Defines default entity action for each tick

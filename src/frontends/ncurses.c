@@ -290,7 +290,7 @@ static void draw_keyboard_state(WINDOW* scr, int x, int y) {
 
 //int SKIPPED_UPDATES = 0;
 static void draw_gamewin(window_t *gamewin) {
-    EntityType* type;
+    Skin* skin;
 
     DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
 
@@ -317,11 +317,11 @@ static void draw_gamewin(window_t *gamewin) {
                         int x = index % maxx;
                         int y = index / maxx;
 
-                        type = game_world_getxy(GLOBALS.game, x, y);
+                        skin = game_world_getxy(GLOBALS.game, x, y);
 
-                        int glyph = type->default_skin->glyph;
+                        int glyph = skin->glyph;
 
-                        if (!g_glyph_init[glyph]) new_glyph(type->default_skin);
+                        if (!g_glyph_init[glyph]) new_glyph(skin);
 
                         wattron(gamewin->win, COLOR_PAIR(glyph));
                         mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
@@ -337,11 +337,11 @@ static void draw_gamewin(window_t *gamewin) {
         for (int y=0; y < gamewin->h; y++) {
             for (int x=0; x < gamewin->w; x++) {
 
-                type = game_world_getxy(GLOBALS.game, x, y);
+                skin = game_world_getxy(GLOBALS.game, x, y);
 
-                int glyph = type->default_skin->glyph;
+                int glyph = skin->glyph;
 
-                if (!g_glyph_init[glyph]) new_glyph(type->default_skin);
+                if (!g_glyph_init[glyph]) new_glyph(skin);
 
                 wattron(gamewin->win, COLOR_PAIR(glyph));
                 mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
@@ -370,7 +370,7 @@ static void draw_uiwin(window_t *uiwin) {
             abs(GLOBALS.player->vx)
             );
 
-    EntityType* entity = game_world_getxy(GLOBALS.game, 1, 1);
+    EntityType* entity = game_world_getxy_type(GLOBALS.game, 1, 1);
     mvwprintw(uiwin->win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
     mvwprintw(uiwin->win, (TIME_MSEC/100)%uiwin->h, uiwin->w/2, "!"); // draw splash icon

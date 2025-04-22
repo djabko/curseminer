@@ -53,7 +53,7 @@ static int g_tile_maxx;
 static int g_tile_maxy;
 static int g_sprite_size = 32;
 static int g_sprite_offset = 0;
-static void (*draw_tile_f)(EntityType*, SDL_Rect*);
+static void (*draw_tile_f)(Skin*, SDL_Rect*);
 
 typedef struct Spritesheet {
     const char name[NAME_MAX];
@@ -274,22 +274,18 @@ int select_sprite(SDL_Rect *rect, int row, int col) {
     return 0;
 }
 
-void draw_tile_rect(EntityType *type, SDL_Rect *rect) {
-    Skin *skin = type->default_skin;
-
+void draw_tile_rect(Skin *skin, SDL_Rect *rect) {
     SDL_SetRenderDrawColor(g_renderer, skin->fg_r, skin->fg_g, skin->fg_b, 0xff);
 
     SDL_RenderFillRect(g_renderer, rect);
 }
 
 static int g_sprite_frame = 0;
-void draw_tile_sprite(EntityType *type, SDL_Rect *dst) {
-    Skin *skin = type->default_skin;
-
-    if (skin->glyph < 1) return draw_tile_rect(type, dst);
+void draw_tile_sprite(Skin *skin, SDL_Rect *dst) {
+    if (skin->glyph < 1) return draw_tile_rect(skin, dst);
 
     // Fill background
-    draw_tile_rect(g_game->entity_types, dst);
+    draw_tile_rect(g_game->entity_types->default_skin, dst);
 
     // TODO: Would be faster to just pregenerate 1D textures
     int idx = skin->glyph - 1;
@@ -299,8 +295,12 @@ void draw_tile_sprite(EntityType *type, SDL_Rect *dst) {
     SDL_Rect src;
     select_sprite(&src, row, col);
 
+    SDL_RendererFlip flip = SDL_FLIP_NONE;
+    flip = skin->flip_x ? flip | SDL_FLIP_HORIZONTAL : flip;
+    flip = skin->flip_y ? flip | SDL_FLIP_VERTICAL   : flip;
+
     SDL_Texture *frame = g_spritesheet->frames[ g_sprite_frame ];
-    SDL_RenderCopy(g_renderer, frame, &src, dst);
+    SDL_RenderCopyEx(g_renderer, frame, &src, dst, (double) skin->rotation, NULL, flip);
 }
 
 void flush_screen() {
@@ -313,7 +313,7 @@ void draw_game() {
     SDL_SetRenderTarget(g_renderer, g_canvas);
 
     SDL_Rect rect = {.x = 0, .y = 0, .w = g_tile_w, .h = g_tile_h};
-    EntityType* type;
+    Skin* skin;
     DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
 
     // No tiles to draw
@@ -339,13 +339,13 @@ void draw_game() {
                         int x = index % maxx;
                         int y = index / maxx;
 
-                        type = game_world_getxy(GLOBALS.game, x, y);
+                        skin = game_world_getxy(GLOBALS.game, x, y);
                         game_set_dirty(GLOBALS.game, x, y, 0);
 
                         rect.x = x * g_tile_w;
                         rect.y = y * g_tile_h;
 
-                        draw_tile_f(type, &rect);
+                        draw_tile_f(skin, &rect);
                     }
                 }
             }
@@ -362,10 +362,10 @@ void draw_game() {
             for (int x = 0; x < g_tile_maxx; x++) {
                 rect.x = x * g_tile_w;
 
-                type = game_world_getxy(GLOBALS.game, x, y);
+                skin = game_world_getxy(GLOBALS.game, x, y);
 
                 game_set_dirty(GLOBALS.game, x, y, 0);
-                draw_tile_f(type, &rect);
+                draw_tile_f(skin, &rect);
             }
         }
     }
