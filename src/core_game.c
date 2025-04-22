@@ -67,8 +67,8 @@ void flush_world_entity_cache(GameContext *game) {
     DirtyFlags *df = game->cache_dirty_flags;
     size_t cache_size = df->groups_available * df->stride;
 
-    for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
-        for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
+    for (int y = 0; y < game->viewport_h; y++) {
+        for (int x = 0; x < game->viewport_w; x++) {
 
             int _x = x + game->world_view_x;
             int _y = y + game->world_view_y;
@@ -108,17 +108,16 @@ static void game_resize_dirty_flags(GameContext *game, size_t tiles_on_screen) {
 
     DirtyFlags *df = game->cache_dirty_flags;
 
-    uint64_t groups = (tiles_on_screen + s - 1) / s;
+    uint64_t groups = (tiles_on_screen) / s;
     size_t alloc_size = sizeof(DirtyFlags) + groups + s * groups;
+    tiles_on_screen = groups * s;
 
     df = realloc(df, alloc_size);
     memset(df, 0, alloc_size);
 
-    byte_t *ptr = (byte_t*) df;
-    df->groups = (byte_t*) (ptr + s);
-    ptr += s;
-
-    df->flags = (byte_t*) (ptr + s * groups);
+    byte_t *ptr = (byte_t*) df + s;
+    df->groups = (byte_t*) (ptr);
+    df->flags = (byte_t*) (ptr + groups);
     df->stride = s;
     df->groups_available = groups;
     df->command = 0;
@@ -131,25 +130,27 @@ bool game_resize_viewport(GameContext *game, int width, int height) {
 
     if (!game) return false;
 
-    size_t tiles_on_screen = width * height;
-    tiles_on_screen = s * ((tiles_on_screen + s - 1) / s);
-    DirtyFlags *df = game->cache_dirty_flags;
-
-    if (df && tiles_on_screen <= df->groups_available * s) return false;
-
-    log_debug("CoreGame: Allocated caches for %d tiles (%dx%d)",
-            tiles_on_screen, GLOBALS.view_port_maxx, GLOBALS.view_port_maxy);
-
     game->viewport_w = width;
     game->viewport_h = height;
 
-    game->cache_world = realloc(game->cache_world, tiles_on_screen);
-    game->cache_entity = realloc(game->cache_entity, tiles_on_screen);
-    game_resize_dirty_flags(game, tiles_on_screen);
+    size_t tiles_on_screen = width * height;
+    uint64_t groups = tiles_on_screen / s;
+    groups = s * ((groups + s) / s);
 
-    if (tiles_on_screen >= GLOBALS.view_port_maxx * GLOBALS.view_port_maxy)
-        flush_world_entity_cache(game);
+    tiles_on_screen = s * groups;
+    DirtyFlags *df = game->cache_dirty_flags;
 
+    if (!df || s * df->groups_available < tiles_on_screen) {
+
+        log_debug("CoreGame: Allocating caches for %d tiles (%dx%d)",
+                tiles_on_screen, width, height);
+
+        game->cache_world = realloc(game->cache_world, tiles_on_screen);
+        game->cache_entity = realloc(game->cache_entity, tiles_on_screen);
+        game_resize_dirty_flags(game, tiles_on_screen);
+    }
+
+    flush_world_entity_cache(game);
     flush_game_entity_cache(game);
 
     return true;
@@ -280,7 +281,7 @@ GameContext *game_init(GameContextCFG *cfg) {
 
     entity_init_default_controller();
 
-    game_resize_viewport(game, 64, 64);
+    game_resize_viewport(game, GLOBALS.view_port_maxx, GLOBALS.view_port_maxy);
     game->f_init(game, 0);
 
     return game;
