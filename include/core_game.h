@@ -29,7 +29,7 @@ typedef enum {
 
 typedef struct DirtyFlags {
     byte_t *groups, *flags;
-    size_t stride, groups_used;
+    size_t stride;
     int64_t command, groups_available, extra2, extra3;
 } DirtyFlags;
 
@@ -55,7 +55,7 @@ typedef struct GameContext {
     World *world;
 
     int world_view_x, world_view_y, skins_c, skins_max, entity_types_c,
-        entity_types_max, scroll_threshold;
+        entity_types_max, scroll_threshold, viewport_w, viewport_h;
 
     EntityType *entity_types;
     Skin *skins;
@@ -90,7 +90,7 @@ void game_set_dirty(GameContext*, int, int, int);
 void game_flush_dirty(GameContext*);
 void flush_game_entity_cache(GameContext*);
 void flush_world_entity_cache(GameContext*);
-bool game_resize_caches(GameContext*);
+bool game_resize_viewport(GameContext*, int w, int h);
 
 
 /* Game Interface */

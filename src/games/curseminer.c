@@ -81,15 +81,15 @@ static void game_input_place_tile(InputEvent *ie) {
         qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
 }
 
-void game_input_set_glyphset_01(InputEvent *ie) {
+static void game_input_set_glyphset_01(InputEvent *ie) {
     if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_00.png");
 }
 
-void game_input_set_glyphset_02(InputEvent *ie) {
+static void game_input_set_glyphset_02(InputEvent *ie) {
     if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_01.png");
 }
 
-void game_input_set_glyphset_03(InputEvent *ie) {
+static void game_input_set_glyphset_03(InputEvent *ie) {
     if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_02.gif");
 }
 
@@ -387,9 +387,6 @@ int game_curseminer_update() {
             bool down = g_player_moving_down;
             bool left = g_player_moving_left;
             bool right = g_player_moving_right;
-
-            log_debug("Player state (%s): %d %d %d %d %d", player->moving ? "moving" : "stoppd",
-                    g_player_moving_changed, up, down, left, right);
 
             if (up || down || left || right) {
                 behaviour_t be;

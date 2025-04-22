@@ -238,18 +238,15 @@ static void recalculate_tile_size(int size) {
     GLOBALS.tile_w = g_tile_w;
     GLOBALS.tile_h = g_tile_h;
 
-    // TODO: rename group_segments to groups
     if (g_game) {
-        size_t tiles = g_tile_maxx * g_tile_maxy;
-        DirtyFlags *df = g_game->cache_dirty_flags;
-
-        if (df->groups_available < tiles)
-            game_resize_caches(g_game);
-
-        flush_game_entity_cache(g_game);
-        flush_world_entity_cache(g_game);
+        game_resize_viewport(g_game, g_tile_maxx, g_tile_maxy);
         game_flush_dirty(g_game);
     }
+}
+
+static void intr_redraw_everything(InputEvent *ie) {
+    if (ie->state == ES_UP) 
+        recalculate_tile_size(g_tile_w);
 }
 
 static void intr_zoom_out(InputEvent *ie) {
@@ -488,7 +485,7 @@ static bool set_glyphset(const char *name) {
 
 /* Scheduler Jobs */
 static int job_animate(Task *task, Stack64 *st) {
-    if (g_spritesheet->layers <= 1) return 0;
+    if (!g_spritesheet || g_spritesheet->layers <= 1) return 0;
 
     g_sprite_frame = (g_sprite_frame + 1) % (g_spritesheet->layers);
 
@@ -567,6 +564,7 @@ int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
 
     schedule(GLOBALS.runqueue, 0, 0, job_wait_for_game, NULL);
 
+    frontend_register_event(E_KB_F5, E_CTX_GAME, intr_redraw_everything);
     frontend_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
     frontend_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
 

@@ -34,19 +34,19 @@ int world_from_mouse_xy(InputEvent *ie, int *world_x, int *world_y) {
 int game_on_screen(GameContext *game, int x, int y) {
     int minx = game->world_view_x;
     int miny = game->world_view_y;
-    int maxx = minx + GLOBALS.view_port_maxx;
-    int maxy = miny + GLOBALS.view_port_maxy;
+    int maxx = minx + game->viewport_w;
+    int maxy = miny + game->viewport_h;
 
     return minx <= x && miny <= y && x < maxx && y < maxy;
 }
 
 void game_cache_set(GameContext *game, byte_t *cache, int x, int y, byte_t tid) {
     game_set_dirty(game, x, y, 1);
-    cache[y * GLOBALS.view_port_maxx + x] = tid;
+    cache[y * game->viewport_w + x] = tid;
 }
 
 byte_t game_cache_get(byte_t *cache, int x, int y) {
-    return cache[y * GLOBALS.view_port_maxx + x];
+    return cache[y * GLOBALS.game->viewport_w + x];
 }
 
 void gamew_cache_set(GameContext *game, byte_t *cache, int x, int y, byte_t tid) {
@@ -64,6 +64,9 @@ byte_t gamew_cache_get(GameContext *game, byte_t *cache, int x, int y) {
 }
 
 void flush_world_entity_cache(GameContext *game) {
+    DirtyFlags *df = game->cache_dirty_flags;
+    size_t cache_size = df->groups_available * df->stride;
+
     for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
         for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
 
@@ -71,15 +74,16 @@ void flush_world_entity_cache(GameContext *game) {
             int _y = y + game->world_view_y;
             int tid = world_getxy(game->world, _x, _y);
 
-            game->cache_world[y * GLOBALS.view_port_maxx + x] = tid;
+            game->cache_world[y * game->viewport_w + x] = tid;
         }
     }
 }
 
 void flush_game_entity_cache(GameContext *game) {
-    for (int y = 0; y < GLOBALS.view_port_maxy; y++)
-        for (int x = 0; x < GLOBALS.view_port_maxx; x++)
-            game->cache_entity[y * GLOBALS.view_port_maxx + x] = 0;
+    DirtyFlags *df = game->cache_dirty_flags;
+    size_t cache_size = df->groups_available * df->stride;
+
+    memset(game->cache_entity, 0, cache_size);
 
     Heap *h = &game->world->entities->heap;
 
@@ -92,52 +96,61 @@ void flush_game_entity_cache(GameContext *game) {
             int x = e->x - game->world_view_x;
             int y = e->y - game->world_view_y;
 
-            game->cache_entity[y * GLOBALS.view_port_maxx + x] = e->type->id;
+            game->cache_entity[y * game->viewport_w + x] = e->type->id;
         }
 
         i++;
     }
 }
 
-void game_resize_dirty_flags(GameContext *game, size_t tiles_on_screen) {
+static void game_resize_dirty_flags(GameContext *game, size_t tiles_on_screen) {
     static size_t s = 64;
 
     DirtyFlags *df = game->cache_dirty_flags;
-    uint64_t groups = s;
 
-    while (groups < tiles_on_screen) groups += s;
-
+    uint64_t groups = (tiles_on_screen + s - 1) / s;
     size_t alloc_size = sizeof(DirtyFlags) + groups + s * groups;
 
     df = realloc(df, alloc_size);
     memset(df, 0, alloc_size);
 
     byte_t *ptr = (byte_t*) df;
-
     df->groups = (byte_t*) (ptr + s);
     ptr += s;
 
     df->flags = (byte_t*) (ptr + s * groups);
     df->stride = s;
     df->groups_available = groups;
-    df->groups_used = (tiles_on_screen + s - 1) / s;
     df->command = 0;
 
     game->cache_dirty_flags = df;
 }
 
-bool game_resize_caches(GameContext *game) {
-    static size_t s = 64;
+bool game_resize_viewport(GameContext *game, int width, int height) {
+    static const size_t s = 64;
 
-    size_t tiles_on_screen = GLOBALS.view_port_maxx * GLOBALS.view_port_maxy;
-    tiles_on_screen = ((tiles_on_screen + 1) * s) / s;
+    if (!game) return false;
+
+    size_t tiles_on_screen = width * height;
+    tiles_on_screen = s * ((tiles_on_screen + s - 1) / s);
+    DirtyFlags *df = game->cache_dirty_flags;
+
+    if (df && tiles_on_screen <= df->groups_available * s) return false;
+
+    log_debug("CoreGame: Allocated caches for %d tiles (%dx%d)",
+            tiles_on_screen, GLOBALS.view_port_maxx, GLOBALS.view_port_maxy);
+
+    game->viewport_w = width;
+    game->viewport_h = height;
 
     game->cache_world = realloc(game->cache_world, tiles_on_screen);
     game->cache_entity = realloc(game->cache_entity, tiles_on_screen);
     game_resize_dirty_flags(game, tiles_on_screen);
 
-    memset(game->cache_world, 0, tiles_on_screen);
-    memset(game->cache_entity, 0, tiles_on_screen);
+    if (tiles_on_screen >= GLOBALS.view_port_maxx * GLOBALS.view_port_maxy)
+        flush_world_entity_cache(game);
+
+    flush_game_entity_cache(game);
 
     return true;
 }
@@ -147,7 +160,7 @@ void game_set_dirty(GameContext *game, int x, int y, int v) {
 
     if (df->command == -1) return;
 
-    int maxx = GLOBALS.view_port_maxx;
+    int maxx = game->viewport_w;
     size_t offset = y * maxx + x;
     size_t s = df->stride;
 
@@ -163,7 +176,7 @@ void game_flush_dirty(GameContext *game) {
 
     byte_t* groups = df->groups;
     size_t s = df->stride;
-    size_t gu = df->groups_used;
+    size_t gu = (game->viewport_w * game->viewport_h) / df->stride;
 
     for (int i = 0; i < gu; i++) {
         groups[i] = 0;
@@ -240,6 +253,9 @@ int game_update(Task* task, Stack64* stack) {
 GameContext *game_init(GameContextCFG *cfg) {
     GameContext *game = calloc(sizeof(GameContext), 1);
 
+    assert_log (game != NULL,
+            "ERROR: UI failed to initialize game...");
+
     game->cache_entity = NULL;
     game->cache_world = NULL;
     game->cache_dirty_flags = NULL;
@@ -257,19 +273,15 @@ GameContext *game_init(GameContextCFG *cfg) {
     game->entity_types = calloc(game->entity_types_max, sizeof(EntityType));
     game->world_view_x = 0;
     game->world_view_y = 0;
+    game->viewport_w = 0;
+    game->viewport_h = 0;
 
     game->world = world_init(20, game->skins_c - 1, PAGE_SIZE * 64);
 
     entity_init_default_controller();
 
-    game_resize_caches(game);
-    flush_world_entity_cache(game);
-    game_flush_dirty(game);
-
+    game_resize_viewport(game, 64, 64);
     game->f_init(game, 0);
-
-    assert_log (game != NULL,
-            "ERROR: UI failed to initialize game...");
 
     return game;
 }
@@ -283,6 +295,8 @@ void game_free(GameContext *game) {
 }
 
 EntityType *game_world_getxy(GameContext *game, int x, int y) {
+    if (!game) return NULL;
+
     int id = game_cache_get(game->cache_entity, x, y);
     id = id > 0 ? id : game_cache_get(game->cache_world, x, y);
 
@@ -296,7 +310,7 @@ EntityType *game_cache_getxy(GameContext *game, int index) {
     int id = game->cache_entity[index];
     id = id > 0 ? id : game->cache_world[index];
 
-    assert_log(index < GLOBALS.view_port_maxx * GLOBALS.view_port_maxy,
+    assert_log(index < game->viewport_w * game->viewport_h,
             "attempting to access invalid game screen cache ID at index=%d", index);
 
     assert_log(id < 0 || game->entity_types_c <= id,
@@ -311,14 +325,14 @@ int game_world_setxy(GameContext *game, int x, int y, entity_id_t tid) {
     x -= game->world_view_x;
     y -= game->world_view_y;
 
-    if (0 < x && 0 < y && x < GLOBALS.view_port_maxx && y < GLOBALS.view_port_maxy)
+    if (0 < x && 0 < y && x < game->viewport_w && y < game->viewport_h)
         game_cache_set(game, game->cache_world, x, y, tid);
     
     return 0;
 }
 
 int game_cache_setxy(GameContext *game, int index, entity_id_t tid) {
-    if (index < GLOBALS.view_port_maxx * GLOBALS.view_port_maxy) return -1;
+    if (index < game->viewport_w * game->viewport_h) return -1;
 
     game->cache_entity[index] = tid;
 

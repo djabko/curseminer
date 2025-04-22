@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "games/other.h"
+#include "core_game.h"
 #include "globals.h"
 #include "util.h"
 #include "entity.h"
@@ -27,6 +28,18 @@ static void handler(InputEvent *ie) {
     e->controller = &g_controller_1;
 }
 
+static void game_input_set_glyphset_01(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_00.png");
+}
+
+static void game_input_set_glyphset_02(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_01.png");
+}
+
+static void game_input_set_glyphset_03(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_02.gif");
+}
+
 static void tick_0(Entity* e) {}
 
 static void tick_1(Entity* e) {
@@ -46,6 +59,8 @@ int game_other_init(GameContext *game, int) {
 
     int glyph = 0;
     int i = 0;
+
+    game_set_glyphset(game, "tiles_02.gif");
 
     game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 33, 33, 33);
     game_create_skin(game, g_skins + i++, glyph++, 0, 32, 64, 0, 192, 255);
@@ -70,6 +85,9 @@ int game_other_init(GameContext *game, int) {
     player->controller = &g_controller_0;
 
     frontend_register_event(E_MS_LMB, E_CTX_GAME, handler);
+    frontend_register_event(E_KB_F1, E_CTX_GAME, game_input_set_glyphset_01);
+    frontend_register_event(E_KB_F2, E_CTX_GAME, game_input_set_glyphset_02);
+    frontend_register_event(E_KB_F3, E_CTX_GAME, game_input_set_glyphset_03);
 
     GLOBALS.player = player;
 
@@ -83,6 +101,3 @@ int game_other_update() {
 int game_other_free() {
     return 0;
 }
-
-#undef g_skins_max
-#undef g_entity_type_max

@@ -152,7 +152,7 @@ int main(int argc, const char** argv) {
         }
     }
 
-    GameContextCFG gcfg_curseminer = {
+    GameContextCFG gcfg = {
         .skins_max = 32,
         .entity_types_max = 32,
         .scroll_threshold = 5,
@@ -160,11 +160,16 @@ int main(int argc, const char** argv) {
         .f_init = game_curseminer_init,
         .f_update = game_curseminer_update,
         .f_free = game_curseminer_free,
+        /*
+        .f_init = game_other_init,
+        .f_update = game_other_update,
+        .f_free = game_other_free,
+        */
     };
 
     init(frontend, title);
 
-    GLOBALS.game = game_init(&gcfg_curseminer);
+    GLOBALS.game = game_init(&gcfg);
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
 
