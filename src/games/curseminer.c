@@ -188,7 +188,7 @@ static void be_break_f(Entity *e) {
 
 static void be_move_one_f(Entity *e) {
     e->moving = true;
-    entity_update_position(g_game, e);
+    entity_advance_position(g_game, e);
     e->moving = false;
 }
 
@@ -287,7 +287,7 @@ static void chaser_find_path(Entity *e, int x, int y) {
 }
 
 static void player_tick(Entity *player) {
-    entity_update_position(g_game, player);
+    entity_advance_position(g_game, player);
 }
 
 static void player_path_find(Entity *player, int x, int y) {}
@@ -338,23 +338,23 @@ int game_curseminer_init(GameContext *game, int) {
     player->controller = &g_player_controller;
 
 
-    frontend_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
-    frontend_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
-    frontend_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
-    frontend_register_event(E_KB_RIGHT,E_CTX_GAME, game_input_move_right);
-    frontend_register_event(E_KB_W,    E_CTX_GAME, game_input_move_up);
-    frontend_register_event(E_KB_A,    E_CTX_GAME, game_input_move_left);
-    frontend_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
-    frontend_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
-    frontend_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
-    frontend_register_event(E_KB_E,    E_CTX_GAME, game_input_inventory_up);
-    frontend_register_event(E_KB_R,    E_CTX_GAME, game_input_inventory_down);
-    frontend_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
-    frontend_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
-    frontend_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
-    frontend_register_event(E_KB_F1, E_CTX_GAME, game_input_set_glyphset_01);
-    frontend_register_event(E_KB_F2, E_CTX_GAME, game_input_set_glyphset_02);
-    frontend_register_event(E_KB_F3, E_CTX_GAME, game_input_set_glyphset_03);
+    frontend_register_event(E_KB_UP,    E_CTX_GAME, game_input_move_up);
+    frontend_register_event(E_KB_DOWN,  E_CTX_GAME, game_input_move_down);
+    frontend_register_event(E_KB_LEFT,  E_CTX_GAME, game_input_move_left);
+    frontend_register_event(E_KB_RIGHT, E_CTX_GAME, game_input_move_right);
+    frontend_register_event(E_KB_W,     E_CTX_GAME, game_input_move_up);
+    frontend_register_event(E_KB_A,     E_CTX_GAME, game_input_move_left);
+    frontend_register_event(E_KB_S,     E_CTX_GAME, game_input_move_down);
+    frontend_register_event(E_KB_D,     E_CTX_GAME, game_input_move_right);
+    frontend_register_event(E_KB_C,     E_CTX_GAME, game_input_place_tile);
+    frontend_register_event(E_KB_E,     E_CTX_GAME, game_input_inventory_up);
+    frontend_register_event(E_KB_R,     E_CTX_GAME, game_input_inventory_down);
+    frontend_register_event(E_KB_Z,     E_CTX_GAME, game_input_break_tile);
+    frontend_register_event(E_MS_LMB,   E_CTX_GAME, game_input_spawn_chaser);
+    frontend_register_event(E_MS_RMB,   E_CTX_GAME, game_input_break_tile_mouse);
+    frontend_register_event(E_KB_F1,    E_CTX_GAME, game_input_set_glyphset_01);
+    frontend_register_event(E_KB_F2,    E_CTX_GAME, game_input_set_glyphset_02);
+    frontend_register_event(E_KB_F3,    E_CTX_GAME, game_input_set_glyphset_03);
 
     GLOBALS.player = player;
 
@@ -376,9 +376,8 @@ int game_curseminer_update() {
     byte_t rightb = plr->x >= wvx + mxx - sth;
     byte_t bottomb = plr->y >= wvy + mxy - sth;
 
-    if (leftb || topb || rightb || bottomb || g_player_moving_changed) {
-
-        // Check for screen scrolling
+    // Screen panning if player near edges
+    if (leftb || topb || rightb || bottomb) {
         if      (leftb)      game->world_view_x--;
         else if (rightb)     game->world_view_x++;
         if      (topb)       game->world_view_y--;
@@ -387,41 +386,40 @@ int game_curseminer_update() {
         flush_world_entity_cache(g_game);
         flush_game_entity_cache(g_game);
         game_flush_dirty(g_game);
+    }
 
-        // Check for player movement
-        if (g_player_moving_changed) {
-            Entity *player = GLOBALS.player;
-            bool up = g_player_moving_up;
-            bool down = g_player_moving_down;
-            bool left = g_player_moving_left;
-            bool right = g_player_moving_right;
+    if (g_player_moving_changed) {
+        Entity *player = GLOBALS.player;
+        bool up = g_player_moving_up;
+        bool down = g_player_moving_down;
+        bool left = g_player_moving_left;
+        bool right = g_player_moving_right;
 
-            if (up || down || left || right) {
-                behaviour_t be;
+        if (up || down || left || right) {
+            behaviour_t be;
 
-                if      (up && left)    be = be_face_ul;
-                else if (up && right)   be = be_face_ur;
-                else if (down && left)  be = be_face_dl;
-                else if (down && right) be = be_face_dr;
-                else if (up)            be = be_face_up;
-                else if (down)          be = be_face_down;
-                else if (left)          be = be_face_left;
-                else if (right)         be = be_face_right;
+            if      (up && left)    be = be_face_ul;
+            else if (up && right)   be = be_face_ur;
+            else if (down && left)  be = be_face_dl;
+            else if (down && right) be = be_face_dr;
+            else if (up)            be = be_face_up;
+            else if (down)          be = be_face_down;
+            else if (left)          be = be_face_left;
+            else if (right)         be = be_face_right;
 
-                entity_command(player, be);
+            entity_command(player, be);
 
-                if (!player->moving) {
-                    if (g_player_crouching)
-                        entity_command(player, be_move_one);
-                    else 
-                        entity_command(player, be_move);
-                }
+            if (!player->moving) {
+                if (g_player_crouching)
+                    entity_command(player, be_move_one);
+                else 
+                    entity_command(player, be_move);
+            }
 
-            } else if (player->moving || g_player_moving_keyup)
-                entity_command(player, be_stop);
+        } else if (player->moving || g_player_moving_keyup)
+            entity_command(player, be_stop);
 
-            g_player_moving_changed = false;
-        }
+        g_player_moving_changed = false;
     }
 
     return 0;

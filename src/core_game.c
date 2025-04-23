@@ -91,7 +91,7 @@ static void game_resize_dirty_flags(GameContext *game, size_t tiles_on_screen) {
     df->flags = (byte_t*) (ptr + groups);
     df->stride = s;
     df->groups_available = groups;
-    df->command = -1;
+    df->command = 0;
 
     game->cache_dirty_flags = df;
 }

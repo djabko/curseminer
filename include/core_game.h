@@ -17,7 +17,7 @@
 
 #define game_cache_set(game, cache, x, y, value)                    \
     do {                                                            \
-        (game_set_dirty) ((game), (x), (y), 1);                     \
+        game_set_dirty((game), (x), (y), (1));                      \
         (cache) [(y) * (game)->viewport_w + (x)] = (value);         \
     } while(0);
 

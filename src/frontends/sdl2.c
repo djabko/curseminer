@@ -282,10 +282,11 @@ void draw_tile_rect(Skin *skin, SDL_Rect *rect) {
 
 static int g_sprite_frame = 0;
 void draw_tile_sprite(Skin *skin, SDL_Rect *dst) {
-    if (skin->glyph < 1) return draw_tile_rect(skin, dst);
 
     // Fill background
     draw_tile_rect(g_game->entity_types->default_skin, dst);
+
+    if (skin->glyph < 1) return;
 
     // TODO: Would be faster to just pregenerate 1D textures
     int idx = skin->glyph - 1;
@@ -394,10 +395,11 @@ static void init_SDL2_keys() {
 }
 
 static int handle_event_SDL2(void *userdata, SDL_Event *event) {
-    bool keyup = event->type == SDL_KEYUP;
-    bool keydown = event->type == SDL_KEYDOWN;
-    bool mouseup = event->type == SDL_MOUSEBUTTONDOWN;
-    bool mousedown = event->type == SDL_MOUSEBUTTONUP;
+    bool keyup      = event->type == SDL_KEYUP;
+    bool keydown    = event->type == SDL_KEYDOWN;
+    bool mouseup    = event->type == SDL_MOUSEBUTTONDOWN;
+    bool mousedown  = event->type == SDL_MOUSEBUTTONUP;
+    bool mousehover = event->type == SDL_MOUSEMOTION;
 
     if ((keyup || keydown) && event->key.repeat) return 0;
 
@@ -431,32 +433,39 @@ static int handle_event_SDL2(void *userdata, SDL_Event *event) {
             ie.mods = keydown ? E_MOD_0 : E_NOMOD;
         }
 
-    } else if (mouseup || mousedown) {
+    } else if (mouseup || mousedown || mousehover) {
         uint8_t mbtn = event->button.button;
 
         ie.type = E_TYPE_MS;
         ie.state = mouseup ? ES_UP : ES_DOWN;
 
-        if (SDL_BUTTON_LEFT <= mbtn && mbtn <= SDL_BUTTON_RIGHT) {
-            int x, y;
+        if (mousehover)
+            ie.id = E_MS_HOVER;
 
-            SDL_GetMouseState(&x, &y);
-
-            x /= GLOBALS.tile_w;
-            y /= GLOBALS.tile_h;
-
-            frontend_pack_event(&ie, x, y, 0, 0);
-
+        else if (SDL_BUTTON_LEFT <= mbtn && mbtn <= SDL_BUTTON_RIGHT)
             ie.id = g_sdl2_mapping_ms[mbtn];
 
-            frontend_dispatch_event(ctx, &ie);
-        }
+        else return 0;
+
+        int x, y;
+        SDL_GetMouseState(&x, &y);
+
+        x /= GLOBALS.tile_w;
+        y /= GLOBALS.tile_h;
+
+        frontend_pack_event(&ie, x, y, 0, 0);
+        frontend_dispatch_event(ctx, &ie);
     }
 
     return 0;
 }
 
 static bool set_glyphset(const char *name) {
+    if (!name) {
+        draw_tile_f = draw_tile_rect;
+        return true;
+    }
+
     int len = strlen(SPRITES_PATH) + strlen(name) + 1;
     char path[len];
 

@@ -77,9 +77,20 @@ int entity_remove_behaviour(behaviour_t be) {
     return 0;
 }
 
-void entity_update_position(GameContext *game, Entity *e) {
-    if (!e->moving || e->moved) return;
+void entity_set_position(GameContext *game, Entity *e, int x, int y) {
+    Entity **cache = game->cache_entity;
 
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, 0);
+
+    e->x = x;
+    e->y = y;
+
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, e);
+}
+
+void entity_advance_position(GameContext *game, Entity *e) {
     Entity **cache = game->cache_entity;
 
     if (game_on_screen(game, e->x, e->y))
@@ -177,7 +188,8 @@ void entity_tick_abstract(GameContext *game, Entity* e) {
 
     entity_process_behaviours(e);
 
-    entity_update_position(game, e);
+    if (!e->moving || e->moved) return;
+        entity_advance_position(game, e);
 }
 
 int entity_create_controller(

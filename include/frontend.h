@@ -80,6 +80,7 @@ typedef enum {
     E_MS_LMB,
     E_MS_RMB,
     E_MS_MMB,
+    E_MS_HOVER,
     E_END,
 } event_t;
 
