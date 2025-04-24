@@ -60,7 +60,6 @@ void frontend_dispatch_event(event_ctx_t ctx, InputEvent *ie) {
 }
 
 int frontend_init(const char *title) {
-
     for (int i = E_CTX_0; i < E_CTX_END; i++) {
         for (int j = E_NULL; j < E_END; j++) {
             g_mapper_ctx_array[i][j] = handler_stub;

@@ -157,14 +157,14 @@ int main(int argc, const char** argv) {
         .entity_types_max = 32,
         .scroll_threshold = 5,
 
-        /*
         .f_init = game_curseminer_init,
         .f_update = game_curseminer_update,
         .f_free = game_curseminer_free,
-        */
+        /*
         .f_init = game_other_init,
         .f_update = game_other_update,
         .f_free = game_other_free,
+        */
     };
 
     init(frontend, title);
@@ -183,4 +183,3 @@ int main(int argc, const char** argv) {
 
     return exit_state();
 }
- 

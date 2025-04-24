@@ -76,6 +76,12 @@ static void game_input_move_right(InputEvent *ie) {
     game_input_player_state(ie, &g_player_moving_right, &g_player_moving_left);
 }
 
+static void game_input_refresh_screen(InputEvent *ie) {
+    if (ie->state == ES_DOWN) {
+        flush_world_entity_cache(g_game);
+    }
+}
+
 static void game_input_place_tile(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
@@ -286,9 +292,7 @@ static void chaser_find_path(Entity *e, int x, int y) {
     entity_command(e, be);
 }
 
-static void player_tick(Entity *player) {
-    entity_advance_position(g_game, player);
-}
+static void player_tick(Entity *player) {}
 
 static void player_path_find(Entity *player, int x, int y) {}
 
@@ -355,6 +359,7 @@ int game_curseminer_init(GameContext *game, int) {
     frontend_register_event(E_KB_F1,    E_CTX_GAME, game_input_set_glyphset_01);
     frontend_register_event(E_KB_F2,    E_CTX_GAME, game_input_set_glyphset_02);
     frontend_register_event(E_KB_F3,    E_CTX_GAME, game_input_set_glyphset_03);
+    frontend_register_event(E_KB_F5,    E_CTX_GAME, game_input_refresh_screen);
 
     GLOBALS.player = player;
 

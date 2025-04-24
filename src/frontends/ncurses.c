@@ -12,6 +12,7 @@
 #include "globals.h"
 #include "util.h"
 #include "stack64.h"
+#include "timer.h"
 #include "core_game.h"
 #include "frontend.h"
 #include "frontends/ncurses.h"
@@ -36,9 +37,9 @@
 typedef void (*voidfunc) ();
 
 typedef struct window_t {
-    WINDOW *win;
+    WINDOW *win, *wrapper;
     Queue64 *draw_qu;
-    int glyph;
+    Skin *skin;
     event_ctx_t input_context;
 
     struct window_t *parent;
@@ -48,6 +49,7 @@ typedef struct window_t {
     char title[NAME_MAX];
     int active, hidden;
 } window_t;
+window_t *g_gamewin;
 
 typedef struct {
     int count, max;
@@ -107,15 +109,26 @@ int new_glyph(Skin *skin) {
     return err;
 }
 
+int resolve_glyph(Skin *skin) {
+    if (!g_glyph_init[skin->glyph]) new_glyph(skin);
+
+    return skin->glyph;
+}
 
 /* Input Handler Functions*/
 static double WIDGET_WIN_C = 1;
 static double WIDGET_WIN_O = 1;
 static int WIDGET_WIN_R = 10;
 
+static void intr_redraw_everything(InputEvent *ie) {
+
+}
+
+void UI_toggle_widgetwin();
 static void ui_input_widget_toggle(InputEvent *ie) {
     if (ie->state == ES_UP) {
         
+        UI_toggle_widgetwin();
         GLOBALS.input_context =
             GLOBALS.input_context == E_CTX_GAME ? E_CTX_NOISE : E_CTX_GAME;
     }
@@ -208,16 +221,15 @@ static void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
         chtype l1, chtype l2, chtype l3, chtype l4,
         chtype c1, chtype c2, chtype c3, chtype c4) {
 
-    mvwaddch(stdscr, y1, x1, c1);
-    mvwaddch(stdscr, y1, x2, c2);
-    mvwaddch(stdscr, y2, x1, c3);
-    mvwaddch(stdscr, y2, x2, c4);
+    mvwaddch(win, y1, x1, c1);
+    mvwaddch(win, y1, x2, c2);
+    mvwaddch(win, y2, x1, c3);
+    mvwaddch(win, y2, x2, c4);
 
-    draw_line(win, l1, x1+1, y1, x2-1, y1);
-    draw_line(win, l2, x1+1, y2, x2-1, y2);
-    draw_line(win, l3, x1, y1+1, x1, y2-1);
-    draw_line(win, l4, x2, y1+1, x2, y2-1);
- 
+    draw_line(stdscr, l1, x1+1, y1, x2-1, y1);
+    draw_line(stdscr, l2, x1+1, y2, x2-1, y2);
+    draw_line(stdscr, l3, x1, y1+1, x1, y2-1);
+    draw_line(stdscr, l4, x2, y1+1, x2, y2-1);
 }
 
 static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
@@ -227,19 +239,27 @@ static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
 }
 
 static void box_win(window_t *window) {
-    wattron(stdscr, COLOR_PAIR(window->glyph));
+    box(window->wrapper, 0, 0);
+    wnoutrefresh(window->wrapper);
 
+    return;
+
+    /*
     mvwprintw(stdscr, window->y-2, window->x, window->title);
 
-    draw_square(stdscr,
-            window->x - 1, window->y - 1,
-            window->x + window->w,
-            window->y + window->h);
+    int x1 = window->x;
+    int y1 = window->y;
+    int x2 = window->x + window->w;
+    int y2 = window->y + window->h;
+
+    draw_square(stdscr, x1, y1, x2, y2);
 
     wattroff(stdscr, COLOR_PAIR(window->glyph));
+    */
 }
 
 static void box_win_clear(window_t * window) {
+    return;
     chtype spc = ' ';
 
     mvwprintw(stdscr, window->y-2, window->x, "                      ");
@@ -261,7 +281,7 @@ static void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double 
 }
 
 static void draw_rt_clock(WINDOW* win, int x, int y, int r) {
-    seconds_t time_sec = TIME_MSEC / 1000;
+    seconds_t time_sec = TIMER_NOW_MS / 1000;
 
     time_t sc = time_sec % 60;
     time_t mn = time_sec % (60*60);
@@ -296,7 +316,6 @@ static void draw_gamewin(window_t *gamewin) {
 
     // No tiles to draw
     if (df->command == 0) {
-        return;
 
     // Draw only dirty tiles
     } else if (df->command == 1) {
@@ -318,10 +337,7 @@ static void draw_gamewin(window_t *gamewin) {
                         int y = index / maxx;
 
                         skin = game_world_getxy(GLOBALS.game, x, y);
-
-                        int glyph = skin->glyph;
-
-                        if (!g_glyph_init[glyph]) new_glyph(skin);
+                        int glyph = resolve_glyph(skin);
 
                         wattron(gamewin->win, COLOR_PAIR(glyph));
                         mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
@@ -334,12 +350,11 @@ static void draw_gamewin(window_t *gamewin) {
 
     // Update all tiles
     } else if (df->command == -1) {
-        for (int y=0; y < gamewin->h; y++) {
-            for (int x=0; x < gamewin->w; x++) {
+        for (int y=1; y < gamewin->h; y++) {
+            for (int x=1; x < gamewin->w; x++) {
 
                 skin = game_world_getxy(GLOBALS.game, x, y);
-
-                int glyph = skin->glyph;
+                int glyph = resolve_glyph(skin);
 
                 if (!g_glyph_init[glyph]) new_glyph(skin);
 
@@ -353,13 +368,9 @@ static void draw_gamewin(window_t *gamewin) {
     }
 
     df->command = 0;
-
-    wnoutrefresh(gamewin->win);
 }
 
 static void draw_uiwin(window_t *uiwin) {
-    werase(uiwin->win);
-
     draw_rt_clock(uiwin->win, uiwin->h/2+2, uiwin->h/2, uiwin->h/2);
 
     mvwprintw(uiwin->win, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
@@ -378,15 +389,12 @@ static void draw_uiwin(window_t *uiwin) {
     mvwprintw(uiwin->win, 3, (int)COLS*.5, "Memory used: %lu/%lu", GLOBALS.game->world->chunk_mem_used, GLOBALS.game->world->chunk_mem_max);
 
     draw_keyboard_state(uiwin->win, (int)COLS*.5, 5);
-    wnoutrefresh(uiwin->win);
 }
 
 static void draw_invwin(window_t *invwin) {
     // TODO: check if inventory changed
 
     if (GLOBALS.player->inventory == NULL) return;
-
-    werase(invwin->win);
 
     for (int i = 0; i <= 10; i++) {
 
@@ -401,20 +409,16 @@ static void draw_invwin(window_t *invwin) {
         mvwprintw(stdscr, invwin->y, invwin->x+invwin->w+2, "index=%d",
                 GLOBALS.player->inventory_index);
     }
-
-    wnoutrefresh(invwin->win);
 }
 
 static void draw_widgetwin_rt_clock(window_t *widgetwin) {
     werase(widgetwin->win);
-
     draw_rt_clock(widgetwin->win, widgetwin->w/2, widgetwin->h/2, WIDGET_WIN_R);
-
-    wnoutrefresh(widgetwin->win);
 }
 
 static void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*, double)) {
     if (!widgetwin->active || widgetwin->hidden) return;
+
     werase(widgetwin->win);
 
     double c = WIDGET_WIN_C;
@@ -445,8 +449,6 @@ static void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseL
             mvwaddch(widgetwin->win, y, x, '+');
         }
     }
-
-    wnoutrefresh(widgetwin->win);
 }
 
 static void draw_widgetwin_value_noise(window_t *widgetwin) {
@@ -457,6 +459,7 @@ static void draw_widgetwin_perlin_noise(window_t *widgetwin) {
     draw_widgetwin_noise(widgetwin, perlin_noise_1D);
 }
 
+void frontend_ncurses_exit();
 static void draw_main_menu() {
     Queue64* qu = WINDOW_MGR.window_qu;
 
@@ -464,6 +467,9 @@ static void draw_main_menu() {
         if (!(win->active) || win->hidden) continue;
 
         win->draw_func(win);
+        box_win(win);
+        wnoutrefresh(win->wrapper);
+        wnoutrefresh(win->win);
     }
 }
 
@@ -479,14 +485,14 @@ static int init_colors() {
 static int init_glyphsets() {
     g_glyph_charsets = ht_init(1);
 
-    log_debug("Inserting %s with key=%lu", GLYPHSET_00_NAME, ht_hash(GLYPHSET_00_NAME));
     ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_00_NAME), (uint64_t) GLYPHSET_00);
     ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_01_NAME), (uint64_t) GLYPHSET_01);
     ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_02_NAME), (uint64_t) GLYPHSET_02);
 }
 
-int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, int glyph) {
-    window->win = newwin(h, w, y, x);
+int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, Skin *skin) {
+    window->wrapper = newwin(h + 2, w + 2, y - 2, x - 2);
+    window->win     = derwin(window->wrapper, h, w, 1, 1);
     window->parent = parent;
     window->draw_qu = qu_init(1);
     window->draw_func = (void (*)(window_t*)) (window->draw_qu);
@@ -495,10 +501,14 @@ int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int
     window->y = y;
     window->w = w;
     window->h = h;
-    window->glyph = glyph;
+    window->skin = skin;
     window->hidden = 0;
     window->active = 1;
     strncpy(window->title, title, NAME_MAX);
+
+    int glyph = resolve_glyph(window->skin);
+    wattron(window->win, COLOR_PAIR(glyph));
+    wattron(window->wrapper, COLOR_PAIR(glyph));
 
     return NULL < (void*) window->win;
 }
@@ -528,10 +538,8 @@ static int window_mgr_init(int size) {
 window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char* title, Skin *skin) {
     if (WINDOW_MGR.count >= WINDOW_MGR.max) return NULL;
 
-    if (!g_glyph_init[skin->glyph]) new_glyph(skin);
-
     window_t *win = &WINDOW_MGR.mempool[ WINDOW_MGR.count++ ];
-    init_window(win, parent, ectx, x, y, w, h, title, skin->glyph);
+    init_window(win, parent, ectx, x, y, w, h, title, skin);
     qu_enqueue(WINDOW_MGR.window_qu, (uint64_t) win);
 
     return win;
@@ -539,8 +547,9 @@ window_t *window_mgr_add(window_t *parent, event_ctx_t ectx, int x, int y, int w
 
 void window_mgr_redraw_visible() {
     qu_foreach(WINDOW_MGR.window_qu, window_t*, w) {
-        if (w->active && !w->hidden)
+        if (w->active && !w->hidden) {
             box_win(w);
+        }
     }
 }
 
@@ -561,21 +570,20 @@ void frontend_ncurses_exit() {
 }
 
 
-/* Public functions used by other components */
 void UI_show_window(window_t *win) {
     win->active = 1;
     if (win->parent) win->parent->active = 0;
 
     box_win(win);
+    wnoutrefresh(win->wrapper);
+    wnoutrefresh(win->win);
 }
 
 void UI_hide_window(window_t *win) {
-    box_win_clear(win);
-
     if (win->parent) win->parent->active = 1;
     win->active = 0;
 
-    box_win(win);
+    werase(win->win);
 }
 
 void UI_toggle_widgetwin() {
@@ -585,9 +593,10 @@ void UI_toggle_widgetwin() {
 
 int job_loop(Task *task, Stack64 *st) {
     if (st_peek(MENU_STACK) == -1) return -1;
-    voidfunc draw_func = (voidfunc) st_peek(MENU_STACK);
-    draw_func();
 
+    voidfunc draw_func = (voidfunc) st_peek(MENU_STACK);
+
+    draw_func();
     doupdate();
 
     tk_sleep(task, REFRESH_RATE / 1000);
@@ -820,7 +829,6 @@ static bool set_glyphset(const char *name) {
         for (int i = 0; i < GLYPH_MAX - 3; i++)
             g_glyph_init[i] = false;
 
-        clear();
         window_mgr_redraw_visible();
 
         return true;
@@ -878,6 +886,7 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     uiwin       = window_mgr_add(NULL, E_CTX_GAME, uwx, uwy, uww, uwh, "UI", &g_win_skin_1);
     invwin      = window_mgr_add(NULL, E_CTX_GAME, iwx, iwy, iww, iwh, "Inventory", &g_win_skin_1);
     g_widgetwin = window_mgr_add(gamewin, E_CTX_NOISE, gwx+2, gwy+2, gww, gwh, "Widget", &g_win_skin_2);
+    g_gamewin = gamewin;
 
     assert_ncurses(gamewin && uiwin && invwin && g_widgetwin,
             "Failed to initialize windows: game<%p> ui<%p> inv<%p> widget<%p>",
@@ -903,6 +912,8 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     frontend_register_event(E_KB_A, E_CTX_CLOCK, ui_input_clock_move);
     frontend_register_event(E_KB_D, E_CTX_CLOCK, ui_input_clock_move);
 
+    frontend_register_event(E_KB_F5, E_CTX_GAME, intr_redraw_everything);
+
     GLOBALS.view_port_x = gwx;
     GLOBALS.view_port_y = gwy;
     GLOBALS.view_port_maxx = gww;
@@ -918,8 +929,6 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     box_win(gamewin);
     box_win(uiwin);
     box_win(invwin);
-
-    wnoutrefresh(stdscr);
 
     schedule(GLOBALS.runqueue, 0, 0, job_loop, NULL);
 
@@ -961,7 +970,6 @@ int frontend_ncurses_input_init(Frontend* fr, const char*) {
     int flags = fcntl(STDIN_FILENO, F_GETFL);
     fcntl(STDIN_FILENO, F_SETFL, flags | O_ASYNC);
     fcntl(STDIN_FILENO, F_SETOWN, getpid());
-
 
     set_glyphset(GLYPHSET_00_NAME);
 

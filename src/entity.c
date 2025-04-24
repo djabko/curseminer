@@ -188,7 +188,7 @@ void entity_tick_abstract(GameContext *game, Entity* e) {
 
     entity_process_behaviours(e);
 
-    if (!e->moving || e->moved) return;
+    if (e->moving && !e->moved)
         entity_advance_position(game, e);
 }
 

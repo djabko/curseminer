@@ -41,6 +41,7 @@ int game_on_screen(GameContext *game, int x, int y) {
 }
 
 void flush_world_entity_cache(GameContext *game) {
+    log_debug("Flushing worldcache");
     for (int y = 0; y < game->viewport_h; y++) {
         for (int x = 0; x < game->viewport_w; x++) {
 
@@ -262,7 +263,7 @@ GameContext *game_init(GameContextCFG *cfg) {
 
     game_resize_viewport(game, GLOBALS.view_port_maxx, GLOBALS.view_port_maxy);
     game->f_init(game, 0);
-
+    
     return game;
 }
 
