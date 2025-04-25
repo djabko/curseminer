@@ -63,9 +63,8 @@ static window_t *g_widgetwin;
 static windowmgr_t WINDOW_MGR;
 static NoiseLattice *LATTICE1D;
 static Stack64* MENU_STACK;
-static milliseconds_t TIME_MSEC;
 static bool g_glyph_init[GLYPH_MAX];
-static char *g_glyph_charset;
+static char *g_glyph_charset = GLYPHSET_00;
 HashTable *g_glyph_charsets;
 
 Skin g_win_skin_0 =     {.glyph = GLYPH_MAX-1, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=215, .fg_g=215, .fg_b=50};
@@ -95,10 +94,14 @@ int new_glyph(Skin *skin) {
     int fg = COLORS_COUNT++;
     int err = 0;
 
-    err += init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
-    err += init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
+    err = init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
+    if (err) log_debug("Ncurses error initializing bg colour: %d", err);
 
-    err += init_pair(skin->glyph, fg, bg);
+    err = init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
+    if (err) log_debug("Ncurses error initializing fg colour: %d", err);
+
+    err = init_pair(skin->glyph, fg, bg);
+    if (err) log_debug("Ncurses error initializing new pair: %d", err);
 
     g_glyph_init[skin->glyph] = true;
 
@@ -120,8 +123,24 @@ static double WIDGET_WIN_C = 1;
 static double WIDGET_WIN_O = 1;
 static int WIDGET_WIN_R = 10;
 
-static void intr_redraw_everything(InputEvent *ie) {
+static void intr_dump_game_world(InputEvent *ie) {
+    if (ie->state == ES_DOWN) {
+        log_debug("=== CACHE DUMP ===");
 
+            for (int y=0; y < g_gamewin->h; y++) {
+                for (int x=0; x < g_gamewin->w; x++) {
+                    Skin *skin = game_world_getxy(GLOBALS.game, x, y);
+                    _log_debug("%c", g_glyph_charset[skin->glyph]);
+                }
+                log_debug_nl();
+            }
+
+        log_debug("===  DUMP END  ===");
+    }
+}
+
+static void intr_redraw_everything(InputEvent *ie) {
+    GLOBALS.game->cache_dirty_flags->command = -1;
 }
 
 void UI_toggle_widgetwin();
@@ -160,7 +179,15 @@ static void ui_input_noise_mover(InputEvent *ie) {
 
 static void ui_input_noise_movel(InputEvent *ie) {
     if (ie->state == ES_DOWN)
-        WIDGET_WIN_O -= 0.1;
+
+        if (ie->mods & E_MOD_0) {
+            g_widgetwin->draw_func =
+                (void(*)(window_t*)) g_widgetwin->draw_qu->mempool
+                                    [g_widgetwin->draw_qu->head];
+            
+            GLOBALS.input_context = E_CTX_CLOCK;
+
+        } else WIDGET_WIN_O -= 0.1;
 }
 
 static void ui_input_clock_zoomin(InputEvent *ie) {
@@ -350,8 +377,8 @@ static void draw_gamewin(window_t *gamewin) {
 
     // Update all tiles
     } else if (df->command == -1) {
-        for (int y=1; y < gamewin->h; y++) {
-            for (int x=1; x < gamewin->w; x++) {
+        for (int y=0; y < gamewin->h; y++) {
+            for (int x=0; x < gamewin->w; x++) {
 
                 skin = game_world_getxy(GLOBALS.game, x, y);
                 int glyph = resolve_glyph(skin);
@@ -371,6 +398,7 @@ static void draw_gamewin(window_t *gamewin) {
 }
 
 static void draw_uiwin(window_t *uiwin) {
+    werase(uiwin->win);
     draw_rt_clock(uiwin->win, uiwin->h/2+2, uiwin->h/2, uiwin->h/2);
 
     mvwprintw(uiwin->win, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
@@ -384,7 +412,7 @@ static void draw_uiwin(window_t *uiwin) {
     EntityType* entity = game_world_getxy_type(GLOBALS.game, 1, 1);
     mvwprintw(uiwin->win, 7, 20, "Entity Type at (1,1): %d", entity->id);
 
-    mvwprintw(uiwin->win, (TIME_MSEC/100)%uiwin->h, uiwin->w/2, "!"); // draw splash icon
+    mvwprintw(uiwin->win, (TIMER_NOW_MS/100)%uiwin->h, uiwin->w/2, "!"); // draw splash icon
 
     mvwprintw(uiwin->win, 3, (int)COLS*.5, "Memory used: %lu/%lu", GLOBALS.game->world->chunk_mem_used, GLOBALS.game->world->chunk_mem_max);
 
@@ -808,6 +836,7 @@ static int charset_normalize_name(char *dst, const char *src, char target) {
 }
 
 static bool set_glyphset(const char *name) {
+    return false;
     char buf[NAME_MAX];
     unsigned long key = ht_hash(name);
     uint64_t result = ht_lookup(g_glyph_charsets, key);
@@ -826,8 +855,6 @@ static bool set_glyphset(const char *name) {
         g_glyph_charset = (const char*) result;
 
         // Don't reset g_win_skin_2 or the others
-        for (int i = 0; i < GLYPH_MAX - 3; i++)
-            g_glyph_init[i] = false;
 
         window_mgr_redraw_visible();
 
@@ -912,6 +939,7 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     frontend_register_event(E_KB_A, E_CTX_CLOCK, ui_input_clock_move);
     frontend_register_event(E_KB_D, E_CTX_CLOCK, ui_input_clock_move);
 
+    frontend_register_event(E_KB_F4, E_CTX_GAME, intr_dump_game_world);
     frontend_register_event(E_KB_F5, E_CTX_GAME, intr_redraw_everything);
 
     GLOBALS.view_port_x = gwx;

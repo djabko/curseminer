@@ -41,7 +41,6 @@ int game_on_screen(GameContext *game, int x, int y) {
 }
 
 void flush_world_entity_cache(GameContext *game) {
-    log_debug("Flushing worldcache");
     for (int y = 0; y < game->viewport_h; y++) {
         for (int x = 0; x < game->viewport_w; x++) {
 
