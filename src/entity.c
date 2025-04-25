@@ -63,6 +63,10 @@ void entity_process_behaviours(Entity *e) {
     g_behaviours[be](e);
 }
 
+int entity_clear_behaviours(Entity *e) {
+    return qu_clear(e->controller->behaviour_queue);
+}
+
 int entity_remove_behaviour(behaviour_t be) {
     if (g_behaviour_max <= be)
         return -1;
@@ -73,10 +77,21 @@ int entity_remove_behaviour(behaviour_t be) {
     return 0;
 }
 
-void entity_update_position(GameContext *game, Entity *e) {
-    if (!e->moving) return;
+void entity_set_position(GameContext *game, Entity *e, int x, int y) {
+    Entity **cache = game->cache_entity;
 
-    byte_t *cache = game->cache_entity;
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, 0);
+
+    e->x = x;
+    e->y = y;
+
+    if (game_on_screen(game, e->x, e->y))
+        gamew_cache_set(game, cache, e->x, e->y, e);
+}
+
+void entity_advance_position(GameContext *game, Entity *e) {
+    Entity **cache = game->cache_entity;
 
     if (game_on_screen(game, e->x, e->y))
         gamew_cache_set(game, cache, e->x, e->y, 0);
@@ -123,16 +138,18 @@ void entity_update_position(GameContext *game, Entity *e) {
     int nx = e->x + e->vx;
     int ny = e->y + e->vy;
 
-    int id = world_getxy(game->world, nx, ny);
-    id = id ? id : gamew_cache_get(game, cache, nx, ny);
+    bool is_free = 0 == gamew_cache_get(game, cache, nx, ny)
+                && 0 == world_getxy(game->world, nx, ny);
 
-    if (!id) {
-        e->x += e->vx;
-        e->y += e->vy;
+    if (is_free) {
+        e->x = nx;
+        e->y = ny;
     }
 
     if (game_on_screen(game, e->x, e->y))
-        gamew_cache_set(game, cache, e->x, e->y, e->type->id);
+        gamew_cache_set(game, cache, e->x, e->y, e);
+
+    e->moved = true;
 }
 
 void default_tick(Entity* e) {
@@ -163,14 +180,16 @@ int entity_inventory_selected(Entity* e) {
 }
 
 void entity_tick_abstract(GameContext *game, Entity* e) {
-
     // Is this the right order?
+
+    e->moved = false;
 
     e->controller->tick(e);
 
     entity_process_behaviours(e);
 
-    entity_update_position(game, e);
+    if (e->moving && !e->moved)
+        entity_advance_position(game, e);
 }
 
 int entity_create_controller(
@@ -211,15 +230,18 @@ Entity* entity_spawn(GameContext *game, World* world, EntityType* type,
     new_entity->facing = face;
     new_entity->next_tick = TIMER_NOW_MS;
     new_entity->moving = false;
+    new_entity->moved = false;
     new_entity->inventory = NULL;
     new_entity->inventory_index = 0;
+
+    new_entity->skin = *type->default_skin;
 
     new_entity->controller = &DEFAULT_CONTROLLER;
 
     pq_enqueue(world->entities, new_entity, TIMER_NOW_MS);
 
-    byte_t *cache = game->cache_entity;
-    gamew_cache_set(game, cache, new_entity->x, new_entity->y, new_entity->type->id);
+    Entity **cache = game->cache_entity;
+    gamew_cache_set(game, cache, x, y, new_entity);
 
     return new_entity;
 }

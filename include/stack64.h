@@ -37,6 +37,7 @@ uint64_t qu_next(Queue64*);
 int qu_empty(Queue64*);
 int qu_full(Queue64*);
 void qu_print(Queue64*);
+int qu_clear(Queue64*);
 
 #define qu_foreach(qu, type, e)                                             \
     int __ITERATOR_1804289383 = 1;                                          \
@@ -63,6 +64,7 @@ HashTable *ht_init(int);
 int ht_insert(HashTable*, unsigned long, int64_t);
 int64_t ht_lookup(HashTable*, unsigned long);
 int ht_clear(HashTable*, unsigned long);
+unsigned long ht_hash(const char*);
 
 
 /* Min Heap */

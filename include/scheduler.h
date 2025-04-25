@@ -53,7 +53,7 @@ typedef struct Task {
     struct Task* next;
 } Task;
 
-void tk_sleep(Task*, unsigned int);
+void tk_sleep(Task*, milliseconds_t);
 int tk_kill(Task*);
 int tk_kill_all();
 

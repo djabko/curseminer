@@ -44,6 +44,7 @@ static bool g_player_moving_up = false;
 static bool g_player_moving_down = false;
 static bool g_player_moving_left = false;
 static bool g_player_moving_right = false;
+static bool g_player_moving_keyup = false;
 static bool g_player_crouching = false;
 
 static void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_kd_reset) {
@@ -51,7 +52,8 @@ static void game_input_player_state(InputEvent *ie, bool *on_kd_true, bool *on_k
         *on_kd_true = true;
         *on_kd_reset = false;
 
-    } else *on_kd_true = false;
+    } else if (ie->state == ES_UP)
+         *on_kd_true = false;
 
     g_player_crouching = ie->mods && E_MOD_CROUCHING;
 
@@ -74,9 +76,27 @@ static void game_input_move_right(InputEvent *ie) {
     game_input_player_state(ie, &g_player_moving_right, &g_player_moving_left);
 }
 
+static void game_input_refresh_screen(InputEvent *ie) {
+    if (ie->state == ES_DOWN) {
+        flush_world_entity_cache(g_game);
+    }
+}
+
 static void game_input_place_tile(InputEvent *ie) {
     if (ie->state == ES_DOWN)
         qu_enqueue(GLOBALS.player->controller->behaviour_queue, be_place);
+}
+
+static void game_input_set_glyphset_01(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_00.png");
+}
+
+static void game_input_set_glyphset_02(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_01.png");
+}
+
+static void game_input_set_glyphset_03(InputEvent *ie) {
+    if (ie->state == ES_UP) game_set_glyphset(g_game, "tiles_02.gif");
 }
 
 static void chaser_tick(Entity*);
@@ -110,10 +130,10 @@ static void game_input_break_tile_mouse(InputEvent *ie) {
 
         if (world_from_mouse_xy(ie, &x, &y) != 0) return;
 
-        EntityType *id = game_world_getxy(g_game, x, y);
+        EntityType *tid = game_world_getxy_type(g_game, x, y);
         int d = man_dist(GLOBALS.player->x, GLOBALS.player->y, x, y);
 
-        bool is_tile_exists = id != E_TYPE_NULL;
+        bool is_tile_exists = tid != E_TYPE_NULL;
         bool is_player_close = d < TILE_BREAK_DISTANCE;
 
         if (is_tile_exists && is_player_close)
@@ -174,12 +194,14 @@ static void be_break_f(Entity *e) {
 
 static void be_move_one_f(Entity *e) {
     e->moving = true;
-    entity_update_position(g_game, e);
+    entity_advance_position(g_game, e);
     e->moving = false;
 }
 
 static void be_move_f(Entity *e) {
     e->moving = true;
+
+    if (e == GLOBALS.player) g_player_moving_changed = true;
 }
 
 static void be_stop_f(Entity *e) {
@@ -188,34 +210,42 @@ static void be_stop_f(Entity *e) {
 
 static void be_face_up_f (Entity *e) {
     e->facing = ENTITY_FACING_UP;
+    e->skin.rotation = 0;
 }
 
 static void be_face_down_f (Entity *e) {
     e->facing = ENTITY_FACING_DOWN;
+    e->skin.rotation = 180;
 }
 
 static void be_face_left_f (Entity *e) {
     e->facing = ENTITY_FACING_LEFT;
+    e->skin.rotation = 270;
 }
 
 static void be_face_right_f (Entity *e) {
     e->facing = ENTITY_FACING_RIGHT;
+    e->skin.rotation = 90;
 }
 
 static void be_face_ul_f (Entity *e) {
     e->facing = ENTITY_FACING_UL;
+    e->skin.rotation = 45;
 }
 
 static void be_face_ur_f (Entity *e) {
     e->facing = ENTITY_FACING_UR;
+    e->skin.rotation = 270 + 45;
 }
 
 static void be_face_dl_f (Entity *e) {
     e->facing = ENTITY_FACING_DL;
+    e->skin.rotation = 180 + 45;
 }
 
 static void be_face_dr_f (Entity *e) {
     e->facing = ENTITY_FACING_DR;
+    e->skin.rotation = 90 + 45;
 }
 
 /* Defines default entity action for each tick
@@ -224,20 +254,17 @@ static void be_face_dr_f (Entity *e) {
  */
 static void chaser_tick(Entity* e) {
     Entity *p = GLOBALS.player;
-
     int radius = 40;
-
     bool is_in_radius = man_dist(e->x, e->y, p->x, p->y) <= radius;
-    if (!is_in_radius && e->moving) {
-        entity_command(e, be_stop);
 
-    } else if (is_in_radius && !e->moving) {
+    //entity_clear_behaviours(e);
+    e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
+
+    if (is_in_radius && !e->moving) {
         entity_command(e, be_move);
-    }
 
-    if (is_in_radius) {
-        e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
-        entity_update_position(g_game, e);
+    } else if (!is_in_radius && e->moving) {
+        entity_command(e, be_stop);
     }
 }
 
@@ -272,18 +299,21 @@ static void player_path_find(Entity *player, int x, int y) {}
 int game_curseminer_init(GameContext *game, int) {
     g_game = game;
 
+    game_set_glyphset(game, "tiles_02.gif");
+    game_set_glyphset(game, "tiles_00.png");
+
     int glyph = 0;
     int i = 0;
 
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 255, 255);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0,  80, 240, 220);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 120,   6,   2);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0, 215, 215,  50);
-    game_create_skin(g_skins + i++, glyph++, 0, 0, 0,  42, 133,  57);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 5, 5, 5);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0,  80, 240, 220);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120, 120, 120);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120,   6,   2);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 215, 215,  50);
+    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0,  42, 133,  57);
 
     for (i = 0; i < g_skin_end; i++)
         g_etypes[i] = game_create_entity_type(g_game, g_skins + i);
@@ -312,20 +342,24 @@ int game_curseminer_init(GameContext *game, int) {
     player->controller = &g_player_controller;
 
 
-    input_register_event(E_KB_UP,   E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_DOWN, E_CTX_GAME, game_input_move_down);
-    input_register_event(E_KB_LEFT, E_CTX_GAME, game_input_move_left);
-    input_register_event(E_KB_RIGHT,E_CTX_GAME, game_input_move_right);
-    input_register_event(E_KB_W,    E_CTX_GAME, game_input_move_up);
-    input_register_event(E_KB_A,    E_CTX_GAME, game_input_move_left);
-    input_register_event(E_KB_S,    E_CTX_GAME, game_input_move_down);
-    input_register_event(E_KB_D,    E_CTX_GAME, game_input_move_right);
-    input_register_event(E_KB_C,    E_CTX_GAME, game_input_place_tile);
-    input_register_event(E_KB_E,    E_CTX_GAME, game_input_inventory_up);
-    input_register_event(E_KB_R,    E_CTX_GAME, game_input_inventory_down);
-    input_register_event(E_KB_Z,    E_CTX_GAME, game_input_break_tile);
-    input_register_event(E_MS_LMB,  E_CTX_GAME, game_input_spawn_chaser);
-    input_register_event(E_MS_RMB,  E_CTX_GAME, game_input_break_tile_mouse);
+    frontend_register_event(E_KB_UP,    E_CTX_GAME, game_input_move_up);
+    frontend_register_event(E_KB_DOWN,  E_CTX_GAME, game_input_move_down);
+    frontend_register_event(E_KB_LEFT,  E_CTX_GAME, game_input_move_left);
+    frontend_register_event(E_KB_RIGHT, E_CTX_GAME, game_input_move_right);
+    frontend_register_event(E_KB_W,     E_CTX_GAME, game_input_move_up);
+    frontend_register_event(E_KB_A,     E_CTX_GAME, game_input_move_left);
+    frontend_register_event(E_KB_S,     E_CTX_GAME, game_input_move_down);
+    frontend_register_event(E_KB_D,     E_CTX_GAME, game_input_move_right);
+    frontend_register_event(E_KB_C,     E_CTX_GAME, game_input_place_tile);
+    frontend_register_event(E_KB_E,     E_CTX_GAME, game_input_inventory_up);
+    frontend_register_event(E_KB_R,     E_CTX_GAME, game_input_inventory_down);
+    frontend_register_event(E_KB_Z,     E_CTX_GAME, game_input_break_tile);
+    frontend_register_event(E_MS_LMB,   E_CTX_GAME, game_input_spawn_chaser);
+    frontend_register_event(E_MS_RMB,   E_CTX_GAME, game_input_break_tile_mouse);
+    frontend_register_event(E_KB_F1,    E_CTX_GAME, game_input_set_glyphset_01);
+    frontend_register_event(E_KB_F2,    E_CTX_GAME, game_input_set_glyphset_02);
+    frontend_register_event(E_KB_F3,    E_CTX_GAME, game_input_set_glyphset_03);
+    frontend_register_event(E_KB_F5,    E_CTX_GAME, game_input_refresh_screen);
 
     GLOBALS.player = player;
 
@@ -347,9 +381,8 @@ int game_curseminer_update() {
     byte_t rightb = plr->x >= wvx + mxx - sth;
     byte_t bottomb = plr->y >= wvy + mxy - sth;
 
-    if (leftb || topb || rightb || bottomb || g_player_moving_changed) {
-        
-        // Check for screen scrolling
+    // Screen panning if player near edges
+    if (leftb || topb || rightb || bottomb) {
         if      (leftb)      game->world_view_x--;
         else if (rightb)     game->world_view_x++;
         if      (topb)       game->world_view_y--;
@@ -358,40 +391,40 @@ int game_curseminer_update() {
         flush_world_entity_cache(g_game);
         flush_game_entity_cache(g_game);
         game_flush_dirty(g_game);
+    }
 
-        // Check for player movement
-        if (g_player_moving_changed) {
-            Entity *player = GLOBALS.player;
-            bool up = g_player_moving_up;
-            bool down = g_player_moving_down;
-            bool left = g_player_moving_left;
-            bool right = g_player_moving_right;
+    if (g_player_moving_changed) {
+        Entity *player = GLOBALS.player;
+        bool up = g_player_moving_up;
+        bool down = g_player_moving_down;
+        bool left = g_player_moving_left;
+        bool right = g_player_moving_right;
 
-            if (up || down || left || right) {
+        if (up || down || left || right) {
+            behaviour_t be;
 
-                if      (up && left)    entity_command(player, be_face_ul);
-                else if (up && right)   entity_command(player, be_face_ur);
-                else if (down && left)  entity_command(player, be_face_dl);
-                else if (down && right) entity_command(player, be_face_dr);
-                else if (up)            entity_command(player, be_face_up);
-                else if (down)          entity_command(player, be_face_down);
-                else if (left)          entity_command(player, be_face_left);
-                else if (right)         entity_command(player, be_face_right);
+            if      (up && left)    be = be_face_ul;
+            else if (up && right)   be = be_face_ur;
+            else if (down && left)  be = be_face_dl;
+            else if (down && right) be = be_face_dr;
+            else if (up)            be = be_face_up;
+            else if (down)          be = be_face_down;
+            else if (left)          be = be_face_left;
+            else if (right)         be = be_face_right;
 
-                if (!player->moving) {
+            entity_command(player, be);
 
-                    if (g_player_crouching)
-                        entity_command(player, be_move_one);
-                    else 
-                        entity_command(player, be_move);
-                }
+            if (!player->moving) {
+                if (g_player_crouching)
+                    entity_command(player, be_move_one);
+                else 
+                    entity_command(player, be_move);
+            }
 
+        } else if (player->moving || g_player_moving_keyup)
+            entity_command(player, be_stop);
 
-            } else if (player->moving)
-                entity_command(player, be_stop);
-
-            g_player_moving_changed = false;
-        }
+        g_player_moving_changed = false;
     }
 
     return 0;

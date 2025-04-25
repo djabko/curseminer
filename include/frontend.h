@@ -4,12 +4,9 @@
 #define ASCII_ESC 27
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "timer.h"
-
-typedef enum {
-    GAME_FRONTEND_NCURSES
-} game_frontent_t;
 
 typedef enum {
     E_TYPE_NULL,
@@ -68,9 +65,22 @@ typedef enum {
     E_KB_Y,
     E_KB_Z,
     E_KB_ESC,
+    E_KB_F1,
+    E_KB_F2,
+    E_KB_F3,
+    E_KB_F4,
+    E_KB_F5,
+    E_KB_F6,
+    E_KB_F7,
+    E_KB_F8,
+    E_KB_F9,
+    E_KB_F10,
+    E_KB_F11,
+    E_KB_F12,
     E_MS_LMB,
     E_MS_RMB,
     E_MS_MMB,
+    E_MS_HOVER,
     E_END,
 } event_t;
 
@@ -87,6 +97,16 @@ typedef enum {
 } event_ctx_t;
 
 typedef struct {
+    int (*f_ui_init)();
+    void (*f_ui_exit)();
+
+    int (*f_input_init)();
+    void (*f_input_exit)();
+
+    bool (*f_set_glyphset)(const char*);
+} Frontend;
+
+typedef struct {
     event_t id;
     event_type_t type;
     event_state_t state;
@@ -94,8 +114,19 @@ typedef struct {
     uint64_t data;
 } InputEvent;
 
-void input_init(game_frontent_t);
-int input_register_event(event_t, event_ctx_t, void (*)(InputEvent*));
-void print_ncurses_mapping(const char* tag);
+typedef int (*frontend_init_t)(Frontend*, const char*);
+typedef void (*frontend_exit_t)(Frontend*);
+
+bool frontend_pack_event(InputEvent*, uint8_t, uint8_t, uint8_t, uint8_t);
+bool frontend_set_glyphset(const char*);
+
+int frontend_register_ui(frontend_init_t, frontend_exit_t);
+int frontend_register_input(frontend_init_t, frontend_exit_t);
+
+int frontend_init(const char* title);
+void frontend_exit();
+
+int frontend_register_event(event_t, event_ctx_t, void (*)(InputEvent*));
+void frontend_dispatch_event(event_ctx_t, InputEvent*);
 
 #endif

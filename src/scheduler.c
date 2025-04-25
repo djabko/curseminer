@@ -162,8 +162,10 @@ int rq_run(RunQueue* rq) {
     current->func(current, current->stack);
 
     // Unlink from other tasks if sleeping
-    if (current->flags & RQ_FLAG_SLEEPING) rq_pop(rq);
-    else {
+    if (current->flags & RQ_FLAG_SLEEPING) {
+        rq_pop(rq);
+
+    } else {
         rq->head = rq->head->next;
         rq->tail->next = current;
         rq->tail = current;
@@ -172,15 +174,16 @@ int rq_run(RunQueue* rq) {
     return 0;
 }
 
-void tk_sleep(Task* task, unsigned int miliseconds) {
-    if (miliseconds < 1) return;
+void tk_sleep(Task* task, milliseconds_t ms) {
+    if (ms < 1) return;
 
-    task->next_run = TIMER_NOW_MS + miliseconds;
+    if (task->flags & RQ_FLAG_SLEEPING)
+        log_debug("Warning: putting already sleeping task %p to sleep", task);
+
+    task->next_run = TIMER_NOW_MS + ms;
 
     task->flags |= RQ_FLAG_SLEEPING;
     pq_enqueue(g_sleep_queue, task, task->next_run);
-
-    // Unlink task from runqueue
 }
 
 ll_head* scheduler_init() {
@@ -259,8 +262,11 @@ int wake_tasks() {
     int i = 0;
     while (!pq_empty(g_sleep_queue) && stk->next_run <= TIMER_NOW_MS) {
         stk = pq_dequeue(g_sleep_queue);
+
         stk->flags &= ~RQ_FLAG_SLEEPING;
         rq_add(stk->runqueue, stk);
+
+        stk = (Task*) pq_peek(g_sleep_queue);
         i++;
     }
 
