@@ -30,9 +30,6 @@ typedef unsigned char byte_t;
     log_debug_nl();                         \
     } while (0)                                       
 
-#define assert(condition) \
-    if (!(condition)) {exit(-1);}
-
 #define assert_log(condition, ...)          \
     if (!(condition)) {                     \
         _log_debug("ERROR: ");              \

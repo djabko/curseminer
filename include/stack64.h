@@ -34,7 +34,6 @@ uint64_t qu_peek(Queue64*);
 uint64_t qu_peek_tail(Queue64*);
 uint64_t qu_get(Queue64*, int, int*);
 uint64_t qu_next(Queue64*);
-uint64_t qu_prev(Queue64*);
 int qu_empty(Queue64*);
 int qu_full(Queue64*);
 void qu_print(Queue64*);
@@ -65,7 +64,7 @@ HashTable *ht_init(int);
 int ht_insert(HashTable*, unsigned long, int64_t);
 int64_t ht_lookup(HashTable*, unsigned long);
 int ht_clear(HashTable*, unsigned long);
-unsigned long ht_hash(char*);
+unsigned long ht_hash(const char*);
 
 
 /* Min Heap */

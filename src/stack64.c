@@ -155,12 +155,11 @@ int qu_full(Queue64* qu) {
 }
 
 int qu_clear(Queue64 *qu) {
-    int i = 0;
+    int i = qu->count;
 
-    while (!qu_empty(qu)) {
-        i++;
-        qu_dequeue(qu);
-    }
+    qu->head = 0;
+    qu->tail = 0;
+    qu->count = 0;
 
     return i;
 }
@@ -181,7 +180,7 @@ void qu_print(Queue64* qu) {
  * Alternatively a hash function can be used which never returns -1
  */
 
-unsigned long ht_hash(char* str) {
+unsigned long ht_hash(const char* str) {
     unsigned long hash = 5381;
     int c;
 

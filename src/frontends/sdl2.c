@@ -33,7 +33,9 @@ typedef const Uint32 bitmask_sdl;
 #define MAGIC_GIF  "\x47\x49\x46\x38\x00"
 #define MAGIC_JPEG "\xff\xd8\xff\xe0\x00"
 
+#ifndef NAME_MAX
 #define NAME_MAX 64
+#endif
 
 #define g_spritesheet_path "assets/spritesheets/tiles.gif"
 
@@ -44,7 +46,6 @@ typedef enum file_format_t {
     FILE_FORMAT_JPEG,
 } file_format_t;
 
-static RunQueue *g_runqueue;
 static SDL_Window *g_window;
 static SDL_Renderer *g_renderer;
 static int g_tile_w = 20;
@@ -56,7 +57,7 @@ static int g_sprite_offset = 0;
 static void (*draw_tile_f)(Skin*, SDL_Rect*);
 
 typedef struct Spritesheet {
-    const char name[NAME_MAX];
+    char name[NAME_MAX];
     SDL_Texture **frames;
     int width, height, layers, stride;
     milliseconds_t delay;
@@ -64,13 +65,13 @@ typedef struct Spritesheet {
 
 // Can be used for jpeg too
 typedef struct PNG {
-    const char *name;
+    char *name;
     void *data;
     int width, height, stride;
 } PNG;
 
 typedef struct GIF {
-    const char *name;
+    char *name;
     void *data;
     int width, height, layers, stride;
     int *delays;
@@ -103,7 +104,7 @@ static file_format_t check_file_format(const char *path) {
     return FILE_FORMAT_INVALID;
 }
 
-static void load_gif(const char *filename, GIF *gif) {
+static void load_gif(char *filename, GIF *gif) {
     size_t size;
     FILE *f = fopen(filename, "rb");
 
@@ -129,7 +130,7 @@ static void load_gif(const char *filename, GIF *gif) {
     free(buf);
 }
 
-static Spritesheet *spritesheet_alloc(const char *name, int width, int height, int layers,
+static Spritesheet *spritesheet_alloc(char *name, int width, int height, int layers,
         int stride, milliseconds_t delay) {
 
     const size_t alloc_size =
@@ -201,7 +202,7 @@ static Spritesheet *spritesheet_from_gif(GIF *gif, SDL_Renderer *renderer) {
 }
 
 // Make sure to free Spritesheet after use
-static Spritesheet *load_spritesheet_from_file(SDL_Renderer *renderer, const char *path) {
+static Spritesheet *load_spritesheet_from_file(SDL_Renderer *renderer, char *path) {
     Spritesheet *ss = NULL;
     file_format_t ff = check_file_format(path);
 

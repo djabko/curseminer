@@ -178,7 +178,7 @@ static void ui_input_noise_mover(InputEvent *ie) {
 }
 
 static void ui_input_noise_movel(InputEvent *ie) {
-    if (ie->state == ES_DOWN)
+    if (ie->state == ES_DOWN) {
 
         if (ie->mods & E_MOD_0) {
             g_widgetwin->draw_func =
@@ -188,6 +188,7 @@ static void ui_input_noise_movel(InputEvent *ie) {
             GLOBALS.input_context = E_CTX_CLOCK;
 
         } else WIDGET_WIN_O -= 0.1;
+    }
 }
 
 static void ui_input_clock_zoomin(InputEvent *ie) {
@@ -213,6 +214,7 @@ static void ui_input_clock_move(InputEvent *ie) {
 
 
 /* Draw Functions */
+static void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) __attribute__((unused));
 static void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
     for (int x=x1; x<=x2; x++) {
         for (int y=y1; y<=y2; y++) {
@@ -259,32 +261,22 @@ static void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
     draw_line(stdscr, l4, x2, y1+1, x2, y2-1);
 }
 
+static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) __attribute__((unused));
 static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
    _draw_square(win, x1, y1, x2, y2,
             ACS_HLINE, ACS_HLINE, ACS_VLINE, ACS_VLINE,
             ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
 }
 
+static void box_win(window_t *window) __attribute__((unused));
 static void box_win(window_t *window) {
     box(window->wrapper, 0, 0);
     wnoutrefresh(window->wrapper);
 
     return;
-
-    /*
-    mvwprintw(stdscr, window->y-2, window->x, window->title);
-
-    int x1 = window->x;
-    int y1 = window->y;
-    int x2 = window->x + window->w;
-    int y2 = window->y + window->h;
-
-    draw_square(stdscr, x1, y1, x2, y2);
-
-    wattroff(stdscr, COLOR_PAIR(window->glyph));
-    */
 }
 
+static void box_win_clear(window_t * window) __attribute__((unused));
 static void box_win_clear(window_t * window) {
     return;
     chtype spc = ' ';
@@ -298,6 +290,7 @@ static void box_win_clear(window_t * window) {
             spc, spc, spc, spc, spc, spc, spc, spc);
 }
 
+static void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) __attribute__((unused));
 static void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
     double x2, y2;
 
@@ -307,6 +300,7 @@ static void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double 
     draw_line(win, c, x1, y1, x2, y2); 
 }
 
+static void draw_rt_clock(WINDOW* win, int x, int y, int r) __attribute__((unused));
 static void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     seconds_t time_sec = TIMER_NOW_MS / 1000;
 
@@ -331,6 +325,7 @@ static void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     attroff(A_BOLD);
 }
 
+static void draw_keyboard_state(WINDOW* scr, int x, int y) __attribute__((unused));
 static void draw_keyboard_state(WINDOW* scr, int x, int y) {
 
 }
@@ -479,10 +474,12 @@ static void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseL
     }
 }
 
+static void draw_widgetwin_value_noise(window_t *widgetwin) __attribute__((unused));
 static void draw_widgetwin_value_noise(window_t *widgetwin) {
     draw_widgetwin_noise(widgetwin, value_noise_1D);
 }
 
+static void draw_widgetwin_perlin_noise(window_t *widgetwin) __attribute__((unused));
 static void draw_widgetwin_perlin_noise(window_t *widgetwin) {
     draw_widgetwin_noise(widgetwin, perlin_noise_1D);
 }
@@ -516,6 +513,8 @@ static int init_glyphsets() {
     ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_00_NAME), (uint64_t) GLYPHSET_00);
     ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_01_NAME), (uint64_t) GLYPHSET_01);
     ht_insert(g_glyph_charsets, ht_hash(GLYPHSET_02_NAME), (uint64_t) GLYPHSET_02);
+
+    return 0;
 }
 
 int init_window(window_t *window, window_t *parent, event_ctx_t ectx, int x, int y, int w, int h, const char *title, Skin *skin) {
@@ -653,7 +652,6 @@ KeyDownState *NEXT_AVAILABLE_KDS = KEY_DOWN_STATES_ARRAY;
 
 static event_t g_ncurses_mapping_kb[ NCURSES_KBMAP_MAX ];
 static InputEvent g_ncurses_mapping_ms[ NCURSES_MSMAP_MAX ];
-static event_t g_ncurses_mapping_fn[ NCURSES_KBMAP_MAX ];
 
 static timer_t g_input_timer = 0;
 static Queue64 *g_queued_kdown = NULL;
@@ -852,7 +850,7 @@ static bool set_glyphset(const char *name) {
     }
 
     if (result != -1) {
-        g_glyph_charset = (const char*) result;
+        g_glyph_charset = (char*) result;
 
         // Don't reset g_win_skin_2 or the others
 
