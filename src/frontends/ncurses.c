@@ -19,7 +19,7 @@
 #include "games/curseminer.h"
 #include "games/other.h"
 
-#define RGB_TO_CURSES(x) ((int)((float)x*3.90625))  // 1000/256 conversion
+#define RGB_TO_CURSES(x) (x * 1000 / 256)  // 1000/256 conversion
 #define NAME_MAX 64
 #define GLYPH_MAX 256
 #define REFRESH_RATE 120
@@ -35,6 +35,10 @@
 /* Drawing */
 
 typedef void (*voidfunc) ();
+
+typedef struct Color {
+    int id, r, g, b;
+} Color;
 
 typedef struct window_t {
     WINDOW *win, *wrapper;
@@ -64,8 +68,10 @@ static windowmgr_t WINDOW_MGR;
 static NoiseLattice *LATTICE1D;
 static Stack64* MENU_STACK;
 static bool g_glyph_init[GLYPH_MAX];
+static bool g_ansi_fallbacks_enabled;
+static bool g_ncurses_quit;
 static char *g_glyph_charset = GLYPHSET_00;
-HashTable *g_glyph_charsets;
+static HashTable *g_glyph_charsets;
 
 Skin g_win_skin_0 =     {.glyph = GLYPH_MAX-1, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=215, .fg_g=215, .fg_b=50};
 Skin g_win_skin_1 =     {.glyph = GLYPH_MAX-2, .bg_r=0, .bg_g=0, .bg_b=0, .fg_r=80, .fg_g=240, .fg_b=220};
@@ -78,36 +84,107 @@ static inline char sign_of_int(int x) {
     return '\0';
 }
 
+static inline int _ansi_color_fallback_var0(int v) {
+    if (0x00 <= v && v <= 0x40)         return 0x00;
+    else if (0x40 <= v && v <= 0xC0)    return 0x80;
+    else if (0xC0 <= v && v <= 0xFF)    return 0xC0;
+}
+    
+/* This one spreads out color values more evenly */
+static inline int _ansi_color_fallback_var1(int v) {
+    if (0x00 <= v && v <= 0x55)         return 0x00;
+    else if (0x55 <= v && v <= 0xAB)    return 0x80;
+    else if (0xAB <= v && v <= 0xFF)    return 0xC0;
+}
+
+static inline void ansi_color_fallback(Color *c) {
+    if (c->r == 0x00 && c->g == 0x00 && c->b == 0x00) {
+        c->id = COLOR_BLACK;
+        return;
+    }
+
+    static int (*fallback_f)(int) = _ansi_color_fallback_var1;
+    c->r = fallback_f(c->r);
+    c->g = fallback_f(c->g);
+    c->b = fallback_f(c->b);
+
+    if (c->r == 0xC0 || c->g == 0xC0 || c->b == 0xC0){
+        c->r = 0xC0;
+        c->g = 0xC0;
+        c->b = 0xC0;
+    }
+
+    log_debug("FALLING BACK TO %X %X %X (id=%d)", c->r, c->g, c->b, c->id);
+
+    int r = c->r;
+    int g = c->g;
+    int b = c->b;
+    int id;
+
+    if (r == 0x80 && g == 0x00 && b == 0x00) id = COLOR_RED;
+    else if (r == 0x00 && g == 0x80 && b == 0x00) id = COLOR_GREEN;
+    else if (r == 0x80 && g == 0x80 && b == 0x00) id = COLOR_YELLOW;
+    else if (r == 0x00 && g == 0x00 && b == 0x80) id = COLOR_BLUE;
+    else if (r == 0x80 && g == 0x00 && b == 0x80) id = COLOR_MAGENTA;
+    else if (r == 0x00 && g == 0x80 && b == 0x80) id = COLOR_CYAN;
+    else id = COLOR_WHITE;
+
+    c->r = r;
+    c->g = g;
+    c->b = b;
+    c->id = id;
+}
+
+
+static inline void normalize_color(Color *c) {
+    if (g_ansi_fallbacks_enabled)
+        ansi_color_fallback(c);
+
+    c->r = RGB_TO_CURSES(c->r);
+    c->g = RGB_TO_CURSES(c->g);
+    c->b = RGB_TO_CURSES(c->b);
+}
+
 
 /* Utility Functions */
 #define assert_ncurses(condition, ...)      \
     if (!(condition)) {                     \
+        frontend_ncurses_exit(-1);          \
         _log_debug("ERROR: ");              \
         log_debug(__VA_ARGS__);             \
-        frontend_ncurses_exit(-1);          \
+        log_debug_nl();                     \
     }
 
 
 int COLORS_COUNT = 0;
 int new_glyph(Skin *skin) {
-    int bg = COLORS_COUNT++;
-    int fg = COLORS_COUNT++;
     int err = 0;
 
-    err = init_color(bg, RGB_TO_CURSES(skin->bg_r), RGB_TO_CURSES(skin->bg_g), RGB_TO_CURSES(skin->bg_b));
-    if (err) log_debug("Ncurses error initializing bg colour: %d", err);
+    Color bg = {.id = COLORS_COUNT++, .r = skin->bg_r, .g = skin->bg_g, .b = skin->bg_b};
+    Color fg = {.id = COLORS_COUNT++, .r = skin->fg_r, .g = skin->fg_g, .b = skin->fg_b};
 
-    err = init_color(fg, RGB_TO_CURSES(skin->fg_r), RGB_TO_CURSES(skin->fg_g), RGB_TO_CURSES(skin->fg_b));
-    if (err) log_debug("Ncurses error initializing fg colour: %d", err);
+    normalize_color(&bg);
+    normalize_color(&fg);
 
-    err = init_pair(skin->glyph, fg, bg);
+    if (g_ansi_fallbacks_enabled)
+        log_debug("Glyph %d remapped to bg(%d, %X %X %X) fg(%d, %X %X %X)",
+                skin->glyph, bg.id, bg.r, bg.g, bg.b, fg.id, fg.r, fg.g, fg.b);
+    else {
+        err = init_color(bg.id, bg.r, bg.g, bg.b);
+        if (err) log_debug("Ncurses error initializing bg color: %d", err);
+
+        err = init_color(fg.id, fg.r, fg.g, fg.b);
+        if (err) log_debug("Ncurses error initializing fg color: %d", err);
+    }
+
+    err = init_pair(skin->glyph, fg.id, bg.id);
     if (err) log_debug("Ncurses error initializing new pair: %d", err);
 
     g_glyph_init[skin->glyph] = true;
 
     log_debug("Initialized pair: %d bg(%d %d %d) fg(%d %d %d)",
-            skin->glyph, skin->bg_r, skin->bg_g, skin->bg_b,
-            skin->fg_r, skin->fg_g, skin->fg_b);
+            skin->glyph, bg.r, bg.g, bg.b,
+            fg.r, fg.g, fg.b);
 
     return err;
 }
@@ -139,8 +216,10 @@ static void intr_dump_game_world(InputEvent *ie) {
     }
 }
 
+char PRINT_CHARACTER = 'A';
 static void intr_redraw_everything(InputEvent *ie) {
     GLOBALS.game->cache_dirty_flags->command = -1;
+    PRINT_CHARACTER++;
 }
 
 void UI_toggle_widgetwin();
@@ -500,6 +579,18 @@ static void draw_main_menu() {
 
 /* Init Functions */
 static int init_colors() {
+    assert_ncurses(has_colors() == TRUE,
+            "Your terminal doesn't support colors...");
+
+    const char *colorterm = getenv("COLORTERM");
+    const char *term = getenv("TERM");
+    const bool is_truecolor =
+        (colorterm && strstr(colorterm, "truecolor")) ||
+        (term && strstr(term, "truecolor"));
+
+    if (!is_truecolor)
+        g_ansi_fallbacks_enabled = true;
+
     for (int i = 0; i < GLYPH_MAX; i++) {
         g_glyph_init[i] = false;
     }
@@ -594,6 +685,7 @@ void frontend_ncurses_exit() {
     window_mgr_free();
     endwin();
     free(MENU_STACK);
+    g_ncurses_quit = true;
 }
 
 
@@ -619,7 +711,8 @@ void UI_toggle_widgetwin() {
 }
 
 int job_loop(Task *task, Stack64 *st) {
-    if (st_peek(MENU_STACK) == -1) return -1;
+    if (st_peek(MENU_STACK) == -1 || g_ncurses_quit)
+        tk_kill(task);
 
     voidfunc draw_func = (voidfunc) st_peek(MENU_STACK);
 
