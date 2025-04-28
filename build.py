@@ -1,7 +1,7 @@
 #!/bin/python
 
-import os
-import subprocess
+import os, subprocess
+from pathlib import Path
 
 CWD = os.getcwd()
 
@@ -25,24 +25,34 @@ CF_DEBUG =      f'-Wall -g -DDEBUG'
 CF_OPTIM =      f'-O3'
 
 
-def get_all_files(dirs, ext):
+def get_all_files(dirs, ext, max_depth=None):
     if type(dirs) is not list:
-        raise Exception('Parameter "dirs" must be type list or str')
+        raise Exception('Parameter "dirs" must be type list')
 
     srcs = []
 
     for d in dirs:
-        for item in os.walk(d, topdown=True):
+        for depth, item in enumerate(os.walk(d, topdown=True)):
+            if (max_depth is not None and max_depth <= depth):
+                break
+
             path, dirs, files = item
 
+            base = path.split('/')[-1]
+            if 0 < len(base) and base[0] == '.':
+                continue
+
             for filename in files:
-                if filename[-len(ext):] == ext:
+                if filename[0] == '.':
+                    continue
+
+                elif filename[-len(ext):] == ext:
                     srcs.append(f'{path}/{filename}')
 
     return srcs
 
 
-def remove_path(path):
+def remove_path(path, max_depth=None):
     if not os.path.exists(path):
         return
 
@@ -50,7 +60,10 @@ def remove_path(path):
         os.remove(path)
 
     elif os.path.isdir(path):
-        for item in os.walk(path, topdown=False):
+        for depth, item in enumerate(os.walk(path, topdown=False)):
+            if (max_depth is not None and max_depth <= depth):
+                break
+
             p, d, f = item
             nodes = d + f
 
@@ -72,6 +85,10 @@ def remove_path(path):
     else:
         raise f'Invalid argument "{path}"'
 
+def remove_files(paths):
+    for path in paths:
+        os.remove(path)
+
 def ensure_path_exists(path):
     if not (type(path) is str or type(path) is os.PathLike or type(path) is bytes):
         raise Exception('Parameter "path" must be string or os.PathLike, not {type(path)}')
@@ -80,7 +97,7 @@ def ensure_path_exists(path):
         path = '/'.join(path.split('/')[:-1])
 
     if not os.path.isdir(path):
-        os.mkdir(path)
+        Path(path).mkdir(parents=True, exist_ok=True)
         return False
 
     return True
@@ -98,7 +115,7 @@ def source_modified(src, obj):
 
 
 def build_obj(srcfile, extra_cflags, dry=False):
-    objfile = srcfile.replace(SRCDIR, OBJDIR)[:-1] + 'o'
+    objfile = f'{OBJDIR}/' + '.'.join(srcfile.split('.')[:-1]) + '.o'
     ensure_path_exists(objfile)
 
     cflags = f'{INCPATHS} {CF_SDL2} -c -o {objfile}'.split(' ')
@@ -106,17 +123,18 @@ def build_obj(srcfile, extra_cflags, dry=False):
 
     cmd = [CC, srcfile, *cflags]
 
-    if dry:
+    if source_modified(srcfile, objfile):
         print(' '.join(cmd))
-
-    elif source_modified(srcfile, objfile):
-        return subprocess.Popen(cmd)
+        if not dry:
+            return subprocess.Popen(cmd)
+    else:
+        print(f'Skipping {srcfile}')
 
 
 def build_exe(extra_cflags=None, dry=False):
 
     extra_cflags = [] if extra_cflags is None else extra_cflags
-    cflags = f'{LIBS_SDL2} {CF_LIBS} {CF_SDL2} {INCPATHS} -o {TARGET}'.split(' ')
+    cflags = f'{LIBS_SDL2} {CF_LIBS} -o {TARGET}'.split(' ')
     cflags.extend(extra_cflags)
 
     if type(extra_cflags) is not list:
@@ -126,9 +144,8 @@ def build_exe(extra_cflags=None, dry=False):
 
     cmd = [CC, *objfiles, *cflags]
 
-    if dry:
-        print(' '.join(cmd))
-    else: 
+    print(' '.join(cmd))
+    if not dry:
         return subprocess.Popen(cmd)
 
 
@@ -141,6 +158,7 @@ if __name__ == '__main__':
     target = os.path.basename(CWD)
 
     sources = get_all_files([SRCDIR], '.c')
+    print(sources)
 
     dry_run = True
     dry_run = False
@@ -160,6 +178,8 @@ if __name__ == '__main__':
     elif mode == 'clean':
         remove_path(OBJDIR)
         remove_path(TARGET)
+        
+        remove_files(get_all_files(['./'], '.log'))
         exit(0)
 
     if 0 < len(processes):
