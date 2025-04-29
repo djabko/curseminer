@@ -15,7 +15,6 @@
 static HashTable *CHUNK_HASHTABLE;
 static NoiseLattice *LATTICE_2D;
 static int GLOBAL_CHUNK_COUNT = 0;
-static int MAXID = 0;
 
 
 /* Internal Helper Functions */
@@ -46,7 +45,7 @@ static ChunkArena *chunk_init_arena(size_t mem_size, int chunk_size) {
 
     // Make sure allocated memory has enough space for at least 1 chunk
     if (mem_size < min_mem)
-        log_debug("ERROR: attempting to allocate arena of %luB, which is too small for chunk allocation (%luB)", mem_size, min_mem);
+        log_debug("ERROR: attempting to allocate arena of %zuB, which is too small for chunk allocation (%zuB)", mem_size, min_mem);
 
     ChunkArena *arena = calloc(mem_size, 1);
 
@@ -455,7 +454,7 @@ static void chunk_free_all(World *world) {
 
 
 /* Interface World Functions */
-World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
+World *world_init(int chunk_s, int lattice_length, size_t chunk_mem_max) {
     World *new_world = calloc(1, sizeof(World));
 
     size_t chunk_mem_stride = sizeof(Chunk) + chunk_s * chunk_s;
@@ -463,7 +462,6 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     int pages = (chunk_max + PAGE_SIZE) / PAGE_SIZE;
     CHUNK_HASHTABLE = ht_init(pages);
 
-    MAXID = maxid;
     new_world->chunk_s = chunk_s;
     new_world->chunk_arenas = NULL;
     new_world->entity_c = 0;
@@ -474,8 +472,7 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
     new_world->chunk_mem_max = chunk_mem_max;
     new_world->chunk_mem_stride = chunk_mem_stride;
 
-    int latlen = 100;
-    LATTICE_2D = noise_init(latlen * latlen, 2, latlen, fade);
+    LATTICE_2D = noise_init(lattice_length * lattice_length, 2, lattice_length, fade);
 
     chunk_create(new_world, 0, 0);
 

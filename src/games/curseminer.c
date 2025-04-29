@@ -296,7 +296,7 @@ static void player_tick(Entity *player) {}
 
 static void player_path_find(Entity *player, int x, int y) {}
 
-int game_curseminer_init(GameContext *game, int) {
+int game_curseminer_init(GameContext *game, int opt) {
     g_game = game;
 
     game_set_glyphset(game, "tiles_02.gif");
@@ -313,10 +313,11 @@ int game_curseminer_init(GameContext *game, int) {
     game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 120,   6,   2);
     game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 255, 215,   0);
     game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0, 215, 215,  50);
-    game_create_skin(game, g_skins + i++, glyph++, 0, 0, 0,  42, 133,  57);
+
+    assert_log(i <= g_skin_end, "Error: defined too many skins...");
 
     for (i = 0; i < g_skin_end; i++)
-        g_etypes[i] = game_create_entity_type(g_game, g_skins + i);
+        g_etypes[i] = game_create_entity_type(game, g_skins + i);
 
     g_game->entity_types_c = g_skin_end;
 
@@ -335,6 +336,7 @@ int game_curseminer_init(GameContext *game, int) {
     be_face_dr = entity_create_behaviour(be_face_dr_f);
 
     entity_create_controller(&g_player_controller, player_tick, player_path_find);
+
     Entity *player = entity_spawn(game, game->world, g_etypes[g_skin_player],
             20, 20, ENTITY_FACING_RIGHT, 1, 0);
 
@@ -401,7 +403,7 @@ int game_curseminer_update() {
         bool right = g_player_moving_right;
 
         if (up || down || left || right) {
-            behaviour_t be;
+            behaviour_t be = be_stop;
 
             if      (up && left)    be = be_face_ul;
             else if (up && right)   be = be_face_ur;

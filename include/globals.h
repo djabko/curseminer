@@ -9,7 +9,12 @@
 typedef unsigned char byte_t;
 
 /* Useful Macros */
+#ifdef __linux__
 #define PAGE_SIZE getpagesize()
+#else
+#define PAGE_SIZE 4096
+#endif
+
 #define capacity_from_pages(pages, offset, stride) \
     (PAGE_SIZE * pages - offset) / stride
 
@@ -21,7 +26,7 @@ typedef unsigned char byte_t;
 
 #ifdef DEBUG
 
-#define DEBUG_FD stderr
+#define DEBUG_FD stdout
 #define log_debug_nl() fprintf(DEBUG_FD, "\n")
 #define _log_debug(...)   fprintf(DEBUG_FD, __VA_ARGS__)
 #define log_debug(...)                      \

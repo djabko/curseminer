@@ -106,7 +106,7 @@ bool game_resize_viewport(GameContext*, int w, int h);
 
 
 /* Game Interface */
-GameContext *game_init(GameContextCFG*);
+GameContext *game_init(GameContextCFG*, World*);
 void game_free(GameContext*);
 int game_update(Task*, Stack64*);
 

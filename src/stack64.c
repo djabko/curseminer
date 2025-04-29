@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 
 /* STACK FUNCTIONS */
@@ -65,7 +66,7 @@ void st_print(Stack64* st) {
 
     int i = 0;
     while (i < st->count) {
-        _log_debug("%lu", *(st->head - i * sizeof(uint64_t)));
+        _log_debug("%" PRIu64, *(st->head - i * sizeof(uint64_t)));
         if (i < st->count-1) _log_debug(", ");
         
         i++;
@@ -283,7 +284,7 @@ void minh_print(Heap *h, char dw) {
     _log_debug("{");
     for (int i=0; i<h->count; i++) {
         HeapNode *node = h->mempool + i;
-        _log_debug("%lu, ", dw ? node->data : node->weight);
+        _log_debug("%" PRIu64 ", ", dw ? node->data : node->weight);
     }
     log_debug("}");
 }

@@ -6,7 +6,6 @@
 
 #include "globals.h"
 #include "scheduler.h"
-#include "files.h"
 #include "timer.h"
 #include "games/curseminer.h"
 #include "games/other.h"
@@ -35,6 +34,8 @@ typedef enum {
 struct Globals GLOBALS = {
     .player = NULL,
     .input_context = E_CTX_0,
+    .view_port_maxx = 5,
+    .view_port_maxy = 5,
 };
 
 static RunQueue* g_runqueue = NULL;
@@ -136,9 +137,9 @@ int main(int argc, const char** argv) {
     }
 
     GameContextCFG gcfg = {
-        .skins_max = 32,
-        .entity_types_max = 32,
-        .scroll_threshold = 5,
+        .skins_max = 12,
+        .entity_types_max = 12,
+        .scroll_threshold = 2,
 
         .f_init = game_curseminer_init,
         .f_update = game_curseminer_update,
@@ -152,7 +153,8 @@ int main(int argc, const char** argv) {
 
     init(frontend, title);
 
-    GLOBALS.game = game_init(&gcfg);
+    World *world = world_init(20, 10, 64 * PAGE_SIZE);
+    GLOBALS.game = game_init(&gcfg, world);
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
 

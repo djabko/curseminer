@@ -45,7 +45,7 @@ behaviour_t entity_create_behaviour(behaviour_func_t func) {
         size_t new_size = g_behaviour_max * sizeof(behaviour_func_t);
 
         g_behaviours = realloc(g_behaviours, new_size);
-        log_debug("Allocated %lu bytes for ge_behaviours", new_size);
+        log_debug("Allocated %zu bytes for ge_behaviours", new_size);
 
         g_behaviour_free_spots += g_behaviour_max - old_behaviour_max;
     }

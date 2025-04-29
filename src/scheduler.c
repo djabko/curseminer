@@ -404,7 +404,7 @@ ll_head* ll_init(int n) {
     head->node = NULL;
     head->count = 0;
     head->max = (n * PAGE_SIZE) / sizeof(ll_node) - sizeof(ll_head);
-    log_debug("%d / %lu = %d", n*PAGE_SIZE, sizeof(ll_node), head->max);
+    log_debug("%d / %zu = %d", n*PAGE_SIZE, sizeof(ll_node), head->max);
 
     return head;
 }

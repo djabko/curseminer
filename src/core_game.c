@@ -113,7 +113,7 @@ bool game_resize_viewport(GameContext *game, int width, int height) {
 
     if (!df || s * df->groups_available < tiles_on_screen) {
 
-        log_debug("CoreGame: Allocating caches for %ld tiles (%dx%d)",
+        log_debug("CoreGame: Allocating caches for %zd tiles (%dx%d)",
                 tiles_on_screen, width, height);
 
         game->cache_world = realloc(game->cache_world, tiles_on_screen);
@@ -230,7 +230,7 @@ int game_update(Task* task, Stack64* stack) {
     return 0;
 }
 
-GameContext *game_init(GameContextCFG *cfg) {
+GameContext *game_init(GameContextCFG *cfg, World *world) {
     GameContext *game = calloc(sizeof(GameContext), 1);
 
     assert_log (game != NULL,
@@ -256,7 +256,7 @@ GameContext *game_init(GameContextCFG *cfg) {
     game->viewport_w = 0;
     game->viewport_h = 0;
 
-    game->world = world_init(20, game->skins_c - 1, PAGE_SIZE * 64);
+    game->world = world;
 
     entity_init_default_controller();
 

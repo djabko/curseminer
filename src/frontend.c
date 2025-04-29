@@ -1,4 +1,3 @@
-#include "ncurses.h"
 #include "globals.h"
 #include "entity.h"
 #include "scheduler.h"
