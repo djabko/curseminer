@@ -11,7 +11,7 @@ EntityController DEFAULT_CONTROLLER;
 Entity* ENTITY_ARRAY = NULL;
 int MAX = 32;
 
-static int g_behaviours_free_spots = 0;
+static int g_behaviour_free_spots = 0;
 static behaviour_t g_behaviour_count = 0;
 static behaviour_t g_behaviour_max = 0;
 static behaviour_func_t *g_behaviours;
@@ -30,24 +30,27 @@ static void set_entity_velocity(Entity *e, int vx, int vy) {
 behaviour_t entity_create_behaviour(behaviour_func_t func) {
     behaviour_t be;
 
-    if (0 < g_behaviours_free_spots) {
+    if (0 < g_behaviour_free_spots) {
 
         for (be = 0; be < g_behaviour_count; be++) {
             if (g_behaviours[be] == NULL) break;
         }
 
-        g_behaviours_free_spots--;
-
         if (g_behaviour_max <= be) return -1;
 
     } else if (g_behaviour_count <= g_behaviour_max) {
 
+        int old_behaviour_max = g_behaviour_max;
         g_behaviour_max = 0 < g_behaviour_max ? 2 * g_behaviour_max : 8;
         size_t new_size = g_behaviour_max * sizeof(behaviour_func_t);
 
         g_behaviours = realloc(g_behaviours, new_size);
+        log_debug("Allocated %lu bytes for ge_behaviours", new_size);
+
+        g_behaviour_free_spots += g_behaviour_max - old_behaviour_max;
     }
 
+    g_behaviour_free_spots--;
     g_behaviours[ g_behaviour_count ] = func;
 
     return g_behaviour_count++;
@@ -72,7 +75,7 @@ int entity_remove_behaviour(behaviour_t be) {
         return -1;
 
     g_behaviours[be] = NULL;
-    g_behaviours_free_spots++;
+    g_behaviour_free_spots++;
 
     return 0;
 }

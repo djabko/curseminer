@@ -460,7 +460,8 @@ World *world_init(int chunk_s, int maxid, size_t chunk_mem_max) {
 
     size_t chunk_mem_stride = sizeof(Chunk) + chunk_s * chunk_s;
     int chunk_max = chunk_mem_max / chunk_mem_stride;
-    CHUNK_HASHTABLE = ht_init(chunk_max);
+    int pages = (chunk_max + PAGE_SIZE) / PAGE_SIZE;
+    CHUNK_HASHTABLE = ht_init(pages);
 
     MAXID = maxid;
     new_world->chunk_s = chunk_s;

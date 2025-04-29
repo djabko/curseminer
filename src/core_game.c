@@ -117,7 +117,7 @@ bool game_resize_viewport(GameContext *game, int width, int height) {
                 tiles_on_screen, width, height);
 
         game->cache_world = realloc(game->cache_world, tiles_on_screen);
-        game->cache_entity = realloc(game->cache_entity, tiles_on_screen * sizeof(Entity));
+        game->cache_entity = realloc(game->cache_entity, tiles_on_screen * sizeof(Entity*));
         game_resize_dirty_flags(game, tiles_on_screen);
     }
 
