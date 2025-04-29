@@ -1,3 +1,6 @@
+//#define COMPILE_FRONTEND_NCURSES
+//#define COMPILE_FRONTEND_SDL2
+
 #include <stdio.h>
 #include <string.h>
 
@@ -8,8 +11,14 @@
 #include "games/curseminer.h"
 #include "games/other.h"
 #include "frontends/headless.h"
+
+#ifdef COMPILE_FRONTEND_NCURSES
 #include "frontends/ncurses.h"
+#endif
+
+#ifdef COMPILE_FRONTEND_SDL2
 #include "frontends/sdl2.h"
+#endif
 
 #define MIN_ARGS 0
 #define UPDATE_RATE 120 // times per second
@@ -40,29 +49,34 @@ static void init(frontend_t frontend, const char *title) {
     assert_log(GLOBALS.runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    frontend_init_t fuii;
-    frontend_exit_t fuie;
-    frontend_init_t fini;
-    frontend_exit_t fine;
+    frontend_init_t fuii = frontend_headless_ui_init;
+    frontend_exit_t fuie = frontend_headless_ui_exit;
+    frontend_init_t fini = frontend_headless_input_init;
+    frontend_exit_t fine = frontend_headless_input_exit;
 
+#ifdef COMPILE_FRONTEND_NCURSES
     if (frontend == FRONTEND_NCURSES) {
         fuii = frontend_ncurses_ui_init;
         fuie = frontend_ncurses_ui_exit;
         fini = frontend_ncurses_input_init;
         fine = frontend_ncurses_input_exit;
+    }
+#else
+        assert_log(frontend != FRONTEND_NCURSES,
+                "Ncurses frontend is not available in this build.");
+#endif
 
-    } else if (frontend == FRONTEND_SDL2) {
+#ifdef COMPILE_FRONTEND_SDL2
+    if (frontend == FRONTEND_SDL2) {
         fuii = frontend_sdl2_ui_init;
         fuie = frontend_sdl2_ui_exit;
         fini = frontend_sdl2_input_init;
         fine = frontend_sdl2_input_exit;
-
-    } else {
-        fuii = frontend_headless_ui_init;
-        fuie = frontend_headless_ui_exit;
-        fini = frontend_headless_input_init;
-        fine = frontend_headless_input_exit;
     }
+#else
+        assert_log(frontend != FRONTEND_SDL2,
+                "SDL2 frontend is not available in this build.")
+#endif
 
     frontend_register_ui(fuii, fuie);
     frontend_register_input(fini, fine);
@@ -82,45 +96,6 @@ static int exit_state() {
     return 0;
 }
 
-/*
-static int job_ui (Task* task, Stack64* stack) {
-    milliseconds_t sec = TIMER_NOW.tv_sec;
-    milliseconds_t msec = TIMER_NOW.tv_usec / 1000;
-
-    UI_update_time(sec * 1000 + msec);
-
-    int quit = UI_loop();
-
-    if (quit)
-        tk_kill(task);
-
-    tk_sleep(task, 1000 / SCREEN_REFRESH_RATE);
-
-    return 0;
-}
-
-static int job_gui(Task *task, Stack64 *stack) {
-    GUI_loop();
-
-    tk_sleep(task, 1000 / SCREEN_REFRESH_RATE);
-    return 0;
-}
-
-static unsigned long TRACK = 0;
-static int job_gui_poll_input(Task *task, Stack64 *stack) {
-    input_SDL2_poll();
-}
-
-static milliseconds_t LAST_SYNC_MS;
-static int job_gui_poll_input_track(Task *task, Stack64 *stack) {
-    log_debug("Input polls: %lu, time since last sync: %lu", TRACK, TIMER_NOW_MS - LAST_SYNC_MS);
-    LAST_SYNC_MS = TIMER_NOW_MS;
-    TRACK = 0;
-
-    tk_sleep(task, 1000);
-}
-*/
-
 static void cb_exit(Task* task) {
     scheduler_kill_all_tasks();
 }
@@ -136,7 +111,15 @@ int main(int argc, const char** argv) {
     const char *tui_string = "-tui";
     const char *gui_string = "-gui";
     const char *title = "Curseminer!";
-    int frontend = FRONTEND_SDL2;
+    int frontend;
+
+#ifdef COMPILE_FRONTEND_SDL2
+    frontend = FRONTEND_SDL2;
+#elifdef COMPILE_FRONTEND_NCURSES
+    frontend = FRONTEND_NCURSES;
+#else
+    frontend = FRONTEND_HEADLESS;
+#endif
 
     for (int i=1; i<argc; i++) {
         if (1 < argc) {
