@@ -117,6 +117,7 @@ static Chunk *chunk_get_free(World *world) {
 
             size_t mem = world->chunk_mem_max - world->chunk_mem_used;
             mem = mem <= DEFAULT_CHUNK_ARENA_SIZE ? mem : DEFAULT_CHUNK_ARENA_SIZE;
+            log_debug("Allocating %zu for chunk arena", mem);
             arena = chunk_init_arena(mem, world->chunk_s);
 
             if (!world->chunk_arenas) world->chunk_arenas = arena;
