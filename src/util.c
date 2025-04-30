@@ -4,7 +4,7 @@
 
 #include "util.h"
 #include "globals.h"
-#include "timer.h"
+#include "cm_time.h"
 
 /* Distance Functions */
 double euc_dist(double x1, double y1, double x2, double y2) {

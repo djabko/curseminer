@@ -17,22 +17,22 @@ extern milliseconds_t INIT_TIME_MS;
 extern milliseconds_t TIMER_NOW_MS;
 extern milliseconds_t TIMER_NEVER_MS;
 
-void timer_init(int);
-void timer_synchronize();
+void time_init(int);
+void time_synchronize();
 
-void timer_now(TimeStamp*);
-void timer_never(TimeStamp*);
+void time_now(TimeStamp*);
+void time_never(TimeStamp*);
 
-int timer_ready(TimeStamp*);
-int timer_nready(TimeStamp*);
-int timer_sleep(TimeStamp*);
+int time_ready(TimeStamp*);
+int time_nready(TimeStamp*);
+int time_sleep(TimeStamp*);
 
-void timer_print(TimeStamp*);
-void timer_print_now();
+void time_print(TimeStamp*);
+void time_print_now();
 
-milliseconds_t timer_to_ms(TimeStamp*);
-TimeStamp timer_diff(TimeStamp*, TimeStamp*);
-void timer_add_ms(TimeStamp*, milliseconds_t);
-milliseconds_t timer_diff_millisec(TimeStamp*, TimeStamp*);
+milliseconds_t time_to_ms(TimeStamp*);
+TimeStamp time_diff(TimeStamp*, TimeStamp*);
+void time_add_ms(TimeStamp*, milliseconds_t);
+milliseconds_t time_diff_millisec(TimeStamp*, TimeStamp*);
 
 #endif

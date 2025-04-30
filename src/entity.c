@@ -4,7 +4,7 @@
 #include "globals.h"
 #include "util.h"
 #include "stack64.h"
-#include "timer.h"
+#include "cm_time.h"
 #include "entity.h"
 
 EntityController DEFAULT_CONTROLLER;

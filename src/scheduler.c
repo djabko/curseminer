@@ -391,7 +391,7 @@ void schedule_run(ll_head* rqll) {
             node = node->next;
         }
 
-        timer_synchronize();
+        time_synchronize();
     }
 }
 

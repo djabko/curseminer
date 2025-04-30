@@ -12,7 +12,7 @@
 #include "globals.h"
 #include "util.h"
 #include "stack64.h"
-#include "timer.h"
+#include "cm_time.h"
 #include "core_game.h"
 #include "frontend.h"
 #include "frontends/ncurses.h"

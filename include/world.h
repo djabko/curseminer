@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "core_game.h"
-#include "timer.h"
+#include "time.h"
 
 typedef struct EntityType EntityType;
 typedef struct EntityController EntityController;

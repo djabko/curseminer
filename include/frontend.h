@@ -6,8 +6,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "timer.h"
-
 typedef enum {
     E_TYPE_NULL,
     E_TYPE_KB,

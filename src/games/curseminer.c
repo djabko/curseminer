@@ -369,6 +369,7 @@ int game_curseminer_init(GameContext *game, int opt) {
 }
 
 int game_curseminer_update() {
+    log_debug("Curseminer update loop!");
     GameContext *game = g_game;
 
     Entity *plr = GLOBALS.player;

@@ -1,5 +1,5 @@
 #include "globals.h"
-#include "timer.h"
+#include "cm_time.h"
 #include "stdio.h"
 #include "string.h"
 
@@ -14,31 +14,31 @@ milliseconds_t TIMER_NEVER_MS = -1;
 
 TimeStamp last_sync, refresh_rate;
 
-void timer_init(int ips) {
+void time_init(int ips) {
     refresh_rate.tv_sec = ips / 1000000;
     refresh_rate.tv_usec = 1000000 / ips;
 
-    timer_now(&INIT_TIME);
-    timer_now(&TIMER_NOW);
-    timer_now(&last_sync);
+    time_now(&INIT_TIME);
+    time_now(&TIMER_NOW);
+    time_now(&last_sync);
 
-    INIT_TIME_MS = timer_to_ms(&TIMER_NOW);
+    INIT_TIME_MS = time_to_ms(&TIMER_NOW);
     TIMER_NOW_MS = INIT_TIME_MS;
 }
 
-void timer_now(TimeStamp* ts) {
+void time_now(TimeStamp* ts) {
     //clock_gettime(CLOCK_MONOTONIC, ts);
     gettimeofday(ts, NULL);
 }
 
-void timer_never(TimeStamp* ts) {
+void time_never(TimeStamp* ts) {
     static TimeStamp never;
     never.tv_sec = -1;
     never.tv_usec = -1;
     memcpy(ts, &never, sizeof(TimeStamp));
 }
 
-void timer_add_ms(TimeStamp *ts, microseconds_t ms) {
+void time_add_ms(TimeStamp *ts, microseconds_t ms) {
     seconds_t sec = ts->tv_sec;
     microseconds_t usec = ts->tv_usec;
 
@@ -50,7 +50,7 @@ void timer_add_ms(TimeStamp *ts, microseconds_t ms) {
     ts->tv_usec = usec;
 }
 
-TimeStamp timer_diff(TimeStamp* a, TimeStamp* b) {
+TimeStamp time_diff(TimeStamp* a, TimeStamp* b) {
     TimeStamp time_diff;
 
     seconds_t asec = a->tv_sec;
@@ -64,7 +64,7 @@ TimeStamp timer_diff(TimeStamp* a, TimeStamp* b) {
     return time_diff;
 }
 
-milliseconds_t timer_diff_millisec(TimeStamp* a, TimeStamp* b) {
+milliseconds_t time_diff_millisec(TimeStamp* a, TimeStamp* b) {
     milliseconds_t diff = 0;
 
     seconds_t asec = a->tv_sec;
@@ -78,11 +78,11 @@ milliseconds_t timer_diff_millisec(TimeStamp* a, TimeStamp* b) {
     return diff;
 }
 
-int timer_nready(TimeStamp* ts) {
-    return !timer_ready(ts);
+int time_nready(TimeStamp* ts) {
+    return !time_ready(ts);
 }
 
-int timer_ready(TimeStamp* ts) {
+int time_ready(TimeStamp* ts) {
     if (ts->tv_sec < 0 || ts->tv_usec < 0) return 0;
 
     seconds_t asec = TIMER_NOW.tv_sec;
@@ -96,15 +96,15 @@ int timer_ready(TimeStamp* ts) {
     return delta_sec > 0 || delta_usec > 0;
 }
 
-int timer_sleep(TimeStamp* t) {
+int time_sleep(TimeStamp* t) {
     return usleep(6000000 * t->tv_sec + t->tv_usec);
 }
 
-milliseconds_t timer_to_ms(TimeStamp *ts) {
+milliseconds_t time_to_ms(TimeStamp *ts) {
     return ts->tv_sec * 1000 + ts->tv_usec / 1000;
 }
 
-void timer_print(TimeStamp* t) {
+void time_print(TimeStamp* t) {
     static long unsigned int hours, minutes, seconds, useconds;
     hours = t->tv_sec / (60*60) % (24);
     minutes = t->tv_sec / (60) % (60);
@@ -113,20 +113,20 @@ void timer_print(TimeStamp* t) {
     _log_debug("<%02lu:%02lu:%02lu.%lu>", hours, minutes, seconds, useconds);
 }
 
-void timer_print_now() {
-    timer_print(&TIMER_NOW);
+void time_print_now() {
+    time_print(&TIMER_NOW);
 }
 
-void timer_synchronize() {
+void time_synchronize() {
     static TimeStamp delta, sleepts;
-    timer_now(&TIMER_NOW);
-    TIMER_NOW_MS = timer_to_ms(&TIMER_NOW);
+    time_now(&TIMER_NOW);
+    TIMER_NOW_MS = time_to_ms(&TIMER_NOW);
 
-    delta = timer_diff(&TIMER_NOW, &last_sync);
-    sleepts = timer_diff(&refresh_rate, &delta);
+    delta = time_diff(&TIMER_NOW, &last_sync);
+    sleepts = time_diff(&refresh_rate, &delta);
 
-    timer_sleep(&sleepts);
+    time_sleep(&sleepts);
 
-    timer_now(&last_sync);
+    time_now(&last_sync);
 }
 

@@ -1,12 +1,12 @@
-//#define COMPILE_FRONTEND_NCURSES
-//#define COMPILE_FRONTEND_SDL2
+#define COMPILE_FRONTEND_NCURSES
+#define COMPILE_FRONTEND_SDL2
 
 #include <stdio.h>
 #include <string.h>
 
 #include "globals.h"
 #include "scheduler.h"
-#include "timer.h"
+#include "cm_time.h"
 #include "games/curseminer.h"
 #include "games/other.h"
 #include "frontends/headless.h"
@@ -41,7 +41,7 @@ struct Globals GLOBALS = {
 static RunQueue* g_runqueue = NULL;
 
 static void init(frontend_t frontend, const char *title) {
-    timer_init(UPDATE_RATE);
+    time_init(UPDATE_RATE);
 
     GLOBALS.runqueue_list = scheduler_init();
     g_runqueue = scheduler_new_rq(GLOBALS.runqueue_list);

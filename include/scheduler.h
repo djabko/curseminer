@@ -1,7 +1,7 @@
 #ifndef RUN_QUEUE_HEADER
 #define RUN_QUEUE_HEADER
 
-#include "timer.h"
+#include "cm_time.h"
 #include "stack64.h"
 
 #define RQ_MEMPOOL_SIZE 4096 * 1
