@@ -24,7 +24,9 @@
 #include "games/curseminer.h"
 #include "frontends/headless.h"
 
-#define g_update_rate 1
+#define g_update_rate 10
+#define g_screen_w 240
+#define g_screen_h 280
 
 #define g_spi_freq (60 * 1000 * 1000)
 #define g_spi_lcd SPI3_HOST
@@ -41,8 +43,8 @@
 struct Globals GLOBALS = {
     .player = NULL,
     .input_context = E_CTX_0,
-    .view_port_maxx = 5,
-    .view_port_maxy = 5,
+    .view_port_maxx = 10,
+    .view_port_maxy = 10,
 };
 
 typedef struct Resolution {
@@ -53,9 +55,23 @@ Resolution g_resolution = {.w = 240, .h = 280};
 
 static RunQueue *g_runqueue;
 
+esp_lcd_panel_handle_t g_lcd_panel;
+static uint16_t *g_draw_buffer;
+
+static void draw_square(int x, int y, int len, uint16_t color) {
+    log_debug("Drawing %d square at (%d, %d)", len, x, y);
+    size_t size = len * len * sizeof(uint16_t);
+    uint16_t *data = malloc(size);
+
+    memset(data, color, size);
+    esp_lcd_panel_draw_bitmap(g_lcd_panel, x, y, x + len, y + len, data);
+
+    free(data);
+}
+
 #define TAG "Panel"
-static int init_panel() {
-    int ret = 0;
+static esp_err_t init_panel() {
+    esp_err_t err = 0;
 
     gpio_config_t bk_gpio_cfg = {
         .pin_bit_mask = 1ULL << g_gpio_lcd_bl,
@@ -105,40 +121,42 @@ static int init_panel() {
                 &io_handle),
             TAG, "New panel IO failed");
 
-    esp_lcd_panel_handle_t lcd_panel = NULL;
-
     ESP_RETURN_ON_ERROR(
-            esp_lcd_new_panel_st7789(io_handle, &panel_cfg, &lcd_panel),
+            esp_lcd_new_panel_st7789(io_handle, &panel_cfg, &g_lcd_panel),
             TAG, "New panel failed");
 
-    esp_lcd_panel_reset(lcd_panel);
-    esp_lcd_panel_init(lcd_panel);
+    esp_lcd_panel_reset(g_lcd_panel);
+    esp_lcd_panel_init(g_lcd_panel);
 
-    esp_lcd_panel_invert_color(lcd_panel, false);
-    esp_lcd_panel_disp_on_off(lcd_panel, true);
-    esp_lcd_panel_mirror(lcd_panel, false, false);
-    esp_lcd_panel_set_gap(lcd_panel, 0, 0);
+    esp_lcd_panel_invert_color(g_lcd_panel, false);
+    esp_lcd_panel_disp_on_off(g_lcd_panel, true);
+    esp_lcd_panel_mirror(g_lcd_panel, false, false);
+    esp_lcd_panel_set_gap(g_lcd_panel, 0, 0);
 
     ESP_ERROR_CHECK(
             gpio_set_level(g_gpio_lcd_bl, 1));
 
-    const void *data[32];
-    memset(data, 0x80, 32);
+    draw_square(0, 0, g_screen_w, 0x80);
 
-    int sx = 0;
-    int y = 100;
-    for (int ex = sx; ex < 200; ex += 10) {
-        esp_lcd_panel_draw_bitmap(lcd_panel, sx, y, ex, y+50, data);
-        WAIT(1000);
-    }
-
-    return ret;
+    return err;
 }
 
-static void init(const char *title) {
-    init_panel();
-    time_init(g_update_rate);
+static bool set_glyphset(const char* name) { return false; }
 
+static int ui_init(Frontend* fr, const char *title) {
+    fr->f_set_glyphset = set_glyphset;
+
+    init_panel();
+
+    return 0;
+}
+
+static void ui_exit() {}
+
+static void init(const char *title) {
+    ESP_ERROR_CHECK(init_panel());
+
+    time_init(g_update_rate);
     GLOBALS.runqueue_list = scheduler_init();
     g_runqueue = scheduler_new_rq(GLOBALS.runqueue_list);
     GLOBALS.runqueue = g_runqueue;
@@ -146,8 +164,8 @@ static void init(const char *title) {
     assert_log(GLOBALS.runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    frontend_init_t fuii = frontend_headless_ui_init;
-    frontend_exit_t fuie = frontend_headless_ui_exit;
+    frontend_init_t fuii = ui_init;
+    frontend_exit_t fuie = ui_exit;
     frontend_init_t fini = frontend_headless_input_init;
     frontend_exit_t fine = frontend_headless_input_exit;
 
@@ -164,9 +182,72 @@ static void cb_exit(Task* task) {
     scheduler_kill_all_tasks();
 }
 
+static int job_render(Task *task, Stack64 *st) {
+    Skin* skin;
+    DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
+
+    // No tiles to draw
+    if (df->command == 0) {
+        return 0;
+
+    // Draw only dirty tiles
+    } else if (df->command == 1) {
+
+        size_t s = df->stride;
+        int maxx = GLOBALS.view_port_maxx;
+
+        for (int i = 0; i < s; i++) {
+            if (df->groups[i]) {
+
+                for (int j = 0; j < s; j++) {
+
+                    int index = i * s + j;
+                    byte_t flag = df->flags[index];
+
+                    if (flag == 1) {
+
+                        int x = index % maxx;
+                        int y = index / maxx;
+
+                        skin = game_world_getxy(GLOBALS.game, x, y);
+
+                        uint16_t color = (skin->fg_r >> 3) + (skin->fg_b >> 2) + (skin->fg_b >> 3);
+
+                        int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
+                        int tile_h =  tile_w;
+                        draw_square(x * tile_w, y * tile_h, tile_w, color);
+                        game_set_dirty(GLOBALS.game, x, y, 0);
+                    }
+                }
+            }
+        }
+
+
+    // Update all tiles
+    } else if (df->command == -1) {
+        for (int y = 0; y < GLOBALS.view_port_maxx; y++) {
+            for (int x = 0; x < GLOBALS.view_port_maxy; x++) {
+
+                skin = game_world_getxy(GLOBALS.game, x, y);
+
+                uint16_t color = (skin->fg_r >> 3) + (skin->fg_b >> 2) + (skin->fg_b >> 3);
+                int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
+                int tile_h =  tile_w;
+                draw_square(x * tile_w, y * tile_h, tile_w, color);
+                game_set_dirty(GLOBALS.game, x, y, 0);
+            }
+        }
+    }
+
+    df->command = 0;
+    return 0;
+}
+
 void app_main(void)
 {
     init("Curseminer!");
+
+    draw_square(20, 20, 100, 0x8000);
 
     GameContextCFG gcfg = {
         .skins_max = 12,
@@ -179,16 +260,13 @@ void app_main(void)
     };
 
     World *world = world_init(10, 10, 4 * 4096);
-    log_debug("1");
-    log_debug("2");
-    log_debug("3");
-    log_debug("4");
-    log_debug("5");
     GameContext *gctx = game_init(&gcfg, world);
+    GLOBALS.game = gctx;
 
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) gctx);
     schedule_cb(g_runqueue, 0, 0, game_update, gst, cb_exit);
+    schedule_cb(g_runqueue, 0, 0, job_render, NULL, cb_exit);
     schedule_run(GLOBALS.runqueue_list);
 
     printf("Restarting now.\n");

@@ -1,4 +1,5 @@
-build
-sdkconfig.old
-sdkconfig.ci
-vim
+esp32s3-waveshare/build
+esp32s3-waveshare/sdkconfig.old
+esp32s3-waveshare/sdkconfig.ci
+esp32s3-waveshare/vim
+esp32s3-waveshare/.ninja_log
