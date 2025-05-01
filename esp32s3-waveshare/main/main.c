@@ -59,21 +59,28 @@ typedef struct Resolution {
 } Resolution;
 
 Resolution g_resolution = {.w = 240, .h = 280};
+uint16_t *g_framebuffer;
 
 static RunQueue *g_runqueue;
 
 esp_lcd_panel_handle_t g_lcd_panel;
 static uint16_t *g_draw_buffer;
 
-static void draw_square(int x, int y, int len, uint16_t color) {
-    size_t size = len * len * sizeof(uint16_t);
-    uint16_t *data = malloc(size);
+static void draw_square(int x1, int y1, int len, uint16_t color) {
+    if (!g_framebuffer) return;
 
-    for (int i = 0; i < len * len; i++) data[i] = color;
+    int x2 = x1 + len;
+    int y2 = y1 + len;
 
-    esp_lcd_panel_draw_bitmap(g_lcd_panel, x, y, x + len, y + len, data);
+    for (int y = y1; y < y2; y++)
+        for (int x = x1; x < x2; x++)
+            g_framebuffer[y * g_resolution.w + x] = color;
+}
 
-    free(data);
+static void lcd_flush() {
+    if (!g_framebuffer) return;
+
+    esp_lcd_panel_draw_bitmap(g_lcd_panel, 0, 0, g_resolution.w, g_resolution.h, g_framebuffer);
 }
 
 #define TAG "Panel"
@@ -143,7 +150,17 @@ static esp_err_t init_panel() {
     ESP_ERROR_CHECK(
             gpio_set_level(g_gpio_lcd_bl, 1));
 
+    size_t size = g_resolution.w * g_resolution.h * panel_cfg.bits_per_pixel;
+    g_framebuffer = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+
+    assert_log(g_framebuffer != NULL,
+            "FATAL ERROR: Failed to allocate %zuB for g_framebuffer", size);
+
+    log_debug("Drawing %dx%d square at (%d, %d)", g_screen_w, g_screen_w, 0, 0);
     draw_square(0, 0, g_screen_w, 0x00);
+
+    log_debug("Flushing lcd");
+    lcd_flush();
 
     return err;
 }
@@ -165,7 +182,7 @@ static void read_gyro_data(int16_t *angle_x, int16_t *angle_y, int16_t *angle_z)
     // Reset FIFO
     wbuf[0] = g_imu_ctrl9;
     wbuf[1] = 0x04;
-    i2c_master_transmit(g_imu_handle, wbuf, 2, 1000);
+    i2c_master_transmit(g_imu_handle, wbuf, 1, 1000);
 
 
     wbuf[0] = 0x2F; // STATUS1 register
@@ -362,6 +379,8 @@ static int job_render(Task *task, Stack64 *st) {
             }
         }
     }
+
+    lcd_flush();
 
     df->command = 0;
     return 0;
