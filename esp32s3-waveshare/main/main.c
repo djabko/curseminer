@@ -58,6 +58,16 @@ typedef struct Resolution {
     int w, h;
 } Resolution;
 
+typedef uint8_t imu_enable_t;
+const imu_enable_t IMU_ENABLE_SYNCSMPL           = 0b10000000;
+const imu_enable_t IMU_ENABLE_SYS_HS             = 0b01000000;
+const imu_enable_t IMU_ENABLE_RESERVED           = 0b00100000; // Do not use
+const imu_enable_t IMU_ENABLE_SNOOZE_MODE        = 0b00010000;
+const imu_enable_t IMU_ENABLE_ATTITUDE_ENGINE    = 0b00001000;
+const imu_enable_t IMU_ENABLE_MAGNETOMETER       = 0b00000100;
+const imu_enable_t IMU_ENABLE_GYROSCOPE          = 0b00000010;
+const imu_enable_t IMU_ENABLE_ACCELEROMETER      = 0b00000001;
+
 Resolution g_resolution = {.w = 240, .h = 280};
 uint16_t *g_framebuffer;
 
@@ -208,7 +218,7 @@ static void read_magno_data(int16_t *magno_x, int16_t *magno_y, int16_t *magno_z
     read_imu_data(0x65, magno_x, magno_y, magno_z);
 }
 
-static esp_err_t init_imu() {
+static esp_err_t init_imu(imu_enable_t enable_flags) {
     i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
 
@@ -282,7 +292,7 @@ static esp_err_t init_imu() {
 
     // Enable gyro and accel
     wbuf[0] = g_imu_ctrl7;
-    wbuf[1] = 0b00000011;
+    wbuf[1] = enable_flags;
     log_debug("Sending {0x%.02X 0x%.02X} to 0x%.02X", wbuf[0], wbuf[1], imu_cfg.device_address);
     i2c_master_transmit(g_imu_handle, wbuf, 2, 1000);
 
@@ -304,8 +314,12 @@ static int ui_init(Frontend* fr, const char *title) {
 static void ui_exit() {}
 
 static void init(const char *title) {
+
+    // Accelerometer requires gyro mode enabled
+    imu_enable_t flags = IMU_ENABLE_ACCELEROMETER | IMU_ENABLE_GYROSCOPE;
+
     ESP_ERROR_CHECK(init_panel());
-    ESP_ERROR_CHECK(init_imu());
+    ESP_ERROR_CHECK(init_imu(flags));
 
     time_init(g_update_rate);
     GLOBALS.runqueue_list = scheduler_init();
@@ -396,30 +410,25 @@ static int job_render(Task *task, Stack64 *st) {
     return 0;
 }
 
-static const uint8_t I_UP = 1;
-static const uint8_t I_DOWN = 2;
-static const uint8_t I_LEFT = 3;
+static const uint8_t I_STILL = 0;
+static const uint8_t I_UP    = 1;
+static const uint8_t I_DOWN  = 2;
+static const uint8_t I_LEFT  = 3;
 static const uint8_t I_RIGHT = 4;
-static uint8_t g_intent = I_LEFT;
-static uint8_t g_move = I_LEFT;
+static uint8_t g_intent = I_STILL;
+static uint8_t g_move = I_STILL;
+
 static int job_input(Task *task, Stack64 *st) {
-    static const int thld = 12000;
+    static const int thld = 5000;
     int16_t x, y, z;
 
     read_accel_data(&x, &y, &z);
-    log_debug("%hd %hd %hd", x, y, z);
 
-    if (x > thld) {
-        g_intent = I_DOWN;
-    } else if (x < -thld) {
-        g_intent = I_UP;
-    }
-
-    if (y > thld) {
-        g_intent = I_LEFT;
-    } else if (y < -thld) {
-        g_intent = I_RIGHT;
-    }
+    if      (x > thld)  g_intent = I_DOWN;
+    else if (x < -thld) g_intent = I_UP;
+    else if (y > thld)  g_intent = I_LEFT;
+    else if (y < -thld) g_intent = I_RIGHT;
+    else                g_intent = I_STILL;
 
     event_ctx_t ctx = E_CTX_GAME;
     InputEvent ie = {
@@ -495,6 +504,17 @@ static int job_input(Task *task, Stack64 *st) {
             frontend_dispatch_event(ctx, &ie);
 
             log_debug("DOWN");
+
+        } else if (g_move == I_STILL) {
+            ie.state = ES_UP;
+            ie.id = E_KB_W;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_A;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_S;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_D;
+            frontend_dispatch_event(ctx, &ie);
         }
     }
 
