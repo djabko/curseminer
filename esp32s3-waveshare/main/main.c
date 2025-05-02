@@ -50,8 +50,8 @@
 struct Globals GLOBALS = {
     .player = NULL,
     .input_context = E_CTX_0,
-    .view_port_maxx = 10,
-    .view_port_maxy = 10,
+    .view_port_maxx = 20,
+    .view_port_maxy = 20,
 };
 
 typedef struct Resolution {
@@ -156,10 +156,7 @@ static esp_err_t init_panel() {
     assert_log(g_framebuffer != NULL,
             "FATAL ERROR: Failed to allocate %zuB for g_framebuffer", size);
 
-    log_debug("Drawing %dx%d square at (%d, %d)", g_screen_w, g_screen_w, 0, 0);
     draw_square(0, 0, g_screen_w, 0x00);
-
-    log_debug("Flushing lcd");
     lcd_flush();
 
     return err;
@@ -169,11 +166,12 @@ typedef const uint8_t reg_t;
 static reg_t g_imu_ctrl1 = 0x02;
 static reg_t g_imu_ctrl2 = 0x03;
 static reg_t g_imu_ctrl3 = 0x04;
+//static reg_t g_imu_ctrl4 = 0x05;
 static reg_t g_imu_ctrl7 = 0x08;
 static reg_t g_imu_ctrl9 = 0x0A;
 static i2c_master_dev_handle_t g_imu_handle;
 
-static void read_gyro_data(int16_t *angle_x, int16_t *angle_y, int16_t *angle_z) {
+static void read_imu_data(reg_t reg_start, int16_t *x, int16_t *y, int16_t *z) {
     uint8_t wbuf[1];
     uint8_t rbuf[6];
     memset(wbuf, 0x00, 1);
@@ -189,13 +187,25 @@ static void read_gyro_data(int16_t *angle_x, int16_t *angle_y, int16_t *angle_z)
     ESP_ERROR_CHECK(
             i2c_master_transmit_receive(g_imu_handle, wbuf, 1, rbuf, 6, 1000));
 
-    wbuf[0] = 0x3B; // First out of 6 acceleration registers
+    wbuf[0] = reg_start; // First out of 6 registers
     ESP_ERROR_CHECK(
             i2c_master_transmit_receive(g_imu_handle, wbuf, 1, rbuf, 6, 1000));
 
-    *angle_x = (int16_t)(rbuf[0]) + ((int16_t)(rbuf[1]) << 8);
-    *angle_y = (int16_t)(rbuf[2]) + ((int16_t)(rbuf[3]) << 8);
-    *angle_z = (int16_t)(rbuf[4]) + ((int16_t)(rbuf[5]) << 8);
+    *x = (int16_t)(rbuf[0]) + ((int16_t)(rbuf[1]) << 8);
+    *y = (int16_t)(rbuf[2]) + ((int16_t)(rbuf[3]) << 8);
+    *z = (int16_t)(rbuf[4]) + ((int16_t)(rbuf[5]) << 8);
+}
+
+static void read_accel_data(int16_t *accel_x, int16_t *accel_y, int16_t *accel_z) {
+    read_imu_data(0x35, accel_x, accel_y, accel_z);
+}
+
+static void read_gyro_data(int16_t *angle_x, int16_t *angle_y, int16_t *angle_z) {
+    read_imu_data(0x3B, angle_x, angle_y, angle_z);
+}
+
+static void read_magno_data(int16_t *magno_x, int16_t *magno_y, int16_t *magno_z) {
+    read_imu_data(0x65, magno_x, magno_y, magno_z);
 }
 
 static esp_err_t init_imu() {
@@ -386,34 +396,106 @@ static int job_render(Task *task, Stack64 *st) {
     return 0;
 }
 
+static const uint8_t I_UP = 1;
+static const uint8_t I_DOWN = 2;
+static const uint8_t I_LEFT = 3;
+static const uint8_t I_RIGHT = 4;
+static uint8_t g_intent = I_LEFT;
+static uint8_t g_move = I_LEFT;
 static int job_input(Task *task, Stack64 *st) {
+    static const int thld = 12000;
     int16_t x, y, z;
 
-    read_gyro_data(&x, &y, &z);
+    read_accel_data(&x, &y, &z);
+    log_debug("%hd %hd %hd", x, y, z);
+
+    if (x > thld) {
+        g_intent = I_DOWN;
+    } else if (x < -thld) {
+        g_intent = I_UP;
+    }
+
+    if (y > thld) {
+        g_intent = I_LEFT;
+    } else if (y < -thld) {
+        g_intent = I_RIGHT;
+    }
 
     event_ctx_t ctx = E_CTX_GAME;
     InputEvent ie = {
         .type = E_KB_DOWN,
-        .state = ES_DOWN,
         .mods = E_NOMOD,
     };
 
-    int thld = 2000;
+    event_t kb_down = E_NULL;
+    event_t kb_up = E_NULL;
 
-    if (x > thld) {
-        ie.id = E_KB_W;
-        frontend_dispatch_event(ctx, &ie);
-    } else if (x < -thld) {
-        ie.id = E_KB_S;
-        frontend_dispatch_event(ctx, &ie);
-    }
+    if (g_move != g_intent) {
+        g_move = g_intent;
 
-    if (z > thld) {
-        ie.id = E_KB_D;
-        frontend_dispatch_event(ctx, &ie);
-    } else if (z < -thld) {
-        ie.id = E_KB_A;
-        frontend_dispatch_event(ctx, &ie);
+        if (g_move == I_LEFT) {
+            ie.state = ES_UP;
+            ie.id = E_KB_W;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_S;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_D;
+            frontend_dispatch_event(ctx, &ie);
+
+            ie.state = ES_DOWN;
+            ie.id = E_KB_A;
+            frontend_dispatch_event(ctx, &ie);
+
+            log_debug("LEFT");
+        }
+
+        else if (g_move== I_RIGHT) {
+            ie.state = ES_UP;
+            ie.id = E_KB_W;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_S;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_A;
+            frontend_dispatch_event(ctx, &ie);
+
+            ie.state = ES_DOWN;
+            ie.id = E_KB_D;
+            frontend_dispatch_event(ctx, &ie);
+
+            log_debug("RIGHT");
+        }
+
+        else if (g_move == I_UP) {
+            ie.state = ES_UP;
+            ie.id = E_KB_S;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_A;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_D;
+            frontend_dispatch_event(ctx, &ie);
+
+            ie.state = ES_DOWN;
+            ie.id = E_KB_W;
+            frontend_dispatch_event(ctx, &ie);
+
+            log_debug("UP");
+        }
+
+        else if (g_move == I_DOWN) {
+            ie.state = ES_UP;
+            ie.id = E_KB_W;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_A;
+            frontend_dispatch_event(ctx, &ie);
+            ie.id = E_KB_D;
+            frontend_dispatch_event(ctx, &ie);
+
+            ie.state = ES_DOWN;
+            ie.id = E_KB_S;
+            frontend_dispatch_event(ctx, &ie);
+
+            log_debug("DOWN");
+        }
     }
 
     return 0;
