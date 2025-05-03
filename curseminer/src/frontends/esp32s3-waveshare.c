@@ -64,6 +64,11 @@ static uint16_t *g_draw_buffer;
 static void draw_square(int x1, int y1, int len, uint16_t color) {
     if (!g_framebuffer) return;
 
+
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    color = (color << 8) | (color >> 8);
+#endif
+
     int x2 = x1 + len;
     int y2 = y1 + len;
 
@@ -290,49 +295,12 @@ static void exit_panel() {
     // TODO
 }
 
+static uint16_t rgb888_to_rgb565(uint8_t r, uint8_t g, uint8_t b) {
+    return (uint16_t) ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
 static uint16_t g_color_constant = 0xFFFF;
 static int job_render(Task *task, Stack64 *st) {
-
-    /*
-    int t = 4;
-    int len = g_resolution.w / t;
-
-    static uint16_t colors[] = {
-        0b0000000000000000, //0b 0000 0000 0000 0000
-        0b1000000000000000, //0b 0100 0010 0000 0000
-        0b1100000000000000, //0b 0100 0010 1000 0000
-        0b1110000000000000, //0b 0110 0011 0000 1010
-
-        0b1111000000000000,
-        0b1111100000000000,
-        0b1111100000000000,
-        0b0011100000000000,
-
-        0b0001100000000000,
-        0b0000100000000000,
-        0b0000000000000000, //0b0000000000000000
-        0b1000000000000000,
-
-        0b0100000000000000,
-        0b0010000000000000,
-        0b0001000000000000,
-        0b0000100000000000,
-    };
-
-    for (int i = 0; i < t*t; i++) {
-        int x = (i % t) * len;
-        int y = (i / t) * len;
-
-        //uint16_t c = (colors[i] << 8) | (colors[i] >> 8);
-        uint16_t c = colors[i]; 
-        draw_square(x, y, len, c);
-    }
-
-    lcd_flush();
-
-    return 0;
-    */
-
     Skin* skin;
     DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
 
@@ -361,7 +329,7 @@ static int job_render(Task *task, Stack64 *st) {
 
                         skin = game_world_getxy(GLOBALS.game, x, y);
 
-                        uint16_t color = (skin->fg_r >> 3) + (skin->fg_b >> 2) + (skin->fg_b >> 3);
+                        uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
 
                         int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
                         int tile_h =  tile_w;
@@ -380,7 +348,8 @@ static int job_render(Task *task, Stack64 *st) {
 
                 skin = game_world_getxy(GLOBALS.game, x, y);
 
-                uint16_t color = (skin->fg_r >> 3) + (skin->fg_b >> 2) + (skin->fg_b >> 3);
+                uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
                 int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
                 int tile_h =  tile_w;
                 draw_square(x * tile_w, y * tile_h, tile_w, color);
@@ -512,6 +481,54 @@ static bool set_glyphset(const char* name) {
     return false;
 }
 
+void lcd_test() {
+    int t = 3;
+    int len = g_resolution.w / t;
+
+    draw_square(0, 0, g_resolution.w, 0x0000);
+    lcd_flush();
+    WAIT(1000);
+    draw_square(0, 0, g_resolution.w, 0xFFFF);
+    lcd_flush();
+    WAIT(1000);
+    draw_square(0, 0, g_resolution.w, 0x8080);
+    lcd_flush();
+    WAIT(1000);
+
+    const uint16_t a = 0b0000000000011111;
+    const uint16_t b = 0b1111100000000000;
+    const uint16_t c = 0b0001111100000000;
+    const uint16_t d = 0b0000000011111000;
+    const uint16_t _c = (a>>8) | (a<<8);
+    const uint16_t _d = (b>>8) | (b<<8);
+    log_debug("a=%X b=%X c=%X d=%X _c=%X _d=%X", a, b, c, d, _c, _d);
+
+    static uint16_t colors[] = {
+        0x0000,
+        a,
+        b,
+
+        0xFFFF,
+        c,
+        d,
+
+        _c,
+        _d,
+        0x0000,
+    };
+
+    for (int i = 0; i < t*t; i++) {
+        int x = (i % t) * len;
+        int y = (i / t) * len;
+
+        //uint16_t c = (colors[i] << 8) | (colors[i] >> 8);
+        uint16_t c = colors[i]; 
+        draw_square(x, y, len, c);
+    }
+
+    lcd_flush();
+}
+
 int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
 
     // Accelerometer requires gyro mode enabled
@@ -520,12 +537,13 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
     ESP_ERROR_CHECK(init_panel());
     ESP_ERROR_CHECK(init_imu(flags));
 
-
     fr->f_set_glyphset = set_glyphset;
 
     schedule(GLOBALS.runqueue, 0, 0, job_render, NULL);
 
     init_panel();
+
+    lcd_test();
 
     return 0;
 }
