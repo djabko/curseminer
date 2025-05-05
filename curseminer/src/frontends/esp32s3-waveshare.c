@@ -51,30 +51,32 @@ const imu_enable_t IMU_ENABLE_MAGNETOMETER       = 0b00000100;
 const imu_enable_t IMU_ENABLE_GYROSCOPE          = 0b00000010;
 const imu_enable_t IMU_ENABLE_ACCELEROMETER      = 0b00000001;
 
+int g_counter = 0;
+
 typedef struct Resolution {
     int w, h;
 } Resolution;
 
-Resolution g_resolution = {.w = 240, .h = 280};
+Resolution g_resolution = {.w = g_screen_w, .h = g_screen_h};
 uint16_t *g_framebuffer;
 
 esp_lcd_panel_handle_t g_lcd_panel;
 static uint16_t *g_draw_buffer;
 
-static void draw_square(int x1, int y1, int len, uint16_t color) {
-    if (!g_framebuffer) return;
-
+static void draw_rect(int x1, int y1, int x2, int y2, uint16_t color) {
+    if (!g_framebuffer || x2 < x1 || y2 < y1) return;
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     color = (color << 8) | (color >> 8);
 #endif
 
-    int x2 = x1 + len;
-    int y2 = y1 + len;
-
     for (int y = y1; y < y2; y++)
         for (int x = x1; x < x2; x++)
             g_framebuffer[y * g_resolution.w + x] = color;
+}
+
+static void draw_square(int x1, int y1, int len, uint16_t color) {
+    draw_rect(x1, y1, x1 + len, y1 + len, color);
 }
 
 static void lcd_flush() {
@@ -279,13 +281,13 @@ static esp_err_t init_panel() {
     ESP_ERROR_CHECK(
             gpio_set_level(g_gpio_lcd_bl, 1));
 
-    size_t size = g_resolution.w * g_resolution.h * panel_cfg.bits_per_pixel;
+    size_t size = g_resolution.w * g_resolution.h  * panel_cfg.bits_per_pixel;
     g_framebuffer = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
 
     assert_log(g_framebuffer != NULL,
             "FATAL ERROR: Failed to allocate %zuB for g_framebuffer", size);
 
-    draw_square(0, 0, g_screen_w, 0x00);
+    draw_rect(0, 0, g_screen_w, g_screen_h, 0x00);
     lcd_flush();
 
     return err;
@@ -301,6 +303,8 @@ static uint16_t rgb888_to_rgb565(uint8_t r, uint8_t g, uint8_t b) {
 
 static uint16_t g_color_constant = 0xFFFF;
 static int job_render(Task *task, Stack64 *st) {
+    if (g_counter) log_debug("g_counter = %d", g_counter);
+    g_counter = 0;
     Skin* skin;
     DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
 
@@ -333,6 +337,7 @@ static int job_render(Task *task, Stack64 *st) {
 
                         int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
                         int tile_h =  tile_w;
+
                         draw_square(x * tile_w, y * tile_h, tile_w, color);
                         game_set_dirty(GLOBALS.game, x, y, 0);
                     }
@@ -343,8 +348,8 @@ static int job_render(Task *task, Stack64 *st) {
 
     // Update all tiles
     } else if (df->command == -1) {
-        for (int y = 0; y < GLOBALS.view_port_maxx; y++) {
-            for (int x = 0; x < GLOBALS.view_port_maxy; x++) {
+        for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
+            for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
 
                 skin = game_world_getxy(GLOBALS.game, x, y);
 
@@ -352,6 +357,7 @@ static int job_render(Task *task, Stack64 *st) {
 
                 int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
                 int tile_h =  tile_w;
+
                 draw_square(x * tile_w, y * tile_h, tile_w, color);
                 game_set_dirty(GLOBALS.game, x, y, 0);
             }
@@ -485,13 +491,20 @@ void lcd_test() {
     int t = 3;
     int len = g_resolution.w / t;
 
-    draw_square(0, 0, g_resolution.w, 0x0000);
+    draw_rect(0, 0, g_resolution.w, g_resolution.h, 0x0000);
     lcd_flush();
     WAIT(1000);
-    draw_square(0, 0, g_resolution.w, 0xFFFF);
+    draw_rect(0, 0, g_resolution.w, g_resolution.h, 0xFFFF);
     lcd_flush();
     WAIT(1000);
-    draw_square(0, 0, g_resolution.w, 0x8080);
+    draw_rect(0, 0, g_resolution.w, g_resolution.h, 0x8080);
+    lcd_flush();
+    WAIT(1000);
+
+    int s = 50;
+    draw_square(0, g_resolution.h-1*s, s, 0x7BCF);
+    draw_square(0, g_resolution.h-2*s, s, 0x7CCF);
+    draw_square(0, g_resolution.h-3*s, s, 0x7DCF);
     lcd_flush();
     WAIT(1000);
 
@@ -527,6 +540,52 @@ void lcd_test() {
     }
 
     lcd_flush();
+    WAIT(1000);
+}
+
+void btn_isr(void *args) {
+    g_counter++;
+
+    InputEvent ie = {
+        .id = E_KB_Z,
+        .type = E_TYPE_KB,
+        .state = ES_DOWN,
+        .mods = E_NOMOD,
+    };
+
+    frontend_dispatch_event(E_CTX_GAME, &ie);
+
+    ie.state = ES_UP;
+    frontend_dispatch_event(E_CTX_GAME, &ie);
+}
+
+esp_err_t init_btn(gpio_num_t gpio) {
+    printf("\n");
+
+    ESP_RETURN_ON_ERROR(gpio_reset_pin(gpio),
+            TAG, "Failed to reset gpio pin %d", gpio);
+
+    gpio_config_t bcfg = {
+        .pin_bit_mask = 1ULL << gpio,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_POSEDGE,
+    };
+
+    ESP_RETURN_ON_ERROR(gpio_config(&bcfg),
+            TAG, "Failed to configure gpio %d", gpio);
+
+    ESP_RETURN_ON_ERROR(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1),
+            TAG, "Failed to install ISR for gpio %d", gpio);
+
+    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(gpio, btn_isr, NULL),
+            TAG, "Failed to add ISR handler %p for gpio %d", btn_isr, gpio);
+
+    log_debug("Initialized isr for gpio %d", gpio);
+    log_debug_nl();
+
+    return ESP_OK;
 }
 
 int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
@@ -534,6 +593,7 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
     // Accelerometer requires gyro mode enabled
     imu_enable_t flags = IMU_ENABLE_ACCELEROMETER | IMU_ENABLE_GYROSCOPE;
 
+    ESP_ERROR_CHECK(init_btn(GPIO_NUM_18));
     ESP_ERROR_CHECK(init_panel());
     ESP_ERROR_CHECK(init_imu(flags));
 

@@ -23,7 +23,7 @@ struct Globals GLOBALS = {
     .player = NULL,
     .input_context = E_CTX_0,
     .view_port_maxx = 20,
-    .view_port_maxy = 20,
+    .view_port_maxy = 23,
 };
 
 static RunQueue *g_runqueue;
@@ -60,7 +60,7 @@ void app_main(void)
     GameContextCFG gcfg = {
         .skins_max = 12,
         .entity_types_max = 12,
-        .scroll_threshold = 2,
+        .scroll_threshold = 5,
 
         .f_init = game_curseminer_init,
         .f_update = game_curseminer_update,
