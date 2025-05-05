@@ -1,9 +1,9 @@
-#include "stack64.h"
-#include "globals.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+
+#include "curseminer/stack64.h"
+#include "curseminer/globals.h"
 
 
 /* STACK FUNCTIONS */

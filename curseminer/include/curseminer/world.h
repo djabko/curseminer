@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 
-#include "core_game.h"
-#include "time.h"
+#include "curseminer/core_game.h"
+#include "curseminer/time.h"
 
 typedef struct EntityType EntityType;
 typedef struct EntityController EntityController;

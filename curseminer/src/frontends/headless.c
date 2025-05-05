@@ -1,5 +1,5 @@
-#include "frontend.h"
-#include "frontends/headless.h"
+#include "curseminer/frontend.h"
+#include "curseminer/frontends/headless.h"
 
 static bool set_glyphset(const char*) {
     return false;

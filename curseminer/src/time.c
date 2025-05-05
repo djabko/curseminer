@@ -1,9 +1,9 @@
-#include "globals.h"
-#include "cm_time.h"
-#include "stdio.h"
-#include "string.h"
-
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
+
+#include "curseminer/globals.h"
+#include "curseminer/time.h"
 
 TimeStamp INIT_TIME;
 TimeStamp TIMER_NOW;

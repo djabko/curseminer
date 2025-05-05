@@ -3,12 +3,12 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "globals.h"
-#include "util.h"
-#include "core_game.h"
-#include "world.h"
-#include "entity.h"
-#include "stack64.h"
+#include "curseminer/globals.h"
+#include "curseminer/util.h"
+#include "curseminer/core_game.h"
+#include "curseminer/world.h"
+#include "curseminer/entity.h"
+#include "curseminer/stack64.h"
 
 int world_from_mouse_xy(InputEvent *ie, int *world_x, int *world_y) {
     uint16_t x = ie->data >> 16 * 0;

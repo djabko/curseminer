@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <math.h>
 
-#include "util.h"
-#include "globals.h"
-#include "cm_time.h"
+#include "curseminer/util.h"
+#include "curseminer/globals.h"
+#include "curseminer/time.h"
 
 /* Distance Functions */
 double euc_dist(double x1, double y1, double x2, double y2) {

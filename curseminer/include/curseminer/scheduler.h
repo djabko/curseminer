@@ -1,8 +1,8 @@
 #ifndef RUN_QUEUE_HEADER
 #define RUN_QUEUE_HEADER
 
-#include "cm_time.h"
-#include "stack64.h"
+#include "curseminer/time.h"
+#include "curseminer/stack64.h"
 
 #define RQ_MEMPOOL_SIZE 4096 * 1
 

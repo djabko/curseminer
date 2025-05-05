@@ -3,10 +3,10 @@
 
 #include <stdbool.h>
 
-#include "stack64.h"
-#include "scheduler.h"
-#include "frontend.h"
-#include "world.h"
+#include "curseminer/stack64.h"
+#include "curseminer/scheduler.h"
+#include "curseminer/frontend.h"
+#include "curseminer/world.h"
 
 #define GAME_REFRESH_RATE 20
 #define E_MOD_CROUCHING E_MOD_0

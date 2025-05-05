@@ -1,10 +1,10 @@
 #include <stdio.h>
 
-#include "games/other.h"
-#include "core_game.h"
-#include "globals.h"
-#include "util.h"
-#include "entity.h"
+#include "curseminer/games/other.h"
+#include "curseminer/core_game.h"
+#include "curseminer/globals.h"
+#include "curseminer/util.h"
+#include "curseminer/entity.h"
 
 #define g_skins_max 10
 #define g_entity_type_max g_skins_max

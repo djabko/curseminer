@@ -13,9 +13,9 @@
 #include "esp_flash.h"
 #include "esp_system.h"
 
-#include "globals.h"
-#include "games/curseminer.h"
-#include "frontends/esp32s3-waveshare.h"
+#include "curseminer/globals.h"
+#include "curseminer/games/curseminer.h"
+#include "curseminer/frontends/esp32s3-waveshare.h"
 
 #define g_update_rate 10
 

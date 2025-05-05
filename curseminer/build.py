@@ -16,6 +16,7 @@ OPT_OBJDIR =    './obj_opt'
 
 INCDIRS =       ['./include', './vendor']
 SRCDIR =        './src'
+EXCLUDE =       [f'{SRCDIR}/frontends/esp32s3-waveshare.c']
 
 TARGET =        os.path.basename(CWD)
 
@@ -158,7 +159,8 @@ if __name__ == '__main__':
     target = os.path.basename(CWD)
 
     sources = get_all_files([SRCDIR], '.c')
-    print(sources)
+    sources = set(sources)
+    sources = sources.difference(set(EXCLUDE))
 
     dry_run = True
     dry_run = False

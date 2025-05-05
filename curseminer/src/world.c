@@ -1,11 +1,11 @@
-#include <globals.h>
-#include <world.h>
-#include <util.h>
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+
+#include "curseminer/globals.h"
+#include "curseminer/world.h"
+#include "curseminer/util.h"
 
 #define DEFAULT_CHUNK_ARENA_SIZE PAGE_SIZE * 16
 

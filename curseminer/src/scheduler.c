@@ -1,8 +1,8 @@
 #include <sys/time.h>
 #include <stdio.h>
 
-#include "globals.h"
-#include <scheduler.h>
+#include "curseminer/globals.h"
+#include "curseminer/scheduler.h"
 
 
 const unsigned char RQ_FLAG_BIT         = 0b00000001;

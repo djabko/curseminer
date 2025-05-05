@@ -3,8 +3,8 @@
 
 #include <unistd.h>
 
-#include "frontend.h"
-#include "core_game.h"
+#include "curseminer/frontend.h"
+#include "curseminer/core_game.h"
 
 typedef unsigned char byte_t;
 

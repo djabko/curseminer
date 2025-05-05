@@ -1,11 +1,11 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "globals.h"
-#include "util.h"
-#include "stack64.h"
-#include "cm_time.h"
-#include "entity.h"
+#include "curseminer/globals.h"
+#include "curseminer/util.h"
+#include "curseminer/stack64.h"
+#include "curseminer/time.h"
+#include "curseminer/entity.h"
 
 EntityController DEFAULT_CONTROLLER;
 Entity* ENTITY_ARRAY = NULL;

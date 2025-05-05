@@ -1,9 +1,9 @@
 #ifndef ENTITY_HEADER
 #define ENTITY_HEADER
 
-#include "stack64.h"
-#include "core_game.h"
-#include "world.h"
+#include "curseminer/stack64.h"
+#include "curseminer/core_game.h"
+#include "curseminer/world.h"
 
 typedef int behaviour_t;
 typedef void (*behaviour_func_t)(Entity*);

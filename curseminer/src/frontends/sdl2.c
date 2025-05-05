@@ -6,11 +6,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "globals.h"
-#include "core_game.h"
-#include "frontend.h"
-#include "frontends/sdl2.h"
-#include "scheduler.h"
+#include "curseminer/globals.h"
+#include "curseminer/core_game.h"
+#include "curseminer/frontend.h"
+#include "curseminer/frontends/sdl2.h"
+#include "curseminer/scheduler.h"
 
 #define SPRITE_MAX 256
 #define REFRESH_RATE 20

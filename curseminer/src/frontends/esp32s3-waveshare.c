@@ -15,9 +15,9 @@
 #include "driver/spi_master.h"
 #include "driver/i2c_master.h"
 
-#include "globals.h"
-#include "frontend.h"
-#include "frontends/esp32s3-waveshare.h"
+#include "curseminer/globals.h"
+#include "curseminer/frontend.h"
+#include "curseminer/frontends/esp32s3-waveshare.h"
 
 #define g_screen_w 240
 #define g_screen_h 280

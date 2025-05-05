@@ -9,15 +9,15 @@
 
 #include <ncurses.h>
 
-#include "globals.h"
-#include "util.h"
-#include "stack64.h"
-#include "cm_time.h"
-#include "core_game.h"
-#include "frontend.h"
-#include "frontends/ncurses.h"
-#include "games/curseminer.h"
-#include "games/other.h"
+#include "curseminer/globals.h"
+#include "curseminer/util.h"
+#include "curseminer/stack64.h"
+#include "curseminer/time.h"
+#include "curseminer/core_game.h"
+#include "curseminer/frontend.h"
+#include "curseminer/frontends/ncurses.h"
+#include "curseminer/games/curseminer.h"
+#include "curseminer/games/other.h"
 
 #define RGB_TO_CURSES(x) (x * 1000 / 256)  // 1000/256 conversion
 #define NAME_MAX 64

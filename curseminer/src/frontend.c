@@ -1,7 +1,6 @@
-#include "globals.h"
-#include "entity.h"
-#include "scheduler.h"
-#include "frontend.h"
+#include "curseminer/globals.h"
+#include "curseminer/scheduler.h"
+#include "curseminer/frontend.h"
 
 Frontend g_frontend;
 

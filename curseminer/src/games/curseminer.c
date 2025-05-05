@@ -1,9 +1,9 @@
 #include <stdio.h>
 
-#include "games/curseminer.h"
-#include "globals.h"
-#include "util.h"
-#include "entity.h"
+#include "curseminer/games/curseminer.h"
+#include "curseminer/globals.h"
+#include "curseminer/util.h"
+#include "curseminer/entity.h"
 
 typedef enum {
      g_skin_null,

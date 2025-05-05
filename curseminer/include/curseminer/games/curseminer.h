@@ -1,7 +1,7 @@
 #ifndef H_GAME_CURSEMINER
 #define H_GAME_CURSEMINER
 
-#include "core_game.h"
+#include "curseminer/core_game.h"
 
 int game_curseminer_init(GameContext*, int);
 int game_curseminer_update();

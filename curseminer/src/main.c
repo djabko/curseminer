@@ -4,19 +4,19 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "globals.h"
-#include "scheduler.h"
-#include "cm_time.h"
-#include "games/curseminer.h"
-#include "games/other.h"
-#include "frontends/headless.h"
+#include "curseminer/globals.h"
+#include "curseminer/scheduler.h"
+#include "curseminer/time.h"
+#include "curseminer/games/curseminer.h"
+#include "curseminer/games/other.h"
+#include "curseminer/frontends/headless.h"
 
 #ifdef COMPILE_FRONTEND_NCURSES
-#include "frontends/ncurses.h"
+#include "curseminer/frontends/ncurses.h"
 #endif
 
 #ifdef COMPILE_FRONTEND_SDL2
-#include "frontends/sdl2.h"
+#include "curseminer/frontends/sdl2.h"
 #endif
 
 #define MIN_ARGS 0
