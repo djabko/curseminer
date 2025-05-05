@@ -26,7 +26,7 @@ typedef unsigned char byte_t;
 
 #ifdef DEBUG
 
-#define DEBUG_FD stdout
+#define DEBUG_FD stderr
 #define log_debug_nl() fprintf(DEBUG_FD, "\n")
 #define _log_debug(...)   fprintf(DEBUG_FD, __VA_ARGS__)
 #define log_debug(...)                      \

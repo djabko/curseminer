@@ -1,13 +1,18 @@
 #ifndef TIMER_HEADER
 #define TIMER_HEADER
 
-#include <sys/time.h>
-#include <unistd.h>
+#include <inttypes.h>
+#include <time.h>
 
-typedef struct timeval TimeStamp;
-typedef suseconds_t microseconds_t;
-typedef suseconds_t milliseconds_t;
+typedef uint32_t nanoseconds_t;
+typedef uint32_t microseconds_t;
+typedef uint32_t milliseconds_t;
 typedef time_t seconds_t;
+
+typedef struct TimeStamp {
+    nanoseconds_t usec;
+    seconds_t sec;
+} TimeStamp;
 
 // TODO: move to globals
 extern TimeStamp INIT_TIME;

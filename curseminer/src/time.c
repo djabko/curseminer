@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 #include "curseminer/globals.h"
 #include "curseminer/time.h"
+#include "curseminer/arch.h"
 
 TimeStamp INIT_TIME;
 TimeStamp TIMER_NOW;
@@ -15,8 +15,8 @@ milliseconds_t TIMER_NEVER_MS = -1;
 TimeStamp last_sync, refresh_rate;
 
 void time_init(int ips) {
-    refresh_rate.tv_sec = ips / 1000000;
-    refresh_rate.tv_usec = 1000000 / ips;
+    refresh_rate.sec = ips / 1000000;
+    refresh_rate.usec = 1000000 / ips;
 
     time_now(&INIT_TIME);
     time_now(&TIMER_NOW);
@@ -27,39 +27,38 @@ void time_init(int ips) {
 }
 
 void time_now(TimeStamp* ts) {
-    //clock_gettime(CLOCK_MONOTONIC, ts);
-    gettimeofday(ts, NULL);
+    arch_get_time_monotonic(ts);
 }
 
 void time_never(TimeStamp* ts) {
     static TimeStamp never;
-    never.tv_sec = -1;
-    never.tv_usec = -1;
+    never.sec = -1;
+    never.usec = -1;
     memcpy(ts, &never, sizeof(TimeStamp));
 }
 
 void time_add_ms(TimeStamp *ts, microseconds_t ms) {
-    seconds_t sec = ts->tv_sec;
-    microseconds_t usec = ts->tv_usec;
+    seconds_t sec = ts->sec;
+    microseconds_t usec = ts->usec;
 
     sec += ms / 1000;
     usec += ms * 1000;
 
-    int carry = usec < ts->tv_usec;
-    ts->tv_sec = sec + carry;
-    ts->tv_usec = usec;
+    int carry = usec < ts->usec;
+    ts->sec = sec + carry;
+    ts->usec = usec;
 }
 
 TimeStamp time_diff(TimeStamp* a, TimeStamp* b) {
     TimeStamp time_diff;
 
-    seconds_t asec = a->tv_sec;
-    seconds_t bsec = b->tv_sec;
-    microseconds_t ausec = a->tv_usec;
-    microseconds_t busec = b->tv_usec;
+    seconds_t asec = a->sec;
+    seconds_t bsec = b->sec;
+    microseconds_t ausec = a->usec;
+    microseconds_t busec = b->usec;
 
-    time_diff.tv_sec = (bsec < asec) * (asec - bsec);
-    time_diff.tv_usec = (0 <= asec - bsec) * (busec < ausec) * (ausec - busec);
+    time_diff.sec = (bsec < asec) * (asec - bsec);
+    time_diff.usec = (0 <= asec - bsec) * (busec < ausec) * (ausec - busec);
 
     return time_diff;
 }
@@ -67,10 +66,10 @@ TimeStamp time_diff(TimeStamp* a, TimeStamp* b) {
 milliseconds_t time_diff_millisec(TimeStamp* a, TimeStamp* b) {
     milliseconds_t diff = 0;
 
-    seconds_t asec = a->tv_sec;
-    seconds_t bsec = b->tv_sec;
-    microseconds_t ausec = a->tv_usec;
-    microseconds_t busec = b->tv_usec;
+    seconds_t asec = a->sec;
+    seconds_t bsec = b->sec;
+    microseconds_t ausec = a->usec;
+    microseconds_t busec = b->usec;
 
     diff += (bsec < asec) * (asec - bsec) * 1000;
     diff += (0 <= asec - bsec) * (busec < ausec) * (ausec - busec) / 1000;
@@ -83,12 +82,12 @@ int time_nready(TimeStamp* ts) {
 }
 
 int time_ready(TimeStamp* ts) {
-    if (ts->tv_sec < 0 || ts->tv_usec < 0) return 0;
+    if (ts->sec < 0 || ts->usec < 0) return 0;
 
-    seconds_t asec = TIMER_NOW.tv_sec;
-    seconds_t bsec = ts->tv_sec;
-    microseconds_t ausec = TIMER_NOW.tv_usec;
-    microseconds_t busec = ts->tv_usec;
+    seconds_t asec = TIMER_NOW.sec;
+    seconds_t bsec = ts->sec;
+    microseconds_t ausec = TIMER_NOW.usec;
+    microseconds_t busec = ts->usec;
 
     seconds_t delta_sec = (bsec < asec) * (asec - bsec);
     microseconds_t delta_usec = (0 <= asec - bsec) * (busec < ausec) * (ausec - busec);
@@ -96,20 +95,20 @@ int time_ready(TimeStamp* ts) {
     return delta_sec > 0 || delta_usec > 0;
 }
 
-int time_sleep(TimeStamp* t) {
-    return usleep(6000000 * t->tv_sec + t->tv_usec);
+int time_sleep(TimeStamp* ts) {
+    return arch_sleep(ts);
 }
 
 milliseconds_t time_to_ms(TimeStamp *ts) {
-    return ts->tv_sec * 1000 + ts->tv_usec / 1000;
+    return ts->sec * 1000 + ts->usec / 1000;
 }
 
 void time_print(TimeStamp* t) {
     static long unsigned int hours, minutes, seconds, useconds;
-    hours = t->tv_sec / (60*60) % (24);
-    minutes = t->tv_sec / (60) % (60);
-    seconds = t->tv_sec % 60;
-    useconds = t->tv_usec;// / 10000;
+    hours = t->sec / (60*60) % (24);
+    minutes = t->sec / (60) % (60);
+    seconds = t->sec % 60;
+    useconds = t->usec;// / 10000;
     _log_debug("<%02lu:%02lu:%02lu.%lu>", hours, minutes, seconds, useconds);
 }
 
@@ -119,14 +118,14 @@ void time_print_now() {
 
 void time_synchronize() {
     static TimeStamp delta, sleepts;
-    time_now(&TIMER_NOW);
-    TIMER_NOW_MS = time_to_ms(&TIMER_NOW);
 
+    time_now(&TIMER_NOW);
+
+    TIMER_NOW_MS = time_to_ms(&TIMER_NOW);
     delta = time_diff(&TIMER_NOW, &last_sync);
     sleepts = time_diff(&refresh_rate, &delta);
 
     time_sleep(&sleepts);
-
     time_now(&last_sync);
 }
 
