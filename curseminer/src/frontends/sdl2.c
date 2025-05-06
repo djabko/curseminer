@@ -4,7 +4,7 @@
 #include <SDL2/SDL_image.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include "vendor/stb_image.h"
 
 #include "curseminer/globals.h"
 #include "curseminer/core_game.h"
@@ -36,8 +36,6 @@ typedef const Uint32 bitmask_sdl;
 #ifndef NAME_MAX
 #define NAME_MAX 64
 #endif
-
-#define g_spritesheet_path "assets/spritesheets/tiles.gif"
 
 typedef enum file_format_t {
     FILE_FORMAT_INVALID = -1,

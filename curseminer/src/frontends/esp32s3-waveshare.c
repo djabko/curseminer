@@ -1,4 +1,5 @@
 #include <string.h>
+#include <dirent.h>
 
 #include "esp_chip_info.h"
 #include "esp_err.h"
@@ -6,6 +7,7 @@
 #include "esp_check.h"
 #include "esp_flash.h"
 #include "esp_system.h"
+#include "esp_spiffs.h"
 
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
@@ -18,6 +20,35 @@
 #include "curseminer/globals.h"
 #include "curseminer/frontend.h"
 #include "curseminer/frontends/esp32s3-waveshare.h"
+
+/* Memory allocation functions just for STB_Image */
+void *my_alloc (size_t size) {
+    log_debug("Allocating with %zuB", size);
+
+    void *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+
+    return ptr;
+}
+
+void *my_realloc(void *old, size_t new) {
+    log_debug("Reallocating %p with %zuB", old, new);
+    
+    free(old);
+    void *ptr = heap_caps_malloc(new, MALLOC_CAP_SPIRAM);
+
+    return ptr;
+}
+
+void my_free(void *ptr) {
+    log_debug("Freeing %p", ptr);
+    free(ptr);
+}
+
+#define STBI_MALLOC(sz)             my_alloc(sz)
+#define STBI_REALLOC(p,newsz)       my_realloc(p,newsz)
+#define STBI_FREE(p)                my_free(p)
+#define STB_IMAGE_IMPLEMENTATION
+#include "vendor/stb_image.h"
 
 #define g_screen_w 240
 #define g_screen_h 280
@@ -38,6 +69,8 @@
 #define g_i2c_freq 100 * 1000
 
 #define g_draw_buf_height 50
+#define g_sprite_w 32
+#define g_sprite_h 32
 #define WAIT(ms) vTaskDelay((ms) / (portTICK_PERIOD_MS));
 
 
@@ -59,9 +92,109 @@ typedef struct Resolution {
 
 Resolution g_resolution = {.w = g_screen_w, .h = g_screen_h};
 uint16_t *g_framebuffer;
+static void *g_spritesheet;
 
 esp_lcd_panel_handle_t g_lcd_panel;
 static uint16_t *g_draw_buffer;
+
+static void print_all_files(const char *path) {
+    DIR *dir = opendir(path);
+
+    if (!dir) {
+        log_debug("Failed to open dir '%s'", path);
+        return;
+    }
+
+    struct dirent *dp;
+
+    while ((dp = readdir(dir)) != NULL)
+        log_debug("File: '%s'", dp->d_name);
+
+    closedir(dir);
+}
+
+static int load_spritesheet(char *path) {
+    int err = 0;
+
+    esp_vfs_spiffs_conf_t config = {
+        .base_path = "/spiffs",
+        .partition_label = "assets",
+        .max_files = 3,
+        .format_if_mount_failed = false,
+    };
+
+    esp_vfs_spiffs_register(&config);
+
+    print_all_files("/spiffs");
+
+    FILE *file = fopen(path, "r");
+
+    if(file == NULL) {
+        ESP_LOGE("FILE", "File does not exist!");
+        err = -1;
+
+    } else {
+        fseek(file, 0, SEEK_END);
+        size_t size = ftell(file);
+        fseek(file, 0, SEEK_SET);
+
+        if (0 < size) {
+
+            void *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+            g_spritesheet = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+            int width, height, layers;
+
+            fread(data, 1, size, file);
+
+            g_spritesheet = stbi_load_from_memory(data, size, &width, &height, &layers, 0);
+
+            log_debug("Spritesheet: %p [%dx%dx%d]", g_spritesheet, width, height, layers);
+
+            free(data);
+
+        } else {
+            log_debug("Error: couldn't find '%s'", path);
+            err = -1;
+        }
+
+        fclose(file);
+    }
+
+    esp_vfs_spiffs_unregister(NULL);
+
+    return err;
+}
+
+static uint16_t rgb888_to_rgb565(uint8_t r, uint8_t g, uint8_t b) {
+    return (uint16_t) ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
+static void draw_sprite(int tx, int ty, int offset, int crop_x, int crop_y) {
+    if (!g_framebuffer || !g_spritesheet) return;
+    if (g_sprite_w < crop_x || crop_x < 0) crop_x = g_sprite_w;
+    if (g_sprite_h < crop_y || crop_y < 0) crop_y = g_sprite_h;
+
+    uint8_t *data = g_spritesheet + (g_sprite_w * g_sprite_h * offset) * 4;
+
+    for (int y = 0; y < crop_y; y++) {
+        for (int x = 0; x < crop_x; x++) {
+
+            uint8_t r = data[4 * (y * g_sprite_w + x) + 0];
+            uint8_t g = data[4 * (y * g_sprite_w + x) + 1];
+            uint8_t b = data[4 * (y * g_sprite_w + x) + 2];
+
+            uint16_t color = rgb888_to_rgb565(r, g, b);
+            int idx = (ty + y) * g_resolution.w + (tx + x);
+
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+            color = (color << 8) | (color >> 8);
+#endif
+
+            g_framebuffer[idx] = color;
+
+        }
+    }
+}
 
 static void draw_rect(int x1, int y1, int x2, int y2, uint16_t color) {
     if (!g_framebuffer || x2 < x1 || y2 < y1) return;
@@ -297,14 +430,7 @@ static void exit_panel() {
     // TODO
 }
 
-static uint16_t rgb888_to_rgb565(uint8_t r, uint8_t g, uint8_t b) {
-    return (uint16_t) ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
-}
-
-static uint16_t g_color_constant = 0xFFFF;
 static int job_render(Task *task, Stack64 *st) {
-    if (g_counter) log_debug("g_counter = %d", g_counter);
-    g_counter = 0;
     Skin* skin;
     DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
 
@@ -338,7 +464,11 @@ static int job_render(Task *task, Stack64 *st) {
                         int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
                         int tile_h =  tile_w;
 
-                        draw_square(x * tile_w, y * tile_h, tile_w, color);
+                        if (skin->glyph == 0)
+                            draw_square(x * tile_w, y * tile_h, tile_w, color);
+                        else
+                            draw_sprite(x * tile_w, y * tile_h, skin->glyph - 1, tile_w, tile_h);
+
                         game_set_dirty(GLOBALS.game, x, y, 0);
                     }
                 }
@@ -358,7 +488,11 @@ static int job_render(Task *task, Stack64 *st) {
                 int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
                 int tile_h =  tile_w;
 
-                draw_square(x * tile_w, y * tile_h, tile_w, color);
+                if (skin->glyph == 0)
+                    draw_square(x * tile_w, y * tile_h, tile_w, color);
+                else
+                    draw_sprite(x * tile_w, y * tile_h, skin->glyph - 1, tile_w, tile_h);
+
                 game_set_dirty(GLOBALS.game, x, y, 0);
             }
         }
@@ -414,8 +548,6 @@ static int job_imu_input(Task *task, Stack64 *st) {
             ie.state = ES_DOWN;
             ie.id = E_KB_A;
             frontend_dispatch_event(ctx, &ie);
-
-            log_debug("LEFT");
         }
 
         else if (g_move== I_RIGHT) {
@@ -430,8 +562,6 @@ static int job_imu_input(Task *task, Stack64 *st) {
             ie.state = ES_DOWN;
             ie.id = E_KB_D;
             frontend_dispatch_event(ctx, &ie);
-
-            log_debug("RIGHT");
         }
 
         else if (g_move == I_UP) {
@@ -446,8 +576,6 @@ static int job_imu_input(Task *task, Stack64 *st) {
             ie.state = ES_DOWN;
             ie.id = E_KB_W;
             frontend_dispatch_event(ctx, &ie);
-
-            log_debug("UP");
         }
 
         else if (g_move == I_DOWN) {
@@ -462,8 +590,6 @@ static int job_imu_input(Task *task, Stack64 *st) {
             ie.state = ES_DOWN;
             ie.id = E_KB_S;
             frontend_dispatch_event(ctx, &ie);
-
-            log_debug("DOWN");
 
         } else if (g_move == I_STILL) {
             ie.state = ES_UP;
@@ -514,7 +640,6 @@ void lcd_test() {
     const uint16_t d = 0b0000000011111000;
     const uint16_t _c = (a>>8) | (a<<8);
     const uint16_t _d = (b>>8) | (b<<8);
-    log_debug("a=%X b=%X c=%X d=%X _c=%X _d=%X", a, b, c, d, _c, _d);
 
     static uint16_t colors[] = {
         0x0000,
@@ -560,7 +685,6 @@ void btn_isr(void *args) {
 }
 
 esp_err_t init_btn(gpio_num_t gpio) {
-    printf("\n");
 
     ESP_RETURN_ON_ERROR(gpio_reset_pin(gpio),
             TAG, "Failed to reset gpio pin %d", gpio);
@@ -579,6 +703,7 @@ esp_err_t init_btn(gpio_num_t gpio) {
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1),
             TAG, "Failed to install ISR for gpio %d", gpio);
 
+    log_debug("Assigning %p as isr handler function", btn_isr);
     ESP_RETURN_ON_ERROR(gpio_isr_handler_add(gpio, btn_isr, NULL),
             TAG, "Failed to add ISR handler %p for gpio %d", btn_isr, gpio);
 
@@ -590,10 +715,11 @@ esp_err_t init_btn(gpio_num_t gpio) {
 
 int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
 
+    ESP_ERROR_CHECK(init_btn(GPIO_NUM_18));
+
     // Accelerometer requires gyro mode enabled
     imu_enable_t flags = IMU_ENABLE_ACCELEROMETER | IMU_ENABLE_GYROSCOPE;
 
-    ESP_ERROR_CHECK(init_btn(GPIO_NUM_18));
     ESP_ERROR_CHECK(init_panel());
     ESP_ERROR_CHECK(init_imu(flags));
 
@@ -601,15 +727,26 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
 
     schedule(GLOBALS.runqueue, 0, 0, job_render, NULL);
 
-    init_panel();
+    if (0 != load_spritesheet("/spiffs/tiles_01.png")) return -1;
 
-    lcd_test();
+    int i = 2;
+    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 0, 0, 0);
+    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 1, 0, 0);
+    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 2, 0, 0);
+    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 3, 0, 0);
+    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 4, 0, 0);
+    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 5, 0, 0);
+    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 6, 0, 0);
+    lcd_flush();
+    WAIT(2000);
 
     return 0;
 }
 
 void frontend_esp32s3_ui_exit() {
     exit_panel();
+    free(g_spritesheet);
+    free(g_framebuffer);
 }
 
 int frontend_esp32s3_input_init(Frontend*, const char*) {

@@ -1,7 +1,7 @@
 #ifndef FRONTEND_SDL2_HEADER
 #define FRONTEND_SDL2_HEADER
 
-#define SPRITES_PATH "assets/spritesheets/"
+#define SPRITES_PATH "../assets/spritesheets/"
 
 int frontend_sdl2_ui_init(Frontend*, const char*);
 int frontend_sdl2_ui_loop(Frontend*);
