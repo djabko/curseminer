@@ -71,7 +71,7 @@ void my_free(void *ptr) {
 #define g_draw_buf_height 50
 #define g_sprite_w 32
 #define g_sprite_h 32
-#define WAIT(ms) vTaskDelay((ms) / (portTICK_PERIOD_MS));
+#define WAIT(ms) vTaskDelay((ms) / (portTICK_PERIOD_MS))
 
 
 typedef uint8_t imu_enable_t;
@@ -113,8 +113,8 @@ static void print_all_files(const char *path) {
     closedir(dir);
 }
 
-static int load_spritesheet(char *path) {
-    int err = 0;
+static uint8_t *load_spritesheet(char *path) {
+    void *img = NULL;
 
     esp_vfs_spiffs_conf_t config = {
         .base_path = "/spiffs",
@@ -129,11 +129,10 @@ static int load_spritesheet(char *path) {
 
     FILE *file = fopen(path, "r");
 
-    if(file == NULL) {
+    if(file == NULL)
         ESP_LOGE("FILE", "File does not exist!");
-        err = -1;
 
-    } else {
+    else {
         fseek(file, 0, SEEK_END);
         size_t size = ftell(file);
         fseek(file, 0, SEEK_SET);
@@ -146,42 +145,59 @@ static int load_spritesheet(char *path) {
 
             fread(data, 1, size, file);
 
-            g_spritesheet = stbi_load_from_memory(data, size, &width, &height, &layers, 0);
+            img = stbi_load_from_memory(data, size, &width, &height, &layers, 0);
 
             log_debug("Spritesheet: %p [%dx%dx%d]", g_spritesheet, width, height, layers);
 
             free(data);
 
-        } else {
+        } else
             log_debug("Error: couldn't find '%s'", path);
-            err = -1;
-        }
 
         fclose(file);
     }
 
     esp_vfs_spiffs_unregister(NULL);
 
-    return err;
+    return img;
 }
 
 static uint16_t rgb888_to_rgb565(uint8_t r, uint8_t g, uint8_t b) {
     return (uint16_t) ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
-static void draw_sprite(int tx, int ty, int offset, int crop_x, int crop_y) {
+static uint8_t *image_shrink(uint8_t *img, int w, int h, int depth, int nw, int nh) {
+    if (w <= nw || h <= nh) return NULL;
+
+    uint8_t *new_img = heap_caps_malloc(nw * nh * depth, MALLOC_CAP_SPIRAM);
+
+    for (int y = 0; y < nh; y++) {
+        for (int x = 0; x < nw; x++) {
+
+            int ox = x * w / nw;
+            int oy = y * h / nh;
+            int off_old = depth * (oy * w + ox);
+            int off_new = depth * (y * nw + x); 
+
+            for (int bit = 0; bit < depth; bit++)
+                *(new_img + off_new + bit) = img[off_old + bit];
+        }
+    }
+
+    return new_img;
+}
+
+static void draw_sprite(int tx, int ty, int offset, int w, int h) {
     if (!g_framebuffer || !g_spritesheet) return;
-    if (g_sprite_w < crop_x || crop_x < 0) crop_x = g_sprite_w;
-    if (g_sprite_h < crop_y || crop_y < 0) crop_y = g_sprite_h;
 
-    uint8_t *data = g_spritesheet + (g_sprite_w * g_sprite_h * offset) * 4;
+    uint8_t *data = g_spritesheet + w * h * offset * 4;
 
-    for (int y = 0; y < crop_y; y++) {
-        for (int x = 0; x < crop_x; x++) {
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
 
-            uint8_t r = data[4 * (y * g_sprite_w + x) + 0];
-            uint8_t g = data[4 * (y * g_sprite_w + x) + 1];
-            uint8_t b = data[4 * (y * g_sprite_w + x) + 2];
+            uint8_t r = data[4 * (y * w + x) + 0];
+            uint8_t g = data[4 * (y * w + x) + 1];
+            uint8_t b = data[4 * (y * w + x) + 2];
 
             uint16_t color = rgb888_to_rgb565(r, g, b);
             int idx = (ty + y) * g_resolution.w + (tx + x);
@@ -190,7 +206,7 @@ static void draw_sprite(int tx, int ty, int offset, int crop_x, int crop_y) {
             color = (color << 8) | (color >> 8);
 #endif
 
-            g_framebuffer[idx] = color;
+            if (color != 0x0000) g_framebuffer[idx] = color;
 
         }
     }
@@ -478,6 +494,7 @@ static int job_render(Task *task, Stack64 *st) {
 
     // Update all tiles
     } else if (df->command == -1) {
+
         for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
             for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
 
@@ -727,16 +744,27 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
 
     schedule(GLOBALS.runqueue, 0, 0, job_render, NULL);
 
-    if (0 != load_spritesheet("/spiffs/tiles_01.png")) return -1;
+    g_spritesheet = load_spritesheet("/spiffs/tiles_01.png");
 
-    int i = 2;
-    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 0, 0, 0);
-    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 1, 0, 0);
-    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 2, 0, 0);
-    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 3, 0, 0);
-    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 4, 0, 0);
-    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 5, 0, 0);
-    draw_sprite(4 *g_sprite_w, i++ * g_sprite_h, 6, 0, 0);
+    if (!g_spritesheet) return -1;
+
+    int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
+    int tile_h =  tile_w;
+
+    for (int i = 0; i < 7; i++)
+        draw_sprite(50, 10 + i * g_sprite_w, i, g_sprite_w, g_sprite_h);
+
+    uint8_t *tmp = image_shrink(g_spritesheet, g_sprite_w, 7 * g_sprite_h, 4, tile_w, 7 * tile_h);
+
+    free(g_spritesheet);
+
+    g_spritesheet = tmp;
+
+    if (!g_spritesheet) return -1;
+
+    for (int i = 0; i < 7; i++)
+        draw_sprite(150, 10 + i * tile_h, i, tile_w, tile_h);
+
     lcd_flush();
     WAIT(2000);
 

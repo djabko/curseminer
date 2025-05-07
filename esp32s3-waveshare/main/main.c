@@ -67,7 +67,9 @@ void app_main(void)
         .f_free = game_curseminer_free,
     };
 
-    World *world = world_init(10, 10, 4 * 4096);
+    heap_caps_print_heap_info(MALLOC_CAP_8BIT);
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    World *world = world_init(10, 10, 4 * PAGE_SIZE);
     GameContext *gctx = game_init(&gcfg, world);
     GLOBALS.game = gctx;
 

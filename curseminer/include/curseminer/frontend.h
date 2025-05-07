@@ -108,7 +108,7 @@ typedef struct {
     event_t id;
     event_type_t type;
     event_state_t state;
-    event_mod_t mods; // Bitmap
+    event_mod_t mods;
     uint64_t data;
 } InputEvent;
 

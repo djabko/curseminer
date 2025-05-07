@@ -153,7 +153,7 @@ int main(int argc, const char** argv) {
 
     init(frontend, title);
 
-    World *world = world_init(20, 10, 64 * PAGE_SIZE);
+    World *world = world_init(20, 1000, 64 * PAGE_SIZE);
     GLOBALS.game = game_init(&gcfg, world);
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
