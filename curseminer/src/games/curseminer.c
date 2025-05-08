@@ -365,6 +365,15 @@ int game_curseminer_init(GameContext *game, int opt) {
 
     GLOBALS.player = player;
 
+    Entity *e = entity_spawn(g_game, g_game->world,
+            g_game->entity_types + g_skin_chaser,
+            30, 30, ENTITY_FACING_RIGHT, 1, 0);
+
+    e->controller->tick = chaser_tick;
+    e->controller->find_path = chaser_find_path;
+
+    e->speed = (20 + rand()) % 150;
+
     return 1;
 }
 

@@ -11,4 +11,4 @@ idf_build_set_property(MINIMAL_BUILD ON)
 
 
 project(curseminer)
-spiffs_create_partition_image(assets ../assets/spritesheets FLASH_IN_PROJECT)
+spiffs_create_partition_image(assets ../assets/spritesheets/raw FLASH_IN_PROJECT)

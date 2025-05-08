@@ -14,6 +14,7 @@
 #include "esp_system.h"
 
 #include "curseminer/globals.h"
+#include "curseminer/entity.h"
 #include "curseminer/games/curseminer.h"
 #include "curseminer/frontends/esp32s3-waveshare.h"
 
@@ -22,8 +23,8 @@
 struct Globals GLOBALS = {
     .player = NULL,
     .input_context = E_CTX_0,
-    .view_port_maxx = 20,
-    .view_port_maxy = 23,
+    .view_port_maxx = 17,
+    .view_port_maxy = 20,
 };
 
 static RunQueue *g_runqueue;

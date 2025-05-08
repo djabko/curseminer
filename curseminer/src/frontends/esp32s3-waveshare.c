@@ -18,6 +18,7 @@
 #include "driver/i2c_master.h"
 
 #include "curseminer/globals.h"
+#include "curseminer/stack64.h"
 #include "curseminer/frontend.h"
 #include "curseminer/frontends/esp32s3-waveshare.h"
 
@@ -50,6 +51,10 @@ void my_free(void *ptr) {
 #define STB_IMAGE_IMPLEMENTATION
 #include "vendor/stb_image.h"
 
+#ifndef NAME_MAX
+#define NAME_MAX 64
+#endif
+
 #define g_screen_w 240
 #define g_screen_h 280
 
@@ -71,6 +76,7 @@ void my_free(void *ptr) {
 #define g_draw_buf_height 50
 #define g_sprite_w 32
 #define g_sprite_h 32
+#define g_spritesheet_size 32 * 224 * 4
 #define WAIT(ms) vTaskDelay((ms) / (portTICK_PERIOD_MS))
 
 
@@ -93,71 +99,81 @@ typedef struct Resolution {
 Resolution g_resolution = {.w = g_screen_w, .h = g_screen_h};
 uint16_t *g_framebuffer;
 static void *g_spritesheet;
+static Queue64 *g_available_spritesheets;
 
 esp_lcd_panel_handle_t g_lcd_panel;
 static uint16_t *g_draw_buffer;
+static bool g_render_sprites = false;
 
-static void print_all_files(const char *path) {
+static Queue64 *scan_available_spritesheets(const char *path, const char *prefix) {
+    Queue64 *qu = NULL;
+
     DIR *dir = opendir(path);
 
     if (!dir) {
         log_debug("Failed to open dir '%s'", path);
-        return;
+        return NULL;
     }
 
     struct dirent *dp;
 
-    while ((dp = readdir(dir)) != NULL)
-        log_debug("File: '%s'", dp->d_name);
+    qu = qu_init(1);
+
+    while ((dp = readdir(dir)) != NULL) {
+
+        if (0 == strncmp(dp->d_name, prefix, strlen(prefix))) {
+
+            char *data = calloc(NAME_MAX, 1);
+
+            int plen = strlen(path);
+            memcpy(data, path, plen);
+
+            *(data + plen) = '/';
+
+            memcpy(data + plen + 1, dp->d_name, strlen(dp->d_name));
+
+            log_debug("Found '%s'", data);
+
+            qu_enqueue(qu, (uint64_t) data);
+        }
+    }
+
+    if (qu_empty(qu)) {
+        free(qu);
+        qu = NULL;
+        log_debug("Found no files with prefix '%s' in '%s'", prefix, path);
+    }
+
+    log_debug("Queue count: %d", qu->count);
 
     closedir(dir);
+
+    return qu;
 }
 
-static uint8_t *load_spritesheet(char *path) {
+static uint8_t *load_rgb(char *path, size_t size) {
     void *img = NULL;
-
-    esp_vfs_spiffs_conf_t config = {
-        .base_path = "/spiffs",
-        .partition_label = "assets",
-        .max_files = 3,
-        .format_if_mount_failed = false,
-    };
-
-    esp_vfs_spiffs_register(&config);
-
-    print_all_files("/spiffs");
 
     FILE *file = fopen(path, "r");
 
-    if(file == NULL)
-        ESP_LOGE("FILE", "File does not exist!");
+    if (file == NULL)
+        log_debug("File '%s' does not exist!", path);
 
     else {
-        fseek(file, 0, SEEK_END);
-        size_t size = ftell(file);
-        fseek(file, 0, SEEK_SET);
 
-        if (0 < size) {
+        img = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
 
-            void *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-            g_spritesheet = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-            int width, height, layers;
+        size_t _size = fread(img, 1, size, file);
 
-            fread(data, 1, size, file);
+        if (_size != size) log_debug("Read %zu bytes, expected %zu", _size, size);
 
-            img = stbi_load_from_memory(data, size, &width, &height, &layers, 0);
-
-            log_debug("Spritesheet: %p [%dx%dx%d]", g_spritesheet, width, height, layers);
-
-            free(data);
-
-        } else
-            log_debug("Error: couldn't find '%s'", path);
+        if (!_size) {
+            free(img);
+            img = NULL;
+        }
 
         fclose(file);
     }
-
-    esp_vfs_spiffs_unregister(NULL);
 
     return img;
 }
@@ -187,17 +203,17 @@ static uint8_t *image_shrink(uint8_t *img, int w, int h, int depth, int nw, int 
     return new_img;
 }
 
-static void draw_sprite(int tx, int ty, int offset, int w, int h) {
-    if (!g_framebuffer || !g_spritesheet) return;
+static void draw_sprite(uint8_t *spritesheet, int tx, int ty, int depth, int offset, int w, int h) {
+    if (!g_framebuffer || !spritesheet) return;
 
-    uint8_t *data = g_spritesheet + w * h * offset * 4;
+    uint8_t *data = spritesheet + w * h * offset * depth;
 
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
 
-            uint8_t r = data[4 * (y * w + x) + 0];
-            uint8_t g = data[4 * (y * w + x) + 1];
-            uint8_t b = data[4 * (y * w + x) + 2];
+            uint8_t r = data[depth * (y * w + x) + 0];
+            uint8_t g = data[depth * (y * w + x) + 1];
+            uint8_t b = data[depth * (y * w + x) + 2];
 
             uint16_t color = rgb888_to_rgb565(r, g, b);
             int idx = (ty + y) * g_resolution.w + (tx + x);
@@ -446,6 +462,31 @@ static void exit_panel() {
     // TODO
 }
 
+static void draw_tile(Skin *skin, int x, int y) {
+    int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
+    int tile_h =  tile_w;
+    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+    if (g_render_sprites && g_available_spritesheets && 0 < skin->glyph) {
+
+        if (!g_spritesheet) {
+            const char *path = (const char*) qu_peek(g_available_spritesheets);
+
+            log_debug("Loading '%s'", path);
+
+            uint8_t *tmp = load_rgb(path, g_spritesheet_size);
+            g_spritesheet = image_shrink(tmp, g_sprite_w, 7 * g_sprite_h, 4, tile_w, 7 * tile_h);
+            free(tmp);
+        }
+
+        draw_sprite(g_spritesheet, x * tile_w, y * tile_h, 4, skin->glyph - 1, tile_w, tile_h);
+
+    } else
+        draw_square(x * tile_w, y * tile_h, tile_w, color);
+
+    game_set_dirty(GLOBALS.game, x, y, 0);
+}
+
 static int job_render(Task *task, Stack64 *st) {
     Skin* skin;
     DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
@@ -475,17 +516,7 @@ static int job_render(Task *task, Stack64 *st) {
 
                         skin = game_world_getxy(GLOBALS.game, x, y);
 
-                        uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
-
-                        int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
-                        int tile_h =  tile_w;
-
-                        if (skin->glyph == 0)
-                            draw_square(x * tile_w, y * tile_h, tile_w, color);
-                        else
-                            draw_sprite(x * tile_w, y * tile_h, skin->glyph - 1, tile_w, tile_h);
-
-                        game_set_dirty(GLOBALS.game, x, y, 0);
+                        draw_tile(skin, x, y);
                     }
                 }
             }
@@ -495,22 +526,18 @@ static int job_render(Task *task, Stack64 *st) {
     // Update all tiles
     } else if (df->command == -1) {
 
+        skin = GLOBALS.game->entity_types->default_skin;
+
+        uint16_t bg = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+        draw_rect(0, 0, g_resolution.w, g_resolution.h, bg);
+
         for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
             for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
 
                 skin = game_world_getxy(GLOBALS.game, x, y);
 
-                uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
-
-                int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
-                int tile_h =  tile_w;
-
-                if (skin->glyph == 0)
-                    draw_square(x * tile_w, y * tile_h, tile_w, color);
-                else
-                    draw_sprite(x * tile_w, y * tile_h, skin->glyph - 1, tile_w, tile_h);
-
-                game_set_dirty(GLOBALS.game, x, y, 0);
+                draw_tile(skin, x, y);
             }
         }
     }
@@ -530,7 +557,7 @@ static uint8_t g_intent = I_STILL;
 static uint8_t g_move = I_STILL;
 
 static int job_imu_input(Task *task, Stack64 *st) {
-    static const int thld = 5000;
+    static const int thld = 10000;
     int16_t x, y, z;
 
     read_accel_data(&x, &y, &z);
@@ -685,9 +712,17 @@ void lcd_test() {
     WAIT(1000);
 }
 
-void btn_isr(void *args) {
-    g_counter++;
+void btn_isr_render_toggle(void *args) {
+    if (g_render_sprites && g_available_spritesheets) {
+        qu_next(g_available_spritesheets);
+        g_spritesheet = NULL;
+    }
 
+    g_render_sprites = true;// !g_render_sprites;
+    GLOBALS.game->cache_dirty_flags->command = -1;
+}
+
+void btn_isr_break_tile(void *args) {
     InputEvent ie = {
         .id = E_KB_Z,
         .type = E_TYPE_KB,
@@ -701,7 +736,7 @@ void btn_isr(void *args) {
     frontend_dispatch_event(E_CTX_GAME, &ie);
 }
 
-esp_err_t init_btn(gpio_num_t gpio) {
+static esp_err_t init_btn(gpio_num_t gpio, void (*handler)(void*)) {
 
     ESP_RETURN_ON_ERROR(gpio_reset_pin(gpio),
             TAG, "Failed to reset gpio pin %d", gpio);
@@ -717,12 +752,8 @@ esp_err_t init_btn(gpio_num_t gpio) {
     ESP_RETURN_ON_ERROR(gpio_config(&bcfg),
             TAG, "Failed to configure gpio %d", gpio);
 
-    ESP_RETURN_ON_ERROR(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1),
-            TAG, "Failed to install ISR for gpio %d", gpio);
-
-    log_debug("Assigning %p as isr handler function", btn_isr);
-    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(gpio, btn_isr, NULL),
-            TAG, "Failed to add ISR handler %p for gpio %d", btn_isr, gpio);
+    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(gpio, handler, NULL),
+            TAG, "Failed to add ISR handler %p for gpio %d", handler, gpio);
 
     log_debug("Initialized isr for gpio %d", gpio);
     log_debug_nl();
@@ -731,8 +762,14 @@ esp_err_t init_btn(gpio_num_t gpio) {
 }
 
 int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
+    esp_vfs_spiffs_conf_t config = {
+        .base_path = "/spiffs",
+        .partition_label = "assets",
+        .max_files = 3,
+        .format_if_mount_failed = false,
+    };
 
-    ESP_ERROR_CHECK(init_btn(GPIO_NUM_18));
+    esp_vfs_spiffs_register(&config);
 
     // Accelerometer requires gyro mode enabled
     imu_enable_t flags = IMU_ENABLE_ACCELEROMETER | IMU_ENABLE_GYROSCOPE;
@@ -744,34 +781,29 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
 
     schedule(GLOBALS.runqueue, 0, 0, job_render, NULL);
 
-    g_spritesheet = load_spritesheet("/spiffs/tiles_01.png");
+    uint8_t *tmp = load_rgb("/spiffs/splash.raw", 128*64*3);
 
-    if (!g_spritesheet) return -1;
-
-    int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
-    int tile_h =  tile_w;
-
-    for (int i = 0; i < 7; i++)
-        draw_sprite(50, 10 + i * g_sprite_w, i, g_sprite_w, g_sprite_h);
-
-    uint8_t *tmp = image_shrink(g_spritesheet, g_sprite_w, 7 * g_sprite_h, 4, tile_w, 7 * tile_h);
-
-    free(g_spritesheet);
-
-    g_spritesheet = tmp;
-
-    if (!g_spritesheet) return -1;
-
-    for (int i = 0; i < 7; i++)
-        draw_sprite(150, 10 + i * tile_h, i, tile_w, tile_h);
+    draw_rect(0, 0, g_resolution.w, g_resolution.h, 0x2020);
+    draw_sprite(tmp, g_resolution.w/2-128/2, g_resolution.h/2-64/2, 3, 0, 128, 64);
 
     lcd_flush();
     WAIT(2000);
+
+    free(tmp);
+
+    g_available_spritesheets = scan_available_spritesheets("/spiffs", "spr_");
+
+    ESP_RETURN_ON_ERROR(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1),
+            TAG, "Failed to install ISR for gpio");
+
+    ESP_ERROR_CHECK(init_btn(GPIO_NUM_18, btn_isr_break_tile));
+    ESP_ERROR_CHECK(init_btn(GPIO_NUM_40, btn_isr_render_toggle));
 
     return 0;
 }
 
 void frontend_esp32s3_ui_exit() {
+    esp_vfs_spiffs_unregister(NULL);
     exit_panel();
     free(g_spritesheet);
     free(g_framebuffer);
