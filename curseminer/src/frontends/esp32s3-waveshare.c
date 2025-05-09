@@ -22,35 +22,6 @@
 #include "curseminer/frontend.h"
 #include "curseminer/frontends/esp32s3-waveshare.h"
 
-/* Memory allocation functions just for STB_Image */
-void *my_alloc (size_t size) {
-    log_debug("Allocating with %zuB", size);
-
-    void *ptr = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-
-    return ptr;
-}
-
-void *my_realloc(void *old, size_t new) {
-    log_debug("Reallocating %p with %zuB", old, new);
-    
-    free(old);
-    void *ptr = heap_caps_malloc(new, MALLOC_CAP_SPIRAM);
-
-    return ptr;
-}
-
-void my_free(void *ptr) {
-    log_debug("Freeing %p", ptr);
-    free(ptr);
-}
-
-#define STBI_MALLOC(sz)             my_alloc(sz)
-#define STBI_REALLOC(p,newsz)       my_realloc(p,newsz)
-#define STBI_FREE(p)                my_free(p)
-#define STB_IMAGE_IMPLEMENTATION
-#include "vendor/stb_image.h"
-
 #ifndef NAME_MAX
 #define NAME_MAX 64
 #endif

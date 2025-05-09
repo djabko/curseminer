@@ -4,3 +4,7 @@ esp32s3-waveshare/sdkconfig.old
 esp32s3-waveshare/sdkconfig.ci
 esp32s3-waveshare/vim
 esp32s3-waveshare/.ninja_log
+assets/spritesheets/raw/splash.raw
+assets/spritesheets/raw/spr_minecraft.rgba
+assets/spritesheets/splash.png
+CHANGELOG.txt
