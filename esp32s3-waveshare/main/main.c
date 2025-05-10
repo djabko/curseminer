@@ -38,10 +38,10 @@ static void init(const char *title) {
     assert_log(GLOBALS.runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    frontend_init_t fuii = frontend_esp32s3_ui_init;
-    frontend_exit_t fuie = frontend_esp32s3_ui_exit;
-    frontend_init_t fini = frontend_esp32s3_input_init;
-    frontend_exit_t fine = frontend_esp32s3_input_exit;
+    frontend_init_ui_t fuii = frontend_esp32s3_ui_init;
+    frontend_exit_ui_t fuie = frontend_esp32s3_ui_exit;
+    frontend_init_input_t fini = frontend_esp32s3_input_init;
+    frontend_exit_input_t fine = frontend_esp32s3_input_exit;
 
     frontend_register_ui(fuii, fuie);
     frontend_register_input(fini, fine);

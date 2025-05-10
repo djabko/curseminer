@@ -489,6 +489,24 @@ static bool set_glyphset(const char *name) {
     return true;
 }
 
+static void draw_point(Skin *skin, int x, int y, int thickness) {
+    SDL_SetRenderDrawColor(g_renderer, skin->fg_r, skin->fg_g, skin->fg_b, 0xff);
+
+    SDL_RenderDrawPoint(g_renderer, x, y);
+}
+
+static void draw_line(Skin *skin, int x1, int y1, int x2, int y2, int thickness) {
+    SDL_SetRenderDrawColor(g_renderer, skin->fg_r, skin->fg_g, skin->fg_b, 0xff);
+
+    SDL_RenderDrawLine(g_renderer, x1, y1, x2, y2);
+}
+
+static void fill_rect(Skin *skin, int x1, int y1, int x2, int y2) {
+    SDL_Rect rect = {.x = x1, .y = y1, .w = x2 - x1, .h = y2 - y1};
+
+    draw_tile_rect(skin, &rect);
+}
+
 
 
 /* Scheduler Jobs */
@@ -538,8 +556,6 @@ static int job_wait_for_game(Task *task, Stack64 *st) {
 
 /* External APIs */
 int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
-    fr->f_set_glyphset = set_glyphset;
-
     // 1. Init SDL2
     int err = SDL_Init(SDL_INIT_VIDEO);
     assert_SDL(0 == err, "Failed to initialize SDL2\t");
@@ -572,6 +588,14 @@ int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
 
     schedule(GLOBALS.runqueue, 0, 0, job_wait_for_game, NULL);
 
+    // 5. Init frontend
+    fr->f_set_glyphset = set_glyphset;
+    fr->f_draw_point = draw_point;
+    fr->f_draw_line = draw_line;
+    fr->f_fill_rect = fill_rect;
+    fr->width = display_mode.w;
+    fr->height = display_mode.h;
+
     frontend_register_event(E_KB_F5, E_CTX_GAME, intr_redraw_everything);
     frontend_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
     frontend_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
@@ -586,7 +610,7 @@ void frontend_sdl2_ui_exit(Frontend *fr) {
     SDL_Quit();
 }
 
-int frontend_sdl2_input_init(Frontend *fr, const char*) {
+int frontend_sdl2_input_init(Frontend *fr) {
     SDL_AddEventWatch(handle_event_SDL2, NULL);
     init_SDL2_keys();
 

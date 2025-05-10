@@ -31,7 +31,7 @@ int frontend_register_event(
     return 0;
 }
 
-int frontend_register_ui(frontend_init_t f_init, frontend_exit_t f_exit) {
+int frontend_register_ui(frontend_init_ui_t f_init, frontend_exit_ui_t f_exit) {
     if (!f_init || !f_exit) return false;
 
     g_frontend.f_ui_init = f_init;
@@ -44,7 +44,7 @@ bool frontend_set_glyphset(const char *name) {
     return g_frontend.f_set_glyphset(name);
 }
 
-int frontend_register_input(frontend_init_t f_init, frontend_exit_t f_exit) {
+int frontend_register_input(frontend_init_input_t f_init, frontend_exit_input_t f_exit) {
     if (!f_init || !f_exit) return false;
 
     g_frontend.f_input_init = f_init;

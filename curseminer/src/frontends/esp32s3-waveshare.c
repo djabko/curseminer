@@ -628,6 +628,44 @@ static bool set_glyphset(const char* name) {
     return false;
 }
 
+static void draw_point(Skin *skin, int x, int y, int thickness) {
+    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+    g_framebuffer[y * g_resolution.w + x] = color;
+}
+
+static void draw_line(Skin *skin, int x1, int y1, int x2, int y2, int thickness) {
+    int dx = abs(x2 - x1);
+    int dy = abs(y2 - y1);
+    int sx = (x1 < x2) + (x2 <= x1) * -1;
+    int sy = (y1 < y2) + (y2 <= y1) * -1;
+    int err = dx - dy;
+    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+    while (1) {
+        g_framebuffer[y1 * g_resolution.w + x1] = color;
+
+        if (x1 == x2 && y1 == y2) break;
+
+        int e2 = err * 2;
+
+        if (e2 > -dy) {
+            err -= dy;
+            x1 += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y1 += sy;
+        }
+    }
+}
+
+static void fill_rect(Skin *skin, int x1, int y1, int x2, int y2) {
+    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+    draw_rect(x1, y1, x2, y2, color);
+}
+
 void lcd_test() {
     int t = 3;
     int len = g_resolution.w / t;
@@ -749,6 +787,11 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
     ESP_ERROR_CHECK(init_imu(flags));
 
     fr->f_set_glyphset = set_glyphset;
+    fr->f_draw_point = draw_point;
+    fr->f_draw_line = draw_line;
+    fr->f_fill_rect = fill_rect;
+    fr->width = g_resolution.w;
+    fr->height = g_resolution.h;
 
     schedule(GLOBALS.runqueue, 0, 0, job_render, NULL);
 
@@ -758,7 +801,7 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
     draw_sprite(tmp, g_resolution.w/2-128/2, g_resolution.h/2-64/2, 3, 0, 128, 64);
 
     lcd_flush();
-    WAIT(2000);
+    WAIT(500);
 
     free(tmp);
 
@@ -780,7 +823,7 @@ void frontend_esp32s3_ui_exit() {
     free(g_framebuffer);
 }
 
-int frontend_esp32s3_input_init(Frontend*, const char*) {
+int frontend_esp32s3_input_init(Frontend*) {
     schedule(GLOBALS.runqueue, 0, 0, job_imu_input, NULL);
     return 0;
 }

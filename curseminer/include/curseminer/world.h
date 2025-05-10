@@ -3,20 +3,12 @@
 
 #include <stdbool.h>
 
+#include "curseminer/frontend.h"
 #include "curseminer/core_game.h"
 #include "curseminer/time.h"
 
 typedef struct EntityType EntityType;
 typedef struct EntityController EntityController;
-
-typedef struct Skin {
-    uint16_t glyph, rotation;
-    uint8_t offset_x, offset_y;
-    bool flip_x, flip_y;
-
-    uint8_t bg_r, bg_g, bg_b, bg_a,
-            fg_r, fg_g, fg_b, fg_a;
-} Skin;
 
 typedef struct Entity {
     EntityType* type;

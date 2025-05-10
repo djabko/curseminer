@@ -94,14 +94,37 @@ typedef enum {
     E_CTX_END,
 } event_ctx_t;
 
-typedef struct {
-    int (*f_ui_init)();
-    void (*f_ui_exit)();
+typedef struct Skin {
+    uint16_t glyph, rotation;
+    uint8_t offset_x, offset_y;
+    bool flip_x, flip_y;
 
-    int (*f_input_init)();
-    void (*f_input_exit)();
+    uint8_t bg_r, bg_g, bg_b, bg_a,
+            fg_r, fg_g, fg_b, fg_a;
+} Skin;
 
-    bool (*f_set_glyphset)(const char*);
+typedef struct Frontend Frontend;
+typedef int (*frontend_init_ui_t)(Frontend*, const char*);
+typedef void (*frontend_exit_ui_t)(Frontend*);
+typedef int (*frontend_init_input_t)(Frontend*);
+typedef void (*frontend_exit_input_t)(Frontend*);
+
+typedef struct Frontend {
+    int width, height;
+
+    /* Drawing Primitives */
+    void (*f_draw_point)    (Skin*, int x, int y, int w);
+    void (*f_draw_line)     (Skin*, int x1, int y1, int x2, int y2, int w);
+    void (*f_fill_rect)     (Skin*, int x1, int y1, int x2, int y2);
+
+    /* Management Functions */
+    frontend_init_ui_t f_ui_init;
+    frontend_exit_ui_t f_ui_exit;
+    frontend_init_input_t f_input_init;
+    frontend_exit_input_t f_input_exit;
+
+    bool (*f_set_glyphset)  (const char *name);
+
 } Frontend;
 
 typedef struct {
@@ -112,14 +135,11 @@ typedef struct {
     uint64_t data;
 } InputEvent;
 
-typedef int (*frontend_init_t)(Frontend*, const char*);
-typedef void (*frontend_exit_t)(Frontend*);
-
 bool frontend_pack_event(InputEvent*, uint8_t, uint8_t, uint8_t, uint8_t);
 bool frontend_set_glyphset(const char*);
 
-int frontend_register_ui(frontend_init_t, frontend_exit_t);
-int frontend_register_input(frontend_init_t, frontend_exit_t);
+int frontend_register_ui(frontend_init_ui_t, frontend_exit_ui_t);
+int frontend_register_input(frontend_init_input_t, frontend_exit_input_t);
 
 int frontend_init(const char* title);
 void frontend_exit();

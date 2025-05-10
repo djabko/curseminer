@@ -50,10 +50,10 @@ static void init(frontend_t frontend, const char *title) {
     assert_log(GLOBALS.runqueue_list && g_runqueue,
             "failed to initialize main RunQueue");
 
-    frontend_init_t fuii = frontend_headless_ui_init;
-    frontend_exit_t fuie = frontend_headless_ui_exit;
-    frontend_init_t fini = frontend_headless_input_init;
-    frontend_exit_t fine = frontend_headless_input_exit;
+    frontend_init_ui_t fuii = frontend_headless_ui_init;
+    frontend_exit_ui_t fuie = frontend_headless_ui_exit;
+    frontend_init_input_t fini = frontend_headless_input_init;
+    frontend_exit_input_t fine = frontend_headless_input_exit;
 
 #ifdef COMPILE_FRONTEND_NCURSES
     if (frontend == FRONTEND_NCURSES) {

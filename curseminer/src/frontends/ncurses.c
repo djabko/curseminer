@@ -293,16 +293,19 @@ static void ui_input_clock_move(InputEvent *ie) {
 
 
 /* Draw Functions */
-static void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) __attribute__((unused));
-static void draw_fill(WINDOW* win, char c, int x1, int y1, int x2, int y2) {
+static void draw_fill(Skin *skin, int x1, int y1, int x2, int y2) {
     for (int x=x1; x<=x2; x++) {
         for (int y=y1; y<=y2; y++) {
-            mvwaddch(win, y, x, c);
+            mvwaddch(stdscr, y, x, g_glyph_charset[skin->glyph]);
         }
     }
 }
 
-static void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y2) {
+static void draw_point(Skin *skin, int x, int y, int d) {
+    mvwaddch(stdscr, x, y, g_glyph_charset[skin->glyph]);
+}
+
+static void _draw_line(char c, int x1, int y1, int x2, int y2) {
     int dx = abs(x2 - x1);
     int dy = abs(y2 - y1);
     int sx = (x1 < x2) + (x2 <= x1) * -1;
@@ -310,7 +313,7 @@ static void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y
     int err = dx - dy;
 
     while (1) {
-        mvwaddch(win, y1, x1, c);
+        mvwaddch(stdscr, y1, x1, c);
         if (x1 == x2 && y1 == y2) break;
         int e2 = err * 2;
 
@@ -325,24 +328,27 @@ static void draw_line(WINDOW* win, const chtype c, int x1, int y1, int x2, int y
     }
 }
 
-static void _draw_square(WINDOW *win, int x1, int y1, int x2, int y2,
+static void draw_line(Skin *skin, int x1, int y1, int x2, int y2, int thickness) {
+    _draw_line(g_glyph_charset[skin->glyph], x1, y1, x2, y2);
+}
+
+static void _draw_square(Skin *skin, int x1, int y1, int x2, int y2,
         chtype l1, chtype l2, chtype l3, chtype l4,
         chtype c1, chtype c2, chtype c3, chtype c4) {
 
-    mvwaddch(win, y1, x1, c1);
-    mvwaddch(win, y1, x2, c2);
-    mvwaddch(win, y2, x1, c3);
-    mvwaddch(win, y2, x2, c4);
+    mvwaddch(stdscr, y1, x1, c1);
+    mvwaddch(stdscr, y1, x2, c2);
+    mvwaddch(stdscr, y2, x1, c3);
+    mvwaddch(stdscr, y2, x2, c4);
 
-    draw_line(stdscr, l1, x1+1, y1, x2-1, y1);
-    draw_line(stdscr, l2, x1+1, y2, x2-1, y2);
-    draw_line(stdscr, l3, x1, y1+1, x1, y2-1);
-    draw_line(stdscr, l4, x2, y1+1, x2, y2-1);
+    _draw_line(l1, x1+1, y1, x2-1, y1);
+    _draw_line(l2, x1+1, y2, x2-1, y2);
+    _draw_line(l3, x1, y1+1, x1, y2-1);
+    _draw_line(l4, x2, y1+1, x2, y2-1);
 }
 
-static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) __attribute__((unused));
-static void draw_square(WINDOW *win, int x1, int y1, int x2, int y2) {
-   _draw_square(win, x1, y1, x2, y2,
+static void draw_rect(Skin *skin, int x1, int y1, int x2, int y2) {
+   _draw_square(skin, x1, y1, x2, y2,
             ACS_HLINE, ACS_HLINE, ACS_VLINE, ACS_VLINE,
             ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
 }
@@ -362,25 +368,23 @@ static void box_win_clear(window_t * window) {
 
     mvwprintw(stdscr, window->y-2, window->x, "                      ");
 
-    _draw_square(stdscr,
+    _draw_square(window->skin,
             window->x - 1, window->y - 1,
             window->x + window->w,
             window->y + window->h,
             spc, spc, spc, spc, spc, spc, spc, spc);
 }
 
-static void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) __attribute__((unused));
-static void draw_clock_needle(WINDOW* win, double x1, double y1, char c, double d, double angle) {
+static void draw_clock_needle(window_t *win, double x1, double y1, char c, double d, double angle) {
     double x2, y2;
 
     x2 = x1 + d * cos(angle);
     y2 = y1 + d * sin(angle);
 
-    draw_line(win, c, x1, y1, x2, y2); 
+    draw_line(win->skin, x1, y1, x2, y2, 0); 
 }
 
-static void draw_rt_clock(WINDOW* win, int x, int y, int r) __attribute__((unused));
-static void draw_rt_clock(WINDOW* win, int x, int y, int r) {
+static void draw_rt_clock(window_t *win, int x, int y, int r) {
     seconds_t time_sec = TIMER_NOW_MS / 1000;
 
     time_t sc = time_sec % 60;
@@ -400,7 +404,7 @@ static void draw_rt_clock(WINDOW* win, int x, int y, int r) {
     draw_clock_needle(win, x, y, 'm', r*0.50, angleM);
     draw_clock_needle(win, x, y, 'H', r*0.25, angleH);
     attron(A_BOLD);
-    mvwaddch(win, y, x, '+');
+    mvwaddch(win->win, y, x, '+');
     attroff(A_BOLD);
 }
 
@@ -473,7 +477,7 @@ static void draw_gamewin(window_t *gamewin) {
 
 static void draw_uiwin(window_t *uiwin) {
     werase(uiwin->win);
-    draw_rt_clock(uiwin->win, uiwin->h/2+2, uiwin->h/2, uiwin->h/2);
+    draw_rt_clock(uiwin, uiwin->h/2+2, uiwin->h/2, uiwin->h/2);
 
     mvwprintw(uiwin->win, 5, 20, "Player: (%d, %d) [%c%d, %c%d]",
             GLOBALS.player->y, GLOBALS.player->x,
@@ -515,7 +519,7 @@ static void draw_invwin(window_t *invwin) {
 
 static void draw_widgetwin_rt_clock(window_t *widgetwin) {
     werase(widgetwin->win);
-    draw_rt_clock(widgetwin->win, widgetwin->w/2, widgetwin->h/2, WIDGET_WIN_R);
+    draw_rt_clock(widgetwin, widgetwin->w/2, widgetwin->h/2, WIDGET_WIN_R);
 }
 
 static void draw_widgetwin_noise(window_t *widgetwin, double (noise_func)(NoiseLattice*, double)) {
@@ -960,8 +964,6 @@ static bool set_glyphset(const char *name) {
 
 /* External APIs */
 int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
-    fr->f_set_glyphset = set_glyphset;
-
     MENU_STACK = st_init(16);
 
     initscr();
@@ -1016,6 +1018,13 @@ int frontend_ncurses_ui_init(Frontend* fr, const char *title) {
     window_insert_draw_func(g_widgetwin,    draw_widgetwin_rt_clock);
     window_insert_draw_func(g_widgetwin,    draw_widgetwin_perlin_noise);
 
+    fr->f_set_glyphset = set_glyphset;
+    fr->f_draw_point = draw_point;
+    fr->f_draw_line = draw_line;
+    fr->f_fill_rect = draw_fill;
+    fr->width = COLS;
+    fr->height = LINES;
+
     frontend_register_event(E_KB_G, E_CTX_GAME, ui_input_widget_toggle);
     frontend_register_event(E_KB_G, E_CTX_NOISE, ui_input_widget_toggle);
     frontend_register_event(E_KB_G, E_CTX_CLOCK, ui_input_widget_toggle);
@@ -1060,7 +1069,7 @@ void frontend_ncurses_ui_exit(Frontend* fr) {
     frontend_ncurses_exit();
 }
 
-int frontend_ncurses_input_init(Frontend* fr, const char*) {
+int frontend_ncurses_input_init(Frontend* fr) {
     
     /* 1. Initialized data structures */
     init_keys_ncurses();
