@@ -44,7 +44,7 @@ static void init(frontend_t frontend, const char *title) {
     time_init(UPDATE_RATE);
 
     GLOBALS.runqueue_list = scheduler_init();
-    g_runqueue = scheduler_new_rq(GLOBALS.runqueue_list);
+    g_runqueue = scheduler_new_rq_(GLOBALS.runqueue_list);
     GLOBALS.runqueue = g_runqueue;
 
     assert_log(GLOBALS.runqueue_list && g_runqueue,

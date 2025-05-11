@@ -19,6 +19,7 @@
 
 #include "curseminer/globals.h"
 #include "curseminer/stack64.h"
+#include "curseminer/widget.h"
 #include "curseminer/frontend.h"
 #include "curseminer/frontends/esp32s3-waveshare.h"
 
@@ -213,6 +214,48 @@ static void draw_rect(int x1, int y1, int x2, int y2, uint16_t color) {
 
 static void draw_square(int x1, int y1, int len, uint16_t color) {
     draw_rect(x1, y1, x1 + len, y1 + len, color);
+}
+
+static bool set_glyphset(const char* name) {
+    return false;
+}
+
+static void draw_point(Skin *skin, int x, int y, int thickness) {
+    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+    g_framebuffer[y * g_resolution.w + x] = color;
+}
+
+static void draw_line(Skin *skin, int x1, int y1, int x2, int y2, int thickness) {
+    int dx = abs(x2 - x1);
+    int dy = abs(y2 - y1);
+    int sx = (x1 < x2) + (x2 <= x1) * -1;
+    int sy = (y1 < y2) + (y2 <= y1) * -1;
+    int err = dx - dy;
+    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+    while (1) {
+        g_framebuffer[y1 * g_resolution.w + x1] = color;
+
+        if (x1 == x2 && y1 == y2) break;
+
+        int e2 = err * 2;
+
+        if (e2 > -dy) {
+            err -= dy;
+            x1 += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y1 += sy;
+        }
+    }
+}
+
+static void fill_rect(Skin *skin, int x1, int y1, int x2, int y2) {
+    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
+
+    draw_rect(x1, y1, x2, y2, color);
 }
 
 static void lcd_flush() {
@@ -433,7 +476,7 @@ static void exit_panel() {
     // TODO
 }
 
-static void draw_tile(Skin *skin, int x, int y) {
+static void draw_tile(int x, int y, Skin *skin) {
     int tile_w =  g_screen_w / GLOBALS.view_port_maxx;
     int tile_h =  tile_w;
     uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
@@ -448,6 +491,10 @@ static void draw_tile(Skin *skin, int x, int y) {
             uint8_t *tmp = load_rgb(path, g_spritesheet_size);
             g_spritesheet = image_shrink(tmp, g_sprite_w, 7 * g_sprite_h, 4, tile_w, 7 * tile_h);
             free(tmp);
+
+            Skin *bg = GLOBALS.game->entity_types->default_skin;
+
+            fill_rect(bg, 0, 0, g_resolution.w, g_resolution.h);
         }
 
         draw_sprite(g_spritesheet, x * tile_w, y * tile_h, 4, skin->glyph - 1, tile_w, tile_h);
@@ -459,63 +506,10 @@ static void draw_tile(Skin *skin, int x, int y) {
 }
 
 static int job_render(Task *task, Stack64 *st) {
-    Skin* skin;
-    DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
+    int tiles_drawn = widget_draw_game(GLOBALS.game, draw_tile);
 
-    // No tiles to draw
-    if (df->command == 0) {
-        return 0;
+    if (tiles_drawn) lcd_flush();
 
-    // Draw only dirty tiles
-    } else if (df->command == 1) {
-
-        size_t s = df->stride;
-        int maxx = GLOBALS.view_port_maxx;
-
-        for (int i = 0; i < s; i++) {
-            if (df->groups[i]) {
-
-                for (int j = 0; j < s; j++) {
-
-                    int index = i * s + j;
-                    byte_t flag = df->flags[index];
-
-                    if (flag == 1) {
-
-                        int x = index % maxx;
-                        int y = index / maxx;
-
-                        skin = game_world_getxy(GLOBALS.game, x, y);
-
-                        draw_tile(skin, x, y);
-                    }
-                }
-            }
-        }
-
-
-    // Update all tiles
-    } else if (df->command == -1) {
-
-        skin = GLOBALS.game->entity_types->default_skin;
-
-        uint16_t bg = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
-
-        draw_rect(0, 0, g_resolution.w, g_resolution.h, bg);
-
-        for (int y = 0; y < GLOBALS.view_port_maxy; y++) {
-            for (int x = 0; x < GLOBALS.view_port_maxx; x++) {
-
-                skin = game_world_getxy(GLOBALS.game, x, y);
-
-                draw_tile(skin, x, y);
-            }
-        }
-    }
-
-    lcd_flush();
-
-    df->command = 0;
     return 0;
 }
 
@@ -624,48 +618,6 @@ static int job_imu_input(Task *task, Stack64 *st) {
 
 
 /* External API Functions */
-static bool set_glyphset(const char* name) {
-    return false;
-}
-
-static void draw_point(Skin *skin, int x, int y, int thickness) {
-    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
-
-    g_framebuffer[y * g_resolution.w + x] = color;
-}
-
-static void draw_line(Skin *skin, int x1, int y1, int x2, int y2, int thickness) {
-    int dx = abs(x2 - x1);
-    int dy = abs(y2 - y1);
-    int sx = (x1 < x2) + (x2 <= x1) * -1;
-    int sy = (y1 < y2) + (y2 <= y1) * -1;
-    int err = dx - dy;
-    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
-
-    while (1) {
-        g_framebuffer[y1 * g_resolution.w + x1] = color;
-
-        if (x1 == x2 && y1 == y2) break;
-
-        int e2 = err * 2;
-
-        if (e2 > -dy) {
-            err -= dy;
-            x1 += sx;
-        }
-        if (e2 < dx) {
-            err += dx;
-            y1 += sy;
-        }
-    }
-}
-
-static void fill_rect(Skin *skin, int x1, int y1, int x2, int y2) {
-    uint16_t color = rgb888_to_rgb565(skin->fg_r, skin->fg_g, skin->fg_b);
-
-    draw_rect(x1, y1, x2, y2, color);
-}
-
 void lcd_test() {
     int t = 3;
     int len = g_resolution.w / t;
@@ -795,15 +747,17 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
 
     schedule(GLOBALS.runqueue, 0, 0, job_render, NULL);
 
-    uint8_t *tmp = load_rgb("/spiffs/splash.raw", 128*64*3);
+    uint8_t *tmp = load_rgb("/spiffs/splash.raw", 128*128*3);
 
-    draw_rect(0, 0, g_resolution.w, g_resolution.h, 0x2020);
-    draw_sprite(tmp, g_resolution.w/2-128/2, g_resolution.h/2-64/2, 3, 0, 128, 64);
+    if (tmp) {
+        draw_rect(0, 0, g_resolution.w, g_resolution.h, 0x2020);
+        draw_sprite(tmp, g_resolution.w/2-128/2, g_resolution.h/2-64/2, 3, 0, 128, 64);
 
-    lcd_flush();
-    WAIT(500);
+        lcd_flush();
+        WAIT(500);
 
-    free(tmp);
+        free(tmp);
+    }
 
     g_available_spritesheets = scan_available_spritesheets("/spiffs", "spr_");
 

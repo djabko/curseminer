@@ -14,6 +14,7 @@
 #include "curseminer/stack64.h"
 #include "curseminer/time.h"
 #include "curseminer/core_game.h"
+#include "curseminer/widget.h"
 #include "curseminer/frontend.h"
 #include "curseminer/frontends/ncurses.h"
 #include "curseminer/games/curseminer.h"
@@ -149,7 +150,7 @@ static inline void normalize_color(Color *c) {
 /* Utility Functions */
 #define assert_ncurses(condition, ...)      \
     if (!(condition)) {                     \
-        frontend_ncurses_exit(-1);          \
+        frontend_ncurses_exit();            \
         _log_debug("ERROR: ");              \
         log_debug(__VA_ARGS__);             \
         log_debug_nl();                     \
@@ -413,66 +414,17 @@ static void draw_keyboard_state(WINDOW* scr, int x, int y) {
 
 }
 
-//int SKIPPED_UPDATES = 0;
+static void draw_tile(int x, int y, Skin *skin) {
+    int glyph = resolve_glyph(skin);
+
+    wattron(g_gamewin->win, COLOR_PAIR(glyph));
+    mvwaddch(g_gamewin->win, y, x, g_glyph_charset[glyph]);
+    game_set_dirty(GLOBALS.game, x, y, 0);
+    wattroff(g_gamewin->win, COLOR_PAIR(glyph));
+}
+
 static void draw_gamewin(window_t *gamewin) {
-    Skin* skin;
-
-    DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
-
-    // No tiles to draw
-    if (df->command == 0) {
-
-    // Draw only dirty tiles
-    } else if (df->command == 1) {
-
-        size_t s = df->stride;
-        int maxx = GLOBALS.view_port_maxx;
-
-        for (int i = 0; i < s; i++) {
-            if (df->groups[i]) {
-
-                for (int j = 0; j < s; j++) {
-
-                    int index = i * s + j;
-                    byte_t flag = df->flags[index];
-
-                    if (flag == 1) {
-
-                        int x = index % maxx;
-                        int y = index / maxx;
-
-                        skin = game_world_getxy(GLOBALS.game, x, y);
-                        int glyph = resolve_glyph(skin);
-
-                        wattron(gamewin->win, COLOR_PAIR(glyph));
-                        mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
-                        game_set_dirty(GLOBALS.game, x, y, 0);
-                        wattroff(gamewin->win, COLOR_PAIR(glyph));
-                    }
-                }
-            }
-        }
-
-    // Update all tiles
-    } else if (df->command == -1) {
-        for (int y=0; y < gamewin->h; y++) {
-            for (int x=0; x < gamewin->w; x++) {
-
-                skin = game_world_getxy(GLOBALS.game, x, y);
-                int glyph = resolve_glyph(skin);
-
-                if (!g_glyph_init[glyph]) new_glyph(skin);
-
-                wattron(gamewin->win, COLOR_PAIR(glyph));
-                mvwaddch(gamewin->win, y, x, g_glyph_charset[glyph]);
-                wattroff(gamewin->win, COLOR_PAIR(glyph));
-            }
-        }
-
-        game_flush_dirty(GLOBALS.game);
-    }
-
-    df->command = 0;
+    widget_draw_game(GLOBALS.game, draw_tile);
 }
 
 static void draw_uiwin(window_t *uiwin) {

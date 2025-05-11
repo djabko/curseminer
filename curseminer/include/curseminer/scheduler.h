@@ -83,6 +83,7 @@ int rqll_kill(ll_head*);
 ll_head *scheduler_init();
 void scheduler_free();
 RunQueue* scheduler_new_rq();
+RunQueue* scheduler_new_rq_(ll_head* rqll);
 RunQueueList *scheduler_new_rqll();
 int scheduler_wake_tasks();
 int scheduler_kill_all_tasks();

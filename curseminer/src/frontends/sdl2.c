@@ -11,6 +11,7 @@
 #include "curseminer/frontend.h"
 #include "curseminer/frontends/sdl2.h"
 #include "curseminer/scheduler.h"
+#include "curseminer/widget.h"
 
 #define SPRITE_MAX 256
 #define REFRESH_RATE 20
@@ -52,7 +53,7 @@ static int g_tile_maxx;
 static int g_tile_maxy;
 static int g_sprite_size = 32;
 static int g_sprite_offset = 0;
-static void (*draw_tile_f)(Skin*, SDL_Rect*);
+static void (*f_draw_tile)(Skin*, SDL_Rect*);
 
 typedef struct Spritesheet {
     char name[NAME_MAX];
@@ -309,71 +310,24 @@ void flush_screen() {
     SDL_RenderPresent(g_renderer);
 }
 
+static void draw_tile(int x, int y, Skin *skin) {
+    SDL_Rect r = {
+        x * g_tile_w,
+        y * g_tile_h,
+        g_tile_w,
+        g_tile_h
+    };
+
+    f_draw_tile(skin, &r);
+}
+
 void draw_game() {
     SDL_SetRenderTarget(g_renderer, g_canvas);
 
-    SDL_Rect rect = {.x = 0, .y = 0, .w = g_tile_w, .h = g_tile_h};
-    Skin* skin;
-    DirtyFlags *df = GLOBALS.game->cache_dirty_flags;
+    int tiles_drawn = widget_draw_game(GLOBALS.game, draw_tile);
 
-    // No tiles to draw
-    if (df->command == 0) {
-        return;
-
-    // Draw only dirty tiles
-    } else if (df->command == 1) {
-
-        size_t s = df->stride;
-        int maxx = GLOBALS.view_port_maxx;
-
-        for (int i = 0; i < s; i++) {
-            if (df->groups[i]) {
-
-                for (int j = 0; j < s; j++) {
-
-                    int index = i * s + j;
-                    byte_t flag = df->flags[index];
-
-                    if (flag == 1) {
-
-                        int x = index % maxx;
-                        int y = index / maxx;
-
-                        skin = game_world_getxy(GLOBALS.game, x, y);
-                        game_set_dirty(GLOBALS.game, x, y, 0);
-
-                        rect.x = x * g_tile_w;
-                        rect.y = y * g_tile_h;
-
-                        draw_tile_f(skin, &rect);
-                    }
-                }
-            }
-        }
-
-
-    // Update all tiles
-    } else if (df->command == -1) {
-        SDL_RenderClear(g_renderer);
-
-        for (int y = 0; y < g_tile_maxy; y++) {
-            rect.y = y * g_tile_h;
-
-            for (int x = 0; x < g_tile_maxx; x++) {
-                rect.x = x * g_tile_w;
-
-                skin = game_world_getxy(GLOBALS.game, x, y);
-
-                game_set_dirty(GLOBALS.game, x, y, 0);
-                draw_tile_f(skin, &rect);
-            }
-        }
-    }
-
-    flush_screen();
-    df->command = 0;
+    if (tiles_drawn) flush_screen();
 }
-
 
 
 
@@ -461,7 +415,7 @@ static int handle_event_SDL2(void *userdata, SDL_Event *event) {
 
 static bool set_glyphset(const char *name) {
     if (!name) {
-        draw_tile_f = draw_tile_rect;
+        f_draw_tile = draw_tile_rect;
         return true;
     }
 
@@ -484,7 +438,7 @@ static bool set_glyphset(const char *name) {
 
     g_spritesheet = ss;
     g_sprite_frame = 0;
-    draw_tile_f = draw_tile_sprite;
+    f_draw_tile = draw_tile_sprite;
 
     return true;
 }
@@ -582,7 +536,7 @@ int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
     assert_SDL(g_canvas != NULL, "Failed to create SDL main canvas texture");
 
     // 4. Init draw func, tasks and interrupts
-    draw_tile_f = draw_tile_rect;
+    f_draw_tile = draw_tile_rect;
 
     recalculate_tile_size(g_tile_w);
 
