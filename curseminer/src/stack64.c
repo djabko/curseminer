@@ -373,31 +373,39 @@ PQueue64* pq_init(int pages) {
     return pq;
 }
 
-int pq_enqueue(PQueue64* pq, void* ptr, uint64_t weight) {
+int pq_enqueue(PQueue64 *pq, void *ptr, uint64_t weight) {
     return pq->heap_insert(&pq->heap, (uint64_t) ptr, weight);
 }
 
-void pq_remove(PQueue64* pq, void* ptr, uint64_t weight) {
+void pq_remove(PQueue64 *pq, void *ptr, uint64_t weight) {
     // TODO: search for ptr and remove from heap
 }
 
-uint64_t _pq_peek(PQueue64* pq, char dw) {
+uint64_t _pq_peek(PQueue64 *pq, char dw) {
     if (dw)
         return pq->heap.mempool[0].data;
 
     return pq->heap.mempool[0].weight;
 }
 
-void *pq_peek(PQueue64* pq) {
+void *pq_peek(PQueue64 *pq) {
     return (void*) _pq_peek(pq, 1);
 }
 
-int pq_empty(PQueue64* pq) {
+int pq_empty(PQueue64 *pq) {
     return pq->heap.count == 0;
 }
 
-int pq_full(PQueue64* pq) {
+int pq_full(PQueue64 *pq) {
     return pq->heap.count < pq->heap.capacity;
+}
+
+int pq_clear(PQueue64 *pq) {
+    int i = pq->heap.count;
+
+    pq->heap.count = 0;
+
+    return i;
 }
 
 void *pq_dequeue(PQueue64 *pq) {

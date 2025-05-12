@@ -58,12 +58,13 @@ typedef unsigned char byte_t;
 struct Globals {
     int view_port_x, view_port_y, view_port_maxx, view_port_maxy,
         tile_w, tile_h;
-    Entity* player;
-    GameContext* game;
+    Entity *player;
+    GameContext *game;
+    Queue64 *games_qu;
     event_ctx_t input_context;
 
-    RunQueue* runqueue;
-    ll_head* runqueue_list;
+    RunQueue *runqueue;
+    ll_head *runqueue_list;
 };
 
 extern struct Globals GLOBALS;

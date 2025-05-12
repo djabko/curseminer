@@ -33,6 +33,8 @@ typedef enum {
 
 struct Globals GLOBALS = {
     .player = NULL,
+    .game = NULL,
+    .games_qu = NULL,
     .input_context = E_CTX_0,
     .view_port_maxx = 5,
     .view_port_maxy = 5,
@@ -91,7 +93,7 @@ static int exit_state() {
 
     frontend_exit();
 
-    game_free(GLOBALS.game);
+    game_exit(GLOBALS.game);
     scheduler_free();
 
     return 0;
@@ -136,25 +138,32 @@ int main(int argc, const char** argv) {
         }
     }
 
+    int games = 2;
+    GLOBALS.games_qu = qu_init(1);
+    GameContextCFG *gcfgs = calloc(games, sizeof(GameContextCFG));
+
     GameContextCFG gcfg = {
         .skins_max = 12,
         .entity_types_max = 12,
         .scroll_threshold = 2,
-
-        .f_init = game_curseminer_init,
-        .f_update = game_curseminer_update,
-        .f_free = game_curseminer_free,
-        /*
-        .f_init = game_other_init,
-        .f_update = game_other_update,
-        .f_free = game_other_free,
-        */
     };
+
+    gcfg.f_init = game_curseminer_init,
+    gcfg.f_update = game_curseminer_update,
+    gcfg.f_exit = game_curseminer_free,
+    gcfgs[0] = gcfg;
+    qu_enqueue(GLOBALS.games_qu, (uint64_t) (gcfgs + 0));
+
+    gcfg.f_init = game_other_init,
+    gcfg.f_update = game_other_update,
+    gcfg.f_exit = game_other_free,
+    gcfgs[1] = gcfg;
+    qu_enqueue(GLOBALS.games_qu, (uint64_t) (gcfgs + 1));
 
     init(frontend, title);
 
     World *world = world_init(20, 1000, 64 * PAGE_SIZE);
-    GLOBALS.game = game_init(&gcfg, world);
+    GLOBALS.game = game_init(gcfgs, world);
     Stack64 *gst = st_init(1);
     st_push(gst, (uint64_t) GLOBALS.game);
 

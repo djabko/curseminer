@@ -263,6 +263,22 @@ static void intr_zoom_in(InputEvent *ie) {
     }
 }
 
+static void intr_game_next(InputEvent *ie) {
+    if (ie->state == ES_DOWN) return;
+
+    World *world = GLOBALS.game->world;
+
+    game_exit(GLOBALS.game);
+
+    qu_next(GLOBALS.games_qu); 
+
+    GameContextCFG *cfg = (GameContextCFG*) qu_peek(GLOBALS.games_qu);
+
+    GLOBALS.game = game_init(cfg, world);
+
+    g_game = GLOBALS.game;
+}
+
 int select_sprite(SDL_Rect *rect, int row, int col) {
     if (!rect) return -1;
 
@@ -553,6 +569,7 @@ int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
     frontend_register_event(E_KB_F5, E_CTX_GAME, intr_redraw_everything);
     frontend_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
     frontend_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
+    frontend_register_event(E_KB_F6, E_CTX_GAME, intr_game_next);
 
     return 0;
 }

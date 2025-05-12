@@ -100,6 +100,7 @@ uint64_t _pq_peek(PQueue64*, char);
 void *pq_peek(PQueue64*);
 int pq_empty(PQueue64*);
 int pq_full(PQueue64*);
+int pq_clear(PQueue64*);
 void pq_free(PQueue64*);
 
 #endif

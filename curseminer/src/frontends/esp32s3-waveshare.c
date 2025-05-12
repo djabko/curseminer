@@ -664,7 +664,6 @@ void lcd_test() {
         int x = (i % t) * len;
         int y = (i / t) * len;
 
-        //uint16_t c = (colors[i] << 8) | (colors[i] >> 8);
         uint16_t c = colors[i]; 
         draw_square(x, y, len, c);
     }
@@ -681,6 +680,16 @@ void btn_isr_render_toggle(void *args) {
 
     g_render_sprites = true;// !g_render_sprites;
     GLOBALS.game->cache_dirty_flags->command = -1;
+}
+
+void btn_isr_game_next(void *args) {
+    game_exit(GLOBALS.game);
+
+    qu_next(GLOBALS.games_qu); 
+
+    GameContextCFG *cfg = (GameContextCFG*) qu_peek(GLOBALS.games_qu);
+
+    GLOBALS.game = game_init(GLOBALS.game);
 }
 
 void btn_isr_break_tile(void *args) {
@@ -765,7 +774,8 @@ int frontend_esp32s3_ui_init(Frontend* fr, const char *title) {
             TAG, "Failed to install ISR for gpio");
 
     ESP_ERROR_CHECK(init_btn(GPIO_NUM_18, btn_isr_break_tile));
-    ESP_ERROR_CHECK(init_btn(GPIO_NUM_40, btn_isr_render_toggle));
+    //ESP_ERROR_CHECK(init_btn(GPIO_NUM_40, btn_isr_render_toggle));
+    ESP_ERROR_CHECK(init_btn(GPIO_NUM_40, btn_isr_game_next));
 
     return 0;
 }

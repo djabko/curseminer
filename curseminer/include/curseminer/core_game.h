@@ -82,7 +82,7 @@ typedef struct GameContext {
 
     int (*f_init)(struct GameContext*, int);
     int (*f_update)();
-    int (*f_free)();
+    int (*f_exit)();
 } GameContext;
 
 typedef struct GameContextCFG {
@@ -90,7 +90,7 @@ typedef struct GameContextCFG {
 
     int (*f_init)(struct GameContext*, int);
     int (*f_update)();
-    int (*f_free)();
+    int (*f_exit)();
 } GameContextCFG;
 
 
@@ -107,7 +107,7 @@ bool game_resize_viewport(GameContext*, int w, int h);
 
 /* Game Interface */
 GameContext *game_init(GameContextCFG*, World*);
-void game_free(GameContext*);
+void game_exit(GameContext*);
 int game_update(Task*, Stack64*);
 
 EntityType *game_world_getxy_type(GameContext *game, int x, int y);

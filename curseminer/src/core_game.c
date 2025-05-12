@@ -205,7 +205,7 @@ EntityType* game_create_entity_type(GameContext *game, Skin* skin) {
 }
 
 int game_update(Task* task, Stack64* stack) {
-    GameContext *game = (GameContext*) st_peek(stack);
+    GameContext *game = GLOBALS.game;
     PQueue64* entity_pq = game->world->entities;
     milliseconds_t next_tick = _pq_peek(entity_pq, 0);
 
@@ -236,26 +236,16 @@ GameContext *game_init(GameContextCFG *cfg, World *world) {
     assert_log (game != NULL,
             "ERROR: UI failed to initialize game...");
 
-    game->cache_entity = NULL;
-    game->cache_world = NULL;
-    game->cache_dirty_flags = NULL;
-
+    log_debug("Initializing game with %d %d %d %p %p %p", cfg->skins_max, cfg->entity_types_max, cfg->scroll_threshold, cfg->f_init, cfg->f_update, cfg->f_exit);
     game->skins_max = cfg->skins_max;
     game->entity_types_max = cfg->entity_types_max;
     game->scroll_threshold = cfg->scroll_threshold;
     game->f_init = cfg->f_init;
     game->f_update = cfg->f_update;
-    game->f_free = cfg->f_free;
+    game->f_exit = cfg->f_exit;
 
-    game->skins_c = 0;
-    game->entity_types_c = 0;
     game->skins = calloc(game->skins_max, sizeof(Skin));
     game->entity_types = calloc(game->entity_types_max, sizeof(EntityType));
-    game->world_view_x = 0;
-    game->world_view_y = 0;
-    game->viewport_w = 0;
-    game->viewport_h = 0;
-
     game->world = world;
 
     entity_init_default_controller();
@@ -266,9 +256,13 @@ GameContext *game_init(GameContextCFG *cfg, World *world) {
     return game;
 }
 
-void game_free(GameContext *game) {
-    game->f_free();
-    world_free(game->world);
+// TODO: free behaviours
+void game_exit(GameContext *game) {
+    game->f_exit();
+    pq_clear(game->world->entities);
+    free(game->cache_entity);
+    free(game->cache_world);
+    free(game->cache_dirty_flags);
     free(game->entity_types);
     free(game->skins);
     free(game);
