@@ -683,13 +683,17 @@ void btn_isr_render_toggle(void *args) {
 }
 
 void btn_isr_game_next(void *args) {
-    game_exit(GLOBALS.game);
+    InputEvent ie = {
+        .id = E_KB_F6,
+        .type = E_TYPE_KB,
+        .state = ES_DOWN,
+        .mods = E_NOMOD,
+    };
 
-    qu_next(GLOBALS.games_qu); 
+    frontend_dispatch_event(E_CTX_GAME, &ie);
 
-    GameContextCFG *cfg = (GameContextCFG*) qu_peek(GLOBALS.games_qu);
-
-    GLOBALS.game = game_init(GLOBALS.game);
+    ie.state = ES_UP;
+    frontend_dispatch_event(E_CTX_GAME, &ie);
 }
 
 void btn_isr_break_tile(void *args) {

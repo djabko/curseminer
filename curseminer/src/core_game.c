@@ -204,7 +204,30 @@ EntityType* game_create_entity_type(GameContext *game, Skin* skin) {
     return type;
 }
 
+int job_game_init_next(Task *tk, Stack64 *st) {
+    if (GLOBALS.game) game_exit(GLOBALS.game);
+
+    GameContextCFG *cfg = (GameContextCFG*) qu_next(GLOBALS.games_qu);
+
+    int i = 0;
+    GameContext *tmp;
+    qu_foreach(GLOBALS.games_qu, GameContextCFG*, tmp) {
+        log_debug("%d. %p", i, tmp->f_init);
+        i++;
+    }
+
+    log_debug("Initializing game[%d] with %d %d %d %p %p %p", GLOBALS.games_qu->count, cfg->skins_max, cfg->entity_types_max, cfg->scroll_threshold, cfg->f_init, cfg->f_update, cfg->f_exit);
+    GLOBALS.game = game_init(cfg, GLOBALS.world);
+
+    tk_kill(tk);
+
+    return 0;
+}
+
 int game_update(Task* task, Stack64* stack) {
+    if (!GLOBALS.game)
+        GLOBALS.game = (GameContext*) qu_next(GLOBALS.games_qu);
+
     GameContext *game = GLOBALS.game;
     PQueue64* entity_pq = game->world->entities;
     milliseconds_t next_tick = _pq_peek(entity_pq, 0);
@@ -236,7 +259,6 @@ GameContext *game_init(GameContextCFG *cfg, World *world) {
     assert_log (game != NULL,
             "ERROR: UI failed to initialize game...");
 
-    log_debug("Initializing game with %d %d %d %p %p %p", cfg->skins_max, cfg->entity_types_max, cfg->scroll_threshold, cfg->f_init, cfg->f_update, cfg->f_exit);
     game->skins_max = cfg->skins_max;
     game->entity_types_max = cfg->entity_types_max;
     game->scroll_threshold = cfg->scroll_threshold;

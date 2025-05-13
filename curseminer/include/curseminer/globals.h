@@ -60,6 +60,7 @@ struct Globals {
         tile_w, tile_h;
     Entity *player;
     GameContext *game;
+    World *world;
     Queue64 *games_qu;
     event_ctx_t input_context;
 

@@ -57,6 +57,12 @@ void frontend_dispatch_event(event_ctx_t ctx, InputEvent *ie) {
     g_mapper_ctx_array[ctx][ie->id](ie);
 }
 
+static void intr_game_next(InputEvent *ie) {
+    if (ie->state == ES_DOWN) return;
+
+    schedule(GLOBALS.runqueue, 0, 0, job_game_init_next, NULL);
+}
+
 int frontend_init(const char *title) {
     for (int i = E_CTX_0; i < E_CTX_END; i++) {
         for (int j = E_NULL; j < E_END; j++) {
@@ -66,6 +72,8 @@ int frontend_init(const char *title) {
 
     g_frontend.f_ui_init(&g_frontend, title);
     g_frontend.f_input_init(&g_frontend);
+
+    frontend_register_event(E_KB_F6, E_CTX_GAME, intr_game_next);
 
     return true;
 }

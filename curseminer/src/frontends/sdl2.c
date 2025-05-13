@@ -76,7 +76,6 @@ typedef struct GIF {
     int *delays;
 } GIF;
 
-GameContext *g_game = NULL;
 GIF *g_gif = NULL;
 static SDL_Texture *g_canvas;
 static Spritesheet *g_spritesheet;
@@ -238,9 +237,9 @@ static void recalculate_tile_size(int size) {
     GLOBALS.tile_w = g_tile_w;
     GLOBALS.tile_h = g_tile_h;
 
-    if (g_game) {
-        game_resize_viewport(g_game, g_tile_maxx, g_tile_maxy);
-        game_flush_dirty(g_game);
+    if (GLOBALS.game) {
+        game_resize_viewport(GLOBALS.game, g_tile_maxx, g_tile_maxy);
+        game_flush_dirty(GLOBALS.game);
     }
 }
 
@@ -261,22 +260,6 @@ static void intr_zoom_in(InputEvent *ie) {
         int size = g_tile_w + 1;
         recalculate_tile_size(size);
     }
-}
-
-static void intr_game_next(InputEvent *ie) {
-    if (ie->state == ES_DOWN) return;
-
-    World *world = GLOBALS.game->world;
-
-    game_exit(GLOBALS.game);
-
-    qu_next(GLOBALS.games_qu); 
-
-    GameContextCFG *cfg = (GameContextCFG*) qu_peek(GLOBALS.games_qu);
-
-    GLOBALS.game = game_init(cfg, world);
-
-    g_game = GLOBALS.game;
 }
 
 int select_sprite(SDL_Rect *rect, int row, int col) {
@@ -300,7 +283,7 @@ static int g_sprite_frame = 0;
 void draw_tile_sprite(Skin *skin, SDL_Rect *dst) {
 
     // Fill background
-    draw_tile_rect(g_game->entity_types->default_skin, dst);
+    draw_tile_rect(GLOBALS.game->entity_types->default_skin, dst);
 
     if (skin->glyph < 1) return;
 
@@ -485,7 +468,7 @@ static int job_animate(Task *task, Stack64 *st) {
 
     g_sprite_frame = (g_sprite_frame + 1) % (g_spritesheet->layers);
 
-    game_flush_dirty(g_game);
+    game_flush_dirty(GLOBALS.game);
     tk_sleep(task, g_spritesheet->delay);
 
     return 0;
@@ -512,7 +495,6 @@ static int job_wait_for_game(Task *task, Stack64 *st) {
     if (!GLOBALS.game) tk_sleep(task, 1000);
 
     else {
-        g_game = GLOBALS.game;
         schedule(GLOBALS.runqueue, 0, 0, job_loop, NULL);
         schedule(GLOBALS.runqueue, 0, 0, job_poll, NULL);
         schedule(GLOBALS.runqueue, 0, 0, job_animate, NULL);
@@ -569,7 +551,6 @@ int frontend_sdl2_ui_init(Frontend *fr, const char *title) {
     frontend_register_event(E_KB_F5, E_CTX_GAME, intr_redraw_everything);
     frontend_register_event(E_KB_J, E_CTX_GAME, intr_zoom_in);
     frontend_register_event(E_KB_K, E_CTX_GAME, intr_zoom_out);
-    frontend_register_event(E_KB_F6, E_CTX_GAME, intr_game_next);
 
     return 0;
 }

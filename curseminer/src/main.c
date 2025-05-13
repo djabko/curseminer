@@ -159,15 +159,14 @@ int main(int argc, const char** argv) {
     gcfg.f_exit = game_other_free,
     gcfgs[1] = gcfg;
     qu_enqueue(GLOBALS.games_qu, (uint64_t) (gcfgs + 1));
+    qu_next(GLOBALS.games_qu);
 
     init(frontend, title);
 
-    World *world = world_init(20, 1000, 64 * PAGE_SIZE);
-    GLOBALS.game = game_init(gcfgs, world);
-    Stack64 *gst = st_init(1);
-    st_push(gst, (uint64_t) GLOBALS.game);
+    GLOBALS.world = world_init(20, 1000, 64 * PAGE_SIZE);
+    GLOBALS.game = game_init(gcfgs, GLOBALS.world);
 
-    schedule_cb(g_runqueue, 0, 0, game_update, gst, cb_exit);
+    schedule_cb(g_runqueue, 0, 0, game_update, NULL, cb_exit);
 
     frontend_register_event(E_KB_Q, E_CTX_GAME, main_event_handler);
     frontend_register_event(E_KB_Q, E_CTX_NOISE, main_event_handler);
