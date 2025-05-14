@@ -66,13 +66,16 @@ typedef struct EntityType {
 
 typedef struct World World;
 
+typedef void (*behaviour_func_t)(Entity *);
 typedef struct GameContext {
     World *world;
 
     int world_view_x, world_view_y, skins_c, skins_max, entity_types_c,
-        entity_types_max, scroll_threshold, viewport_w, viewport_h;
+        entity_types_max, scroll_threshold, viewport_w, viewport_h,
+        behaviour_c, behaviour_free_spots, behaviour_max;
 
     EntityType *entity_types;
+    behaviour_func_t *behaviours;
     Skin *skins;
 
     // Can't be embedded, need to scale with screen size

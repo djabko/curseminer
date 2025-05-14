@@ -120,7 +120,7 @@ static void game_input_spawn_chaser(InputEvent *ie) {
 }
 
 static void game_input_break_tile(InputEvent *ie) {
-    entity_command(GLOBALS.player, be_break);
+    entity_command(GLOBALS.game, GLOBALS.player, be_break);
 }
 
 static void game_input_break_tile_mouse(InputEvent *ie) {
@@ -261,10 +261,10 @@ static void chaser_tick(Entity* e) {
     e->controller->find_path(e, GLOBALS.player->x, GLOBALS.player->y);
 
     if (is_in_radius && !e->moving) {
-        entity_command(e, be_move);
+        entity_command(GLOBALS.game, e, be_move);
 
     } else if (!is_in_radius && e->moving) {
-        entity_command(e, be_stop);
+        entity_command(GLOBALS.game, e, be_stop);
     }
 }
 
@@ -289,7 +289,7 @@ static void chaser_find_path(Entity *e, int x, int y) {
     else log_debug("ERROR: unable to execute pathfinding for entity %p(%d, %d)"
             "with respect to point (%d, %d)}", e, e->x, e->y, x, y);
 
-    entity_command(e, be);
+    entity_command(GLOBALS.game, e, be);
 }
 
 static void player_tick(Entity *player) {}
@@ -321,19 +321,19 @@ int game_curseminer_init(GameContext *game, int opt) {
 
     g_game->entity_types_c = g_skin_end;
 
-    be_place = entity_create_behaviour(be_place_f);
-    be_break = entity_create_behaviour(be_break_f);
-    be_move = entity_create_behaviour(be_move_f);
-    be_move_one = entity_create_behaviour(be_move_one_f);
-    be_stop = entity_create_behaviour(be_stop_f);
-    be_face_up = entity_create_behaviour(be_face_up_f);
-    be_face_down = entity_create_behaviour(be_face_down_f);
-    be_face_left = entity_create_behaviour(be_face_left_f);
-    be_face_right = entity_create_behaviour(be_face_right_f);
-    be_face_ul = entity_create_behaviour(be_face_ul_f);
-    be_face_ur = entity_create_behaviour(be_face_ur_f);
-    be_face_dl = entity_create_behaviour(be_face_dl_f);
-    be_face_dr = entity_create_behaviour(be_face_dr_f);
+    be_place = entity_create_behaviour(game, be_place_f);
+    be_break = entity_create_behaviour(game, be_break_f);
+    be_move = entity_create_behaviour(game, be_move_f);
+    be_move_one = entity_create_behaviour(game, be_move_one_f);
+    be_stop = entity_create_behaviour(game, be_stop_f);
+    be_face_up = entity_create_behaviour(game, be_face_up_f);
+    be_face_down = entity_create_behaviour(game, be_face_down_f);
+    be_face_left = entity_create_behaviour(game, be_face_left_f);
+    be_face_right = entity_create_behaviour(game, be_face_right_f);
+    be_face_ul = entity_create_behaviour(game, be_face_ul_f);
+    be_face_ur = entity_create_behaviour(game, be_face_ur_f);
+    be_face_dl = entity_create_behaviour(game, be_face_dl_f);
+    be_face_dr = entity_create_behaviour(game, be_face_dr_f);
 
     entity_create_controller(&g_player_controller, player_tick, player_path_find);
 
@@ -423,17 +423,17 @@ int game_curseminer_update() {
             else if (left)          be = be_face_left;
             else if (right)         be = be_face_right;
 
-            entity_command(player, be);
+            entity_command(g_game, player, be);
 
             if (!player->moving) {
                 if (g_player_crouching)
-                    entity_command(player, be_move_one);
+                    entity_command(g_game, player, be_move_one);
                 else 
-                    entity_command(player, be_move);
+                    entity_command(g_game, player, be_move);
             }
 
         } else if (player->moving || g_player_moving_keyup)
-            entity_command(player, be_stop);
+            entity_command(g_game, player, be_stop);
 
         g_player_moving_changed = false;
     }

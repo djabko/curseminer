@@ -11,13 +11,8 @@ EntityController DEFAULT_CONTROLLER;
 Entity* ENTITY_ARRAY = NULL;
 int MAX = 32;
 
-static int g_behaviour_free_spots = 0;
-static behaviour_t g_behaviour_count = 0;
-static behaviour_t g_behaviour_max = 0;
-static behaviour_func_t *g_behaviours;
-
-int entity_command(Entity *e, behaviour_t be) {
-    if (be <= 0 && g_behaviour_max <= be) return -1;
+int entity_command(GameContext *game, Entity *e, behaviour_t be) {
+    if (be <= 0 && game->behaviour_max <= be) return -1;
 
     return qu_enqueue(e->controller->behaviour_queue, be);
 }
@@ -27,55 +22,54 @@ static void set_entity_velocity(Entity *e, int vx, int vy) {
     e->vy = vy;
 }
 
-behaviour_t entity_create_behaviour(behaviour_func_t func) {
-    behaviour_t be;
+behaviour_t entity_create_behaviour(GameContext *game, behaviour_func_t func) { behaviour_t be;
 
-    if (0 < g_behaviour_free_spots) {
+    if (0 < game->behaviour_free_spots) {
 
-        for (be = 0; be < g_behaviour_count; be++) {
-            if (g_behaviours[be] == NULL) break;
+        for (be = 0; be < game->behaviour_c; be++) {
+            if (game->behaviours[be] == NULL) break;
         }
 
-        if (g_behaviour_max <= be) return -1;
+        if (game->behaviour_max <= be) return -1;
 
-    } else if (g_behaviour_count <= g_behaviour_max) {
+    } else if (game->behaviour_c <= game->behaviour_max) {
 
-        int old_behaviour_max = g_behaviour_max;
-        g_behaviour_max = 0 < g_behaviour_max ? 2 * g_behaviour_max : 8;
-        size_t new_size = g_behaviour_max * sizeof(behaviour_func_t);
+        int old_behaviour_max = game->behaviour_max;
+        game->behaviour_max = 0 < game->behaviour_max ? 2 * game->behaviour_max : 8;
+        size_t new_size = game->behaviour_max * sizeof(behaviour_func_t);
 
-        g_behaviours = realloc(g_behaviours, new_size);
+        game->behaviours = realloc(game->behaviours, new_size);
         log_debug("Allocated %zu bytes for ge_behaviours", new_size);
 
-        g_behaviour_free_spots += g_behaviour_max - old_behaviour_max;
+        game->behaviour_free_spots += game->behaviour_max - old_behaviour_max;
     }
 
-    g_behaviour_free_spots--;
-    g_behaviours[ g_behaviour_count ] = func;
+    game->behaviour_free_spots--;
+    game->behaviours[ game->behaviour_c ] = func;
 
-    return g_behaviour_count++;
+    return game->behaviour_c++;
 }
 
-void entity_process_behaviours(Entity *e) {
+void entity_process_behaviours(GameContext *game, Entity *e) {
     Queue64* qu = e->controller->behaviour_queue;
 
     if (qu_empty(qu)) return;
 
     behaviour_t be = (behaviour_t) qu_dequeue(qu);
 
-    g_behaviours[be](e);
+    game->behaviours[be](e);
 }
 
 int entity_clear_behaviours(Entity *e) {
     return qu_clear(e->controller->behaviour_queue);
 }
 
-int entity_remove_behaviour(behaviour_t be) {
-    if (g_behaviour_max <= be)
+int entity_remove_behaviour(GameContext *game, behaviour_t be) {
+    if (game->behaviour_max <= be)
         return -1;
 
-    g_behaviours[be] = NULL;
-    g_behaviour_free_spots++;
+    game->behaviours[be] = NULL;
+    game->behaviour_free_spots++;
 
     return 0;
 }
@@ -189,7 +183,7 @@ void entity_tick_abstract(GameContext *game, Entity* e) {
 
     e->controller->tick(e);
 
-    entity_process_behaviours(e);
+    entity_process_behaviours(game, e);
 
     if (e->moving && !e->moved)
         entity_advance_position(game, e);

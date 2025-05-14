@@ -216,7 +216,6 @@ int job_game_init_next(Task *tk, Stack64 *st) {
         i++;
     }
 
-    log_debug("Initializing game[%d] with %d %d %d %p %p %p", GLOBALS.games_qu->count, cfg->skins_max, cfg->entity_types_max, cfg->scroll_threshold, cfg->f_init, cfg->f_update, cfg->f_exit);
     GLOBALS.game = game_init(cfg, GLOBALS.world);
 
     tk_kill(tk);
@@ -269,6 +268,7 @@ GameContext *game_init(GameContextCFG *cfg, World *world) {
     game->skins = calloc(game->skins_max, sizeof(Skin));
     game->entity_types = calloc(game->entity_types_max, sizeof(EntityType));
     game->world = world;
+    game->behaviours = NULL;
 
     entity_init_default_controller();
 
@@ -282,6 +282,7 @@ GameContext *game_init(GameContextCFG *cfg, World *world) {
 void game_exit(GameContext *game) {
     game->f_exit();
     pq_clear(game->world->entities);
+    free(game->behaviours);
     free(game->cache_entity);
     free(game->cache_world);
     free(game->cache_dirty_flags);
