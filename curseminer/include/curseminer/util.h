@@ -33,4 +33,19 @@ double perlin_noise_1D(NoiseLattice *lattice, double x);
 double perlin_noise_2D(NoiseLattice *lattice, double x, double y);
 double perlin_noise_2D_var(NoiseLattice *lattice, double x, double y);
 
+/* Sprite Functions */
+#define SPRITE_MAX 256
+
+typedef struct Spritesheet {
+    char name[NAME_MAX];
+    void **frames;
+    int width, height, layers, stride;
+    milliseconds_t delay;
+} Spritesheet;
+
+
+Spritesheet *load_spritesheet_png(const char *path);
+Spritesheet *load_spritesheet_gif(const char *path);
+Spritesheet *load_spritesheet_raw(const char *path);
+
 #endif

@@ -9,6 +9,10 @@
 typedef unsigned char byte_t;
 
 /* Useful Macros */
+#ifndef NAME_MAX
+#define NAME_MAX 64
+#endif
+
 #ifdef __linux__
 #define PAGE_SIZE getpagesize()
 #else

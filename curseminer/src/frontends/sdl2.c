@@ -12,8 +12,8 @@
 #include "curseminer/frontends/sdl2.h"
 #include "curseminer/scheduler.h"
 #include "curseminer/widget.h"
+#include "curseminer/util.h"
 
-#define SPRITE_MAX 256
 #define REFRESH_RATE 20
 
 typedef const Uint32 bitmask_sdl;
@@ -34,10 +34,6 @@ typedef const Uint32 bitmask_sdl;
 #define MAGIC_GIF  "\x47\x49\x46\x38\x00"
 #define MAGIC_JPEG "\xff\xd8\xff\xe0\x00"
 
-#ifndef NAME_MAX
-#define NAME_MAX 64
-#endif
-
 typedef enum file_format_t {
     FILE_FORMAT_INVALID = -1,
     FILE_FORMAT_PNG,
@@ -55,168 +51,11 @@ static int g_sprite_size = 32;
 static int g_sprite_offset = 0;
 static void (*f_draw_tile)(Skin*, SDL_Rect*);
 
-typedef struct Spritesheet {
-    char name[NAME_MAX];
-    SDL_Texture **frames;
-    int width, height, layers, stride;
-    milliseconds_t delay;
-} Spritesheet;
-
-// Can be used for jpeg too
-typedef struct PNG {
-    char *name;
-    void *data;
-    int width, height, stride;
-} PNG;
-
-typedef struct GIF {
-    char *name;
-    void *data;
-    int width, height, layers, stride;
-    int *delays;
-} GIF;
-
-GIF *g_gif = NULL;
 static SDL_Texture *g_canvas;
 static Spritesheet *g_spritesheet;
 
 static void assert_SDL(bool condition, const char *msg) {
     assert_log(condition, "%s\nSDL2 Error: '%s'", msg, SDL_GetError());
-}
-
-static file_format_t check_file_format(const char *path) {
-    bool exists = 0 == access(path, R_OK);
-
-    if (exists) {
-        FILE *f = fopen(path, "rb");
-
-        static byte_t buf[] = {0, 0, 0, 0, 0};
-
-        fread(buf, 1, 4, f);
-
-        if      (0 == memcmp(buf, MAGIC_PNG,  4)) return FILE_FORMAT_PNG;
-        else if (0 == memcmp(buf, MAGIC_GIF,  4)) return FILE_FORMAT_GIF;
-        else if (0 == memcmp(buf, MAGIC_JPEG, 4)) return FILE_FORMAT_JPEG;
-    }
-    
-    return FILE_FORMAT_INVALID;
-}
-
-static void load_gif(char *filename, GIF *gif) {
-    size_t size;
-    FILE *f = fopen(filename, "rb");
-
-    fseek(f, 0, SEEK_END);
-    size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    assert_log(0 < size, "Error: File '%s' is empty", filename);
-
-    void *buf = malloc(size);
-
-    size_t r = fread(buf, 1, size, f);
-
-    assert_log(r == size,
-            "Error: Failed to read file '%s', %lu bytes returned", filename, r);
-
-    gif->name = filename;
-    gif->data = stbi_load_gif_from_memory(buf, size, &gif->delays,
-            &gif->width, &gif->height, &gif->layers, &gif->stride, 0);
-
-    assert_log(gif->data, "Error: Failed to load '%s' as GIF", filename);
-
-    free(buf);
-}
-
-static Spritesheet *spritesheet_alloc(char *name, int width, int height, int layers,
-        int stride, milliseconds_t delay) {
-
-    const size_t alloc_size =
-        sizeof(Spritesheet) + layers * sizeof(SDL_Texture*);
-
-    Spritesheet *sp = calloc(alloc_size, 1);
-
-    assert_log(sp != NULL,
-            "Error: failed to allocate %lu for spritesheet '%s'",
-            alloc_size, name);
-
-    strncpy(sp->name, name, NAME_MAX);
-    sp->frames = (SDL_Texture**) (sp + 1);
-    sp->width = width;
-    sp->height = height;
-    sp->layers = layers;
-    sp->stride = stride;
-    sp->delay = delay;
-
-    return sp;
-}
-
-static SDL_Texture *spritesheet_init_frame(Spritesheet *sp, void *img_data,
-        SDL_Renderer* renderer, int stride, int pitch) {
-
-    SDL_Surface *surface = SDL_CreateRGBSurfaceFrom(
-            img_data, sp->width, sp->height,
-            stride * 8, pitch, g_bmr, g_bmg, g_bmb, g_bma);
-
-    SDL_Texture *frame = SDL_CreateTextureFromSurface(renderer, surface);
-
-    SDL_FreeSurface(surface);
-
-    assert_SDL(frame != NULL, "Failed to initialize SDL_Texture");
-
-    return frame;
-}
-
-static Spritesheet *spritesheet_from_png(PNG *png, SDL_Renderer *renderer) {
-    const int pitch = png->width * png->stride;
-    const int layers = 1;
-
-    Spritesheet *sp = spritesheet_alloc(
-            png->name, png->width, png->height, layers, png->stride, 0);
-
-    sp->frames[0] = spritesheet_init_frame(
-            sp, png->data, renderer, png->stride, pitch);
-
-    return sp;
-}
-
-static Spritesheet *spritesheet_from_gif(GIF *gif, SDL_Renderer *renderer) {
-    const int pitch = gif->width * gif->stride;
-
-    Spritesheet *sp = spritesheet_alloc(
-            gif->name, gif->width, gif->height, gif->layers, gif->stride,
-            gif->delays[0]);
-
-    void *data = gif->data;
-
-    for (int i = 0; i < gif->layers; i++) {
-        sp->frames[i] = spritesheet_init_frame(
-                sp, data, renderer, gif->stride, pitch);
-
-        data += gif->width * gif->height * gif->stride;
-    }
-
-    return sp;
-}
-
-// Make sure to free Spritesheet after use
-static Spritesheet *load_spritesheet_from_file(SDL_Renderer *renderer, char *path) {
-    Spritesheet *ss = NULL;
-    file_format_t ff = check_file_format(path);
-
-    if (ff == FILE_FORMAT_PNG || ff == FILE_FORMAT_JPEG) {
-        PNG png;
-        png.name = path;
-        png.data = stbi_load(path, &png.width, &png.height, &png.stride, 0);
-        ss = spritesheet_from_png(&png, renderer);
-
-    } else if (ff == FILE_FORMAT_GIF) {
-        GIF gif;
-        load_gif(path, &gif);
-        ss = spritesheet_from_gif(&gif, renderer);
-    }
-
-    return ss;
 }
 
 static void recalculate_tile_size(int size) {
